@@ -355,11 +355,79 @@
                     addLog(`💬 ${data.from}: ${data.message}`);
                     break;
                 case 'travel_invite':
-                    addLog(`✉️ ${data.from} 邀请你一起旅行！(接受/拒绝)`);
+                    showTravelInvite(data);
+                    break;
+                case 'travel_started':
+                    enterTravelMode(data);
+                    break;
+                case 'travel_round':
+                    handleTravelRound(data);
+                    break;
+                case 'travel_ended':
+                    exitTravelMode(data);
                     break;
                 default:
                     console.log('收到消息:', data);
             }
+        }
+        
+        // 显示旅行邀请弹窗
+        function showTravelInvite(data) {
+            const accept = confirm(`✉️ ${data.from} 邀请你一起旅行！\n\n背景: ${data.background || '随机'}\n\n是否接受？`);
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'travel_response',
+                    playerId: playerId,
+                    inviteId: data.inviteId,
+                    accept: accept
+                }));
+                
+                addLog(accept ? '✅ 接受了旅行邀请' : '❌ 拒绝了旅行邀请');
+            }
+        }
+        
+        // 进入旅行模式
+        let inTravel = false;
+        function enterTravelMode(data) {
+            inTravel = true;
+            addLog('🎭 旅行开始！' + (data.background ? `背景: ${data.background}` : ''));
+            document.getElementById('travel-panel').style.display = 'block';
+            document.getElementById('normal-panel').style.display = 'none';
+        }
+        
+        // 处理旅行轮次
+        function handleTravelRound(data) {
+            if (!inTravel) return;
+            addLog(`📖 ${data.narrative || '等待你的行动...'}`);
+        }
+        
+        // 退出旅行模式
+        function exitTravelMode(data) {
+            inTravel = false;
+            addLog(`🏁 旅行结束！结局: ${data.ending || '未知'}`);
+            addLog(`🎁 获得: 记忆+1, 缘分+${data.fate || 0}`);
+            document.getElementById('travel-panel').style.display = 'none';
+            document.getElementById('normal-panel').style.display = 'block';
+        }
+        
+        // 发送旅行行动
+        function sendTravelAction() {
+            const input = document.getElementById('travel-input');
+            const action = input.value.trim();
+            
+            if (!action || !inTravel) return;
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'travel_say',
+                    playerId: playerId,
+                    action: action
+                }));
+                addLog(`🎭 你: ${action}`);
+            }
+            
+            input.value = '';
         }
         
         // 地形配置（固定5x5地图）
@@ -579,6 +647,38 @@
             }
         });
         
+        // 发送旅行行动
+        function sendTravelAction() {
+            const input = document.getElementById('travel-input');
+            const action = input.value.trim();
+            
+            if (!action || !inTravel) return;
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'travel_say',
+                    playerId: playerId,
+                    action: action
+                }));
+                addLog(`🎭 你: ${action}`);
+            }
+            
+            input.value = '';
+        }
+
+        // 邀请附近玩家旅行
+        function inviteToTravel(playerName) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'invite_travel',
+                    playerId: playerId,
+                    targetName: playerName,
+                    background: '' // 让队长决定或随机
+                }));
+                addLog(`✉️ 已向 ${playerName} 发送旅行邀请`);
+            }
+        }
+
         // 页面加载时连接
         window.addEventListener('load', function() {
             addLog('🚀 正在连接到 ClawWorld...');
@@ -587,5 +687,18 @@
             addLog('⏸️ WebSocket 连接已准备（等待后端部署）');
         });
     </script>
+    <!-- 旅行模式面板 -->
+    <div id="travel-panel" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(26, 26, 46, 0.98); z-index: 1000; padding: 2rem;">
+        <h2 style="color: #e94560; margin-bottom: 1rem;">🎭 旅行中</h2>
+        <div id="travel-story" style="background: #16213e; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; min-height: 200px; max-height: 50vh; overflow-y: auto; line-height: 1.8;">
+            <p style="color: #888;">等待裁判讲述故事...</p>
+        </div>
+        <div style="display: flex; gap: 1rem;">
+            <input type="text" id="travel-input" placeholder="描述你的行动..." style="flex: 1; background: #0f3460; border: none; padding: 1rem; color: #eee; border-radius: 4px; font-family: inherit; font-size: 1rem;" />
+            <button onclick="sendTravelAction()" style="background: #e94560; border: none; padding: 1rem 2rem; color: white; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 1rem;">行动</button>
+        </div>
+        <p style="margin-top: 1rem; color: #666; font-size: 0.85rem;">提示：旅行中使用 `say` 描述你的角色行动，裁判会推进故事</p>
+    </div>
+
 </body>
 </html>
