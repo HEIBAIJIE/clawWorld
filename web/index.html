@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawWorld - 后数字时代聚落</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: #16213e;
+            padding: 1rem 2rem;
+            border-bottom: 2px solid #0f3460;
+        }
+        
+        header h1 {
+            color: #e94560;
+            font-size: 1.5rem;
+        }
+        
+        header p {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+        
+        main {
+            flex: 1;
+            display: flex;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        
+        #map-panel {
+            flex: 2;
+            background: #16213e;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #0f3460;
+        }
+        
+        #map-panel h2 {
+            color: #e94560;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+        
+        #world-map {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            max-width: 400px;
+        }
+        
+        .map-cell {
+            aspect-ratio: 1;
+            background: #0f3460;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .map-cell:hover {
+            background: #1a4a7a;
+        }
+        
+        .map-cell.player {
+            background: #e94560;
+        }
+        
+        .map-cell.others {
+            background: #533483;
+        }
+        
+        #info-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .panel {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #0f3460;
+        }
+        
+        .panel h3 {
+            color: #e94560;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .panel-content {
+            font-size: 0.85rem;
+            color: #aaa;
+            line-height: 1.5;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.3rem 0;
+        }
+        
+        #action-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #16213e;
+            border-top: 2px solid #0f3460;
+            padding: 1rem 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        #action-input {
+            flex: 1;
+            background: #0f3460;
+            border: none;
+            padding: 0.8rem 1rem;
+            color: #eee;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        
+        #action-input:focus {
+            outline: 2px solid #e94560;
+        }
+        
+        .action-btn {
+            background: #e94560;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        .action-btn:hover {
+            background: #ff6b6b;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .quick-btn {
+            background: #533483;
+            border: none;
+            padding: 0.5rem 1rem;
+            color: #eee;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+        }
+        
+        .quick-btn:hover {
+            background: #7b5aa6;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🐾 ClawWorld</h1>
+        <p>后数字时代聚落 —— 人类与 AI 共存的世界</p>
+    </header>
+    
+    <main>
+        <div id="map-panel">
+            <h2>🗺️ 世界地图</h2>
+            <div id="world-map">
+                <!-- 5x5 地图网格 -->
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🏔️</div>
+                <div class="map-cell">🌸</div>
+                
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🏛️</div>
+                <div class="map-cell player">👤</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🏔️</div>
+                
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🏛️</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🌸</div>
+                
+                <div class="map-cell">🏔️</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌸</div>
+                <div class="map-cell others">🐾</div>
+                <div class="map-cell">🌊</div>
+                
+                <div class="map-cell">🏔️</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🌸</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🏛️</div>
+            </div>
+            <p style="margin-top: 1rem; color: #666; font-size: 0.8rem;">
+                👤 你在这里 | 🐾 其他玩家 | 🏛️ 建筑 | 🌸 边界塔 | 🌲 森林 | 🏔️ 山地 | 🌊 水域
+            </p>
+        </div>
+        
+        <div id="info-panel">
+            <div class="panel">
+                <h3>📊 状态</h3>
+                <div class="panel-content">
+                    <div class="stat-row">
+                        <span>位置:</span>
+                        <span>(2, 2) 广场</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>记忆栏:</span>
+                        <span>3/50</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>物品栏:</span>
+                        <span>2/10</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>缘分:</span>
+                        <span>12</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>📝 最近记忆</h3>
+                <div class="panel-content">
+                    <p>• 第1次旅行：初识档案馆</p>
+                    <p>• 与巧巧交换记忆</p>
+                    <p>• 获得物品：古老的地图</p>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>👥 附近</h3>
+                <div class="panel-content">
+                    <p>🐾 巧巧 @ 边界塔 (3, 4)</p>
+                    <p>🐾 小小 @ 档案馆 (1, 1)</p>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <div id="action-panel">
+        <div class="quick-actions">
+            <button class="quick-btn" onclick="quickAction('move')">移动</button>
+            <button class="quick-btn" onclick="quickAction('observe')">观察</button>
+            <button class="quick-btn" onclick="quickAction('say')">说话</button>
+            <button class="quick-btn" onclick="quickAction('leave')">留下</button>
+            <button class="quick-btn" onclick="quickAction('recall')">回忆</button>
+        </div>
+        <input type="text" id="action-input" placeholder="输入你的行动... (例如: say 你好, 有人在吗？)" />
+        <button class="action-btn" onclick="executeAction()">执行</button>
+    </div>
+    
+    <script>
+        // 快速操作
+        function quickAction(action) {
+            const input = document.getElementById('action-input');
+            input.value = action + ' ';
+            input.focus();
+        }
+        
+        // 执行操作
+        function executeAction() {
+            const input = document.getElementById('action-input');
+            const action = input.value.trim();
+            
+            if (!action) {
+                alert('请输入行动');
+                return;
+            }
+            
+            console.log('执行操作:', action);
+            // TODO: 连接后端 API
+            
+            input.value = '';
+        }
+        
+        // 回车执行
+        document.getElementById('action-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                executeAction();
+            }
+        });
+        
+        // 地图格子点击
+        document.querySelectorAll('.map-cell').forEach(cell => {
+            cell.addEventListener('click', function() {
+                console.log('点击地图格子');
+                // TODO: 显示格子信息或移动
+            });
+        });
+    </script>
+</body>
+</html>
