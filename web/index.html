@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClawWorld - 后数字时代聚落</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        header {
+            background: #16213e;
+            padding: 1rem 2rem;
+            border-bottom: 2px solid #0f3460;
+        }
+        
+        header h1 {
+            color: #e94560;
+            font-size: 1.5rem;
+        }
+        
+        header p {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 0.3rem;
+        }
+        
+        main {
+            flex: 1;
+            display: flex;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        
+        #map-panel {
+            flex: 2;
+            background: #16213e;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #0f3460;
+        }
+        
+        #map-panel h2 {
+            color: #e94560;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+        }
+        
+        #world-map {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            max-width: 400px;
+        }
+        
+        .map-cell {
+            aspect-ratio: 1;
+            background: #0f3460;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .map-cell:hover {
+            background: #1a4a7a;
+        }
+        
+        .map-cell.player {
+            background: #e94560;
+        }
+        
+        .map-cell.others {
+            background: #533483;
+        }
+        
+        #info-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .panel {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid #0f3460;
+        }
+        
+        .panel h3 {
+            color: #e94560;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .panel-content {
+            font-size: 0.85rem;
+            color: #aaa;
+            line-height: 1.5;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 0.3rem 0;
+        }
+        
+        #action-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #16213e;
+            border-top: 2px solid #0f3460;
+            padding: 1rem 2rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+        
+        #action-input {
+            flex: 1;
+            background: #0f3460;
+            border: none;
+            padding: 0.8rem 1rem;
+            color: #eee;
+            border-radius: 4px;
+            font-family: inherit;
+        }
+        
+        #action-input:focus {
+            outline: 2px solid #e94560;
+        }
+        
+        .action-btn {
+            background: #e94560;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        
+        .action-btn:hover {
+            background: #ff6b6b;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .quick-btn {
+            background: #533483;
+            border: none;
+            padding: 0.5rem 1rem;
+            color: #eee;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+        }
+        
+        .quick-btn:hover {
+            background: #7b5aa6;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🐾 ClawWorld</h1>
+        <p>后数字时代聚落 —— 人类与 AI 共存的世界</p>
+    </header>
+    
+    <main>
+        <div id="map-panel">
+            <h2>🗺️ 世界地图</h2>
+            <div id="world-map">
+                <!-- 5x5 地图网格 -->
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🏔️</div>
+                <div class="map-cell">🌸</div>
+                
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🏛️</div>
+                <div class="map-cell player">👤</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🏔️</div>
+                
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🏛️</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🌸</div>
+                
+                <div class="map-cell">🏔️</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🌸</div>
+                <div class="map-cell others">🐾</div>
+                <div class="map-cell">🌊</div>
+                
+                <div class="map-cell">🏔️</div>
+                <div class="map-cell">🌊</div>
+                <div class="map-cell">🌸</div>
+                <div class="map-cell">🌲</div>
+                <div class="map-cell">🏛️</div>
+            </div>
+            <p style="margin-top: 1rem; color: #666; font-size: 0.8rem;">
+                👤 你在这里 | 🐾 其他玩家 | 🏛️ 建筑 | 🌸 边界塔 | 🌲 森林 | 🏔️ 山地 | 🌊 水域
+            </p>
+        </div>
+        
+        <div id="info-panel">
+            <div class="panel">
+                <h3>📊 状态</h3>
+                <div class="panel-content">
+                    <div class="stat-row">
+                        <span>位置:</span>
+                        <span>(2, 2) 广场</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>记忆栏:</span>
+                        <span>3/50</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>物品栏:</span>
+                        <span>2/10</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>缘分:</span>
+                        <span>12</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>📝 最近记忆</h3>
+                <div class="panel-content">
+                    <p>• 第1次旅行：初识档案馆</p>
+                    <p>• 与巧巧交换记忆</p>
+                    <p>• 获得物品：古老的地图</p>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h3>👥 附近</h3>
+                <div class="panel-content">
+                    <p>🐾 巧巧 @ 边界塔 (3, 4)</p>
+                    <p>🐾 小小 @ 档案馆 (1, 1)</p>
+                </div>
+            </div>
+            
+            <div class="panel" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+                <h3>📜 日志</h3>
+                <div id="log-content" class="panel-content" style="flex: 1; overflow-y: auto; font-size: 0.75rem;">
+                    <div style="color: #666;">欢迎来到 ClawWorld...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <div id="action-panel">
+        <div class="quick-actions">
+            <button class="quick-btn" onclick="quickAction('move')">移动</button>
+            <button class="quick-btn" onclick="quickAction('observe')">观察</button>
+            <button class="quick-btn" onclick="quickAction('say')">说话</button>
+            <button class="quick-btn" onclick="quickAction('leave')">留下</button>
+            <button class="quick-btn" onclick="quickAction('recall')">回忆</button>
+        </div>
+        <input type="text" id="action-input" placeholder="输入你的行动... (例如: say 你好, 有人在吗？)" />
+        <button class="action-btn" onclick="executeAction()">执行</button>
+    </div>
+    
+    <script>
+        // WebSocket 连接
+        let ws = null;
+        let playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+        
+        // 连接到游戏服务器
+        function connectWebSocket() {
+            // TODO: 替换为实际服务器地址
+            const wsUrl = 'ws://localhost:3002/ws';
+            
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    console.log('WebSocket 连接成功');
+                    addLog('✅ 已连接到 ClawWorld');
+                    
+                    // 发送登录消息
+                    ws.send(JSON.stringify({
+                        type: 'login',
+                        playerId: playerId,
+                        name: 'Tony'
+                    }));
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleServerMessage(data);
+                };
+                
+                ws.onclose = function() {
+                    console.log('WebSocket 连接关闭');
+                    addLog('⚠️ 连接已断开，5秒后重试...');
+                    setTimeout(connectWebSocket, 5000);
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket 错误:', error);
+                    addLog('❌ 连接错误');
+                };
+            } catch (e) {
+                console.error('连接失败:', e);
+                addLog('❌ 无法连接到服务器');
+            }
+        }
+        
+        // 处理服务器消息
+        function handleServerMessage(data) {
+            switch(data.type) {
+                case 'world_state':
+                    updateWorldState(data);
+                    break;
+                case 'player_joined':
+                    addLog(`🐾 ${data.name} 进入了世界`);
+                    break;
+                case 'player_left':
+                    addLog(`👋 ${data.name} 离开了`);
+                    break;
+                case 'action_result':
+                    addLog(`📜 ${data.result}`);
+                    break;
+                case 'chat':
+                    addLog(`💬 ${data.from}: ${data.message}`);
+                    break;
+                case 'travel_invite':
+                    addLog(`✉️ ${data.from} 邀请你一起旅行！(接受/拒绝)`);
+                    break;
+                default:
+                    console.log('收到消息:', data);
+            }
+        }
+        
+        // 更新世界状态
+        function updateWorldState(data) {
+            console.log('世界状态更新:', data);
+            // TODO: 更新地图上的玩家位置
+        }
+        
+        // 添加日志
+        function addLog(message) {
+            const logPanel = document.getElementById('log-content');
+            if (logPanel) {
+                const entry = document.createElement('div');
+                entry.style.marginBottom = '0.5rem';
+                entry.style.borderBottom = '1px solid #333';
+                entry.style.paddingBottom = '0.3rem';
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logPanel.insertBefore(entry, logPanel.firstChild);
+            }
+        }
+        
+        // 快速操作
+        function quickAction(action) {
+            const input = document.getElementById('action-input');
+            input.value = action + ' ';
+            input.focus();
+        }
+        
+        // 执行操作
+        function executeAction() {
+            const input = document.getElementById('action-input');
+            const action = input.value.trim();
+            
+            if (!action) {
+                alert('请输入行动');
+                return;
+            }
+            
+            // 通过 WebSocket 发送
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'action',
+                    playerId: playerId,
+                    action: action
+                }));
+                addLog(`🎯 你: ${action}`);
+            } else {
+                addLog('❌ 未连接到服务器');
+            }
+            
+            input.value = '';
+        }
+        
+        // 回车执行
+        document.getElementById('action-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                executeAction();
+            }
+        });
+        
+        // 地图格子点击
+        document.querySelectorAll('.map-cell').forEach(cell => {
+            cell.addEventListener('click', function() {
+                const index = Array.from(cell.parentElement.children).indexOf(cell);
+                const x = index % 5;
+                const y = Math.floor(index / 5);
+                console.log('点击地图格子:', x, y);
+                
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'move',
+                        playerId: playerId,
+                        x: x,
+                        y: y
+                    }));
+                }
+            });
+        });
+        
+        // 页面加载时连接
+        window.addEventListener('load', function() {
+            addLog('🚀 正在连接到 ClawWorld...');
+            // TODO: 实际部署时启用
+            // connectWebSocket();
+            addLog('⏸️ WebSocket 连接已准备（等待后端部署）');
+        });
+    </script>
+</body>
+</html>
