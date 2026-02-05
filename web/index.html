@@ -362,11 +362,170 @@
             }
         }
         
+        // 地形配置（固定5x5地图）
+        const TERRAIN = [
+            ['🌲', '🌲', '🌲', '🏔️', '🌸'],
+            ['🌲', '🏛️', '⬜', '🌊', '🏔️'],
+            ['🌲', '🌊', '🏛️', '🌊', '🌸'],
+            ['🏔️', '🌲', '🌸', '⬜', '🌊'],
+            ['🏔️', '🌊', '🌸', '🌲', '🏛️']
+        ];
+        
+        const TERRAIN_NAMES = {
+            '🌲': '森林', '🏔️': '山地', '🌊': '水域', 
+            '🏛️': '建筑', '🌸': '边界塔', '⬜': '广场'
+        };
+        
+        // 玩家位置
+        let myPosition = { x: 2, y: 1 }; // 初始位置
+        let otherPlayers = {}; // 其他玩家位置
+        
         // 更新世界状态
         function updateWorldState(data) {
             console.log('世界状态更新:', data);
-            // TODO: 更新地图上的玩家位置
+            
+            // 更新玩家位置
+            if (data.players) {
+                otherPlayers = {};
+                data.players.forEach(player => {
+                    if (player.id === playerId) {
+                        myPosition = { x: player.x, y: player.y };
+                        updateStatusPanel(player);
+                    } else {
+                        otherPlayers[player.id] = player;
+                    }
+                });
+            }
+            
+            // 重新渲染地图
+            renderMap();
+            
+            // 更新附近玩家列表
+            updateNearbyPlayers();
         }
+        
+        // 渲染地图
+        function renderMap() {
+            const mapContainer = document.getElementById('world-map');
+            mapContainer.innerHTML = '';
+            
+            for (let y = 0; y < 5; y++) {
+                for (let x = 0; x < 5; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'map-cell';
+                    
+                    // 检查是否有玩家在这里
+                    let content = TERRAIN[y][x];
+                    let hasPlayer = false;
+                    
+                    // 检查自己
+                    if (myPosition.x === x && myPosition.y === y) {
+                        content = '👤';
+                        cell.classList.add('player');
+                        hasPlayer = true;
+                    } else {
+                        // 检查其他玩家
+                        for (let pid in otherPlayers) {
+                            const p = otherPlayers[pid];
+                            if (p.x === x && p.y === y) {
+                                content = '🐾';
+                                cell.classList.add('others');
+                                hasPlayer = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    cell.textContent = content;
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    cell.dataset.terrain = TERRAIN_NAMES[TERRAIN[y][x]];
+                    
+                    cell.addEventListener('click', function() {
+                        const tx = parseInt(this.dataset.x);
+                        const ty = parseInt(this.dataset.y);
+                        
+                        // 检查是否是相邻格子
+                        const dx = Math.abs(tx - myPosition.x);
+                        const dy = Math.abs(ty - myPosition.y);
+                        
+                        if (dx + dy === 1) {
+                            // 相邻，发送移动指令
+                            if (ws && ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify({
+                                    type: 'move',
+                                    playerId: playerId,
+                                    x: tx,
+                                    y: ty
+                                }));
+                                addLog(`🚶 向 ${TERRAIN_NAMES[TERRAIN[ty][tx]]} 移动...`);
+                            }
+                        } else if (dx === 0 && dy === 0) {
+                            addLog('📍 你在这里');
+                        } else {
+                            addLog('❌ 只能移动到相邻格子');
+                        }
+                    });
+                    
+                    mapContainer.appendChild(cell);
+                }
+            }
+        }
+        
+        // 更新状态面板
+        function updateStatusPanel(player) {
+            const statRows = document.querySelectorAll('.stat-row');
+            if (statRows[0]) {
+                const terrain = TERRAIN[player.y][player.x];
+                statRows[0].querySelector('span:last-child').textContent = 
+                    `(${player.x}, ${player.y}) ${TERRAIN_NAMES[terrain]}`;
+            }
+            if (statRows[1]) {
+                statRows[1].querySelector('span:last-child').textContent = 
+                    `${player.memoryCount || 0}/50`;
+            }
+            if (statRows[2]) {
+                statRows[2].querySelector('span:last-child').textContent = 
+                    `${player.inventoryCount || 0}/10`;
+            }
+            if (statRows[3]) {
+                statRows[3].querySelector('span:last-child').textContent = 
+                    `${player.fate || 0}`;
+            }
+        }
+        
+        // 更新附近玩家列表
+        function updateNearbyPlayers() {
+            const nearbyPanel = document.querySelector('.panel:nth-child(3) .panel-content');
+            if (!nearbyPanel) return;
+            
+            let html = '';
+            let nearbyCount = 0;
+            
+            for (let pid in otherPlayers) {
+                const p = otherPlayers[pid];
+                const distance = Math.abs(p.x - myPosition.x) + Math.abs(p.y - myPosition.y);
+                
+                if (distance <= 2) { // 2格范围内算附近
+                    const terrain = TERRAIN[p.y][p.x];
+                    html += `<p>🐾 ${p.name || '未知玩家'} @ ${TERRAIN_NAMES[terrain]} (${p.x}, ${p.y})`;
+                    if (distance <= 1) {
+                        html += ' [可交互]';
+                    }
+                    html += '</p>';
+                    nearbyCount++;
+                }
+            }
+            
+            if (nearbyCount === 0) {
+                html = '<p style="color: #666;">附近没有玩家...</p>';
+            }
+            
+            nearbyPanel.innerHTML = html;
+        }
+        
+        // 初始化地图
+        renderMap();
         
         // 添加日志
         function addLog(message) {
@@ -418,25 +577,6 @@
             if (e.key === 'Enter') {
                 executeAction();
             }
-        });
-        
-        // 地图格子点击
-        document.querySelectorAll('.map-cell').forEach(cell => {
-            cell.addEventListener('click', function() {
-                const index = Array.from(cell.parentElement.children).indexOf(cell);
-                const x = index % 5;
-                const y = Math.floor(index / 5);
-                console.log('点击地图格子:', x, y);
-                
-                if (ws && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        type: 'move',
-                        playerId: playerId,
-                        x: x,
-                        y: y
-                    }));
-                }
-            });
         });
         
         // 页面加载时连接
