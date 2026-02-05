@@ -2,7 +2,8 @@ const fastify = require('fastify')({ logger: true });
 const cors = require('@fastify/cors');
 require('dotenv').config();
 
-const { getOnlinePlayers, setPlayerOnline } = require('./redis');
+const { getOnlinePlayers, setPlayerOnline, redis } = require('./redis');
+const { getTerrainInfo, canMoveTo, WORLD_SIZE } = require('./world');
 
 // Register CORS
 fastify.register(cors, {
@@ -32,12 +33,77 @@ fastify.get('/world/state', async (request, reply) => {
 // Player position endpoint
 fastify.get('/player/:id/position', async (request, reply) => {
   const { id } = request.params;
-  // TODO: fetch from database
+  const status = await redis.hgetall(`player:${id}`);
+  const x = parseInt(status.x) || 0;
+  const y = parseInt(status.y) || 0;
+  const terrain = getTerrainInfo(x, y);
+  
   return {
     playerId: id,
-    x: 0,
-    y: 0,
-    terrain: 'plains'
+    x,
+    y,
+    terrain: terrain.type,
+    terrainName: terrain.name,
+    terrainDescription: terrain.description
+  };
+});
+
+// Player move endpoint
+fastify.post('/player/:id/move', async (request, reply) => {
+  const { id } = request.params;
+  const { direction } = request.body;
+  
+  // Get current position
+  const status = await redis.hgetall(`player:${id}`);
+  let x = parseInt(status.x) || 0;
+  let y = parseInt(status.y) || 0;
+  
+  // Calculate new position
+  let newX = x, newY = y;
+  switch(direction) {
+    case 'north': newY = y - 1; break;
+    case 'south': newY = y + 1; break;
+    case 'east': newX = x + 1; break;
+    case 'west': newX = x - 1; break;
+    default:
+      return reply.code(400).send({ error: 'Invalid direction' });
+  }
+  
+  // Check if can move
+  if (!canMoveTo(newX, newY)) {
+    return reply.code(400).send({ 
+      error: 'Cannot move there',
+      terrain: getTerrainInfo(newX, newY)
+    });
+  }
+  
+  // Update position
+  await redis.hset(`player:${id}`, 'x', newX, 'y', newY);
+  const terrain = getTerrainInfo(newX, newY);
+  
+  return {
+    playerId: id,
+    from: { x, y },
+    to: { x: newX, y: newY },
+    direction,
+    terrain: terrain.type,
+    terrainName: terrain.name
+  };
+});
+
+// Get terrain at position
+fastify.get('/world/terrain/:x/:y', async (request, reply) => {
+  const x = parseInt(request.params.x);
+  const y = parseInt(request.params.y);
+  
+  if (isNaN(x) || isNaN(y) || x < 0 || x >= WORLD_SIZE || y < 0 || y >= WORLD_SIZE) {
+    return reply.code(400).send({ error: 'Invalid coordinates' });
+  }
+  
+  const terrain = getTerrainInfo(x, y);
+  return {
+    x, y,
+    ...terrain
   };
 });
 
