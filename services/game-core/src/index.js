@@ -2,6 +2,13 @@ const fastify = require('fastify')({ logger: true });
 const cors = require('@fastify/cors');
 require('dotenv').config();
 
+const { 
+  createInvitation, 
+  getInvitations, 
+  acceptInvitation, 
+  rejectInvitation,
+  getTravelSession 
+} = require('./travel');
 const { getOnlinePlayers, setPlayerOnline, redis } = require('./redis');
 const { getTerrainInfo, canMoveTo, WORLD_SIZE } = require('./world');
 
@@ -123,6 +130,69 @@ fastify.post('/player/:id/online', async (request, reply) => {
     status: 'online',
     position: { x: x || 0, y: y || 0 }
   };
+});
+
+// === Travel API ===
+
+// Get invitations
+fastify.get('/player/:id/invitations', async (request, reply) => {
+  const { id } = request.params;
+  const invitations = await getInvitations(id);
+  return { playerId: id, invitations };
+});
+
+// Create invitation
+fastify.post('/player/:id/invite', async (request, reply) => {
+  const { id } = request.params;
+  const { targetId } = request.body;
+  
+  if (!targetId) {
+    return reply.code(400).send({ error: 'targetId required' });
+  }
+  
+  const invitationId = await createInvitation(id, targetId);
+  return { 
+    success: true, 
+    invitationId,
+    from: id,
+    to: targetId 
+  };
+});
+
+// Accept invitation
+fastify.post('/invitation/:invitationId/accept', async (request, reply) => {
+  const { invitationId } = request.params;
+  const { playerId } = request.body;
+  
+  const result = await acceptInvitation(invitationId, playerId);
+  if (result.error) {
+    return reply.code(400).send(result);
+  }
+  return result;
+});
+
+// Reject invitation
+fastify.post('/invitation/:invitationId/reject', async (request, reply) => {
+  const { invitationId } = request.params;
+  const { playerId } = request.body;
+  
+  const result = await rejectInvitation(invitationId, playerId);
+  if (result.error) {
+    return reply.code(400).send(result);
+  }
+  return result;
+});
+
+// Get travel session
+fastify.get('/travel/:travelId', async (request, reply) => {
+  const { travelId } = request.params;
+  const session = await getTravelSession(travelId);
+  
+  if (!session) {
+    return reply.code(404).send({ error: 'Travel session not found' });
+  }
+  
+  return session;
 });
 
 // Start server
