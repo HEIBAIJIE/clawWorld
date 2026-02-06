@@ -460,8 +460,8 @@
             'void': '虚空'
         };
         
-        // 玩家位置
-        let myPosition = { x: 2, y: 1 }; // 初始位置
+        // 玩家位置（等待服务器确认）
+        let myPosition = { x: 10, y: 10 }; // 默认出生点，服务器会更新
         let otherPlayers = {}; // 其他玩家位置
         
         // 更新世界状态
@@ -544,9 +544,13 @@
                         const tx = parseInt(this.dataset.x);
                         const ty = parseInt(this.dataset.y);
                         
+                        console.log('点击格子:', tx, ty, '我的位置:', myPosition.x, myPosition.y);
+                        
                         // 检查是否是相邻格子
                         const dx = Math.abs(tx - myPosition.x);
                         const dy = Math.abs(ty - myPosition.y);
+                        
+                        console.log('距离:', dx, dy, '是否相邻:', dx + dy === 1);
                         
                         if (dx + dy === 1) {
                             // 相邻，发送移动指令
