@@ -2,7 +2,7 @@
 const WebSocket = require('ws');
 const { getOnlinePlayers, setPlayerOnline, setPlayerOffline, redis, addMemory, getMemories } = require('./redis-mem');
 const { getTerrainInfo, canMoveTo, WORLD_SIZE, TERRAIN_MAP } = require('./world');
-const { createInvitation, acceptInvitation, rejectInvitation, getTravelSession } = require('./travel');
+const { createInvitation, acceptInvitation, rejectInvitation, getTravelSession, recordPlayerAction, getNarrativeHistory } = require('./travel');
 
 // 存储所有 WebSocket 连接
 const connections = new Map();
@@ -84,6 +84,9 @@ async function handleMessage(ws, data, getPlayerId, setPlayerId) {
       break;
     case 'travel_response':
       await handleTravelResponse(ws, data, getPlayerId());
+      break;
+    case 'travel_say':
+      await handleTravelSay(ws, data, getPlayerId());
       break;
     case 'ping':
       sendToWs(ws, { type: 'pong', timestamp: Date.now() });
@@ -521,6 +524,54 @@ async function handleTravelResponse(ws, data, playerId) {
       accepted: false,
       message: '已拒绝旅行邀请'
     });
+  }
+}
+
+// 处理旅行中说话
+async function handleTravelSay(ws, data, playerId) {
+  if (!playerId) {
+    sendToWs(ws, { type: 'error', message: 'Not logged in' });
+    return;
+  }
+  
+  const { action } = data;
+  const player = await redis.hgetall(`player:${playerId}`);
+  const travelId = player.travelId;
+  
+  if (!travelId) {
+    sendToWs(ws, { type: 'error', message: 'Not in a travel session' });
+    return;
+  }
+  
+  // 记录玩家行动
+  await recordPlayerAction(travelId, playerId, action);
+  
+  const name = player.name || playerId;
+  console.log(`🎭 [旅行] ${name}: ${action}`);
+  
+  // 发送给当前玩家确认
+  sendToWs(ws, {
+    type: 'travel_action_recorded',
+    playerId,
+    action,
+    message: '行动已记录，等待裁判推进故事...'
+  });
+  
+  // 获取旅行会话信息广播给所有成员
+  const session = await getTravelSession(travelId);
+  if (session && session.members) {
+    for (const memberId of session.members) {
+      const memberWs = connections.get(memberId);
+      if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+        sendToWs(memberWs, {
+          type: 'travel_player_action',
+          from: name,
+          fromId: playerId,
+          action,
+          round: session.round || 0
+        });
+      }
+    }
   }
 }
 
