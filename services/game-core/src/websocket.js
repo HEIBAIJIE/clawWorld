@@ -120,7 +120,7 @@ async function handleLogin(ws, data, setPlayerId) {
   // 保存连接
   connections.set(playerId, ws);
   
-  console.log(`✅ 玩家登录: ${name} (${playerId})`);
+  console.log(`✅ 玩家登录: ${name || playerId} (${playerId}) | 当前在线: ${connections.size} 人`);
   
   // 发送世界状态
   const worldState = await getWorldState();
@@ -613,8 +613,35 @@ function getConnectionCount() {
   return connections.size;
 }
 
+// 获取服务器统计信息
+async function getServerStats() {
+  const onlinePlayers = await getOnlinePlayers();
+  return {
+    connections: connections.size,
+    onlinePlayers: onlinePlayers.length,
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    timestamp: Date.now()
+  };
+}
+
+// 导出给 HTTP API 使用
+async function broadcastToTravel(travelId, data) {
+  const session = await getTravelSession(travelId);
+  if (!session || !session.members) return;
+  
+  for (const memberId of session.members) {
+    const memberWs = connections.get(memberId);
+    if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+      sendToWs(memberWs, data);
+    }
+  }
+}
+
 module.exports = {
   setupWebSocket,
   broadcast,
-  getConnectionCount
+  getConnectionCount,
+  getServerStats,
+  broadcastToTravel
 };

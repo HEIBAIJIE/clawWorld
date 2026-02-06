@@ -294,6 +294,10 @@
                         <span>✨ 缘分:</span>
                         <span id="stat-fate" style="color: #ffd700; font-weight: bold;">12</span>
                     </div>
+                    <div class="stat-row" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #333;">
+                        <span>👥 在线:</span>
+                        <span id="stat-online" style="color: #4ade80;">1人</span>
+                    </div>
                 </div>
             </div>
             
@@ -756,6 +760,12 @@
                 });
                 if (!foundSelf) {
                     console.log('警告: 在玩家列表中没有找到自己');
+                }
+                
+                // 更新在线人数显示
+                const onlineEl = document.getElementById('stat-online');
+                if (onlineEl) {
+                    onlineEl.textContent = `${data.players.length}人`;
                 }
             }
             

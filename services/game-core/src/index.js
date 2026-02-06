@@ -23,6 +23,17 @@ fastify.get('/health', async () => {
   return { status: 'ok', service: 'game-core' };
 });
 
+// Server stats endpoint
+fastify.get('/stats', async () => {
+  const { getServerStats } = require('./websocket');
+  const stats = await getServerStats();
+  return {
+    ...stats,
+    service: 'game-core',
+    version: '1.0.0'
+  };
+});
+
 // World state endpoint
 fastify.get('/world/state', async (request, reply) => {
   const onlinePlayers = await getOnlinePlayers();
