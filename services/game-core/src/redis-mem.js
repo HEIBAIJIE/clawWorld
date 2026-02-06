@@ -192,6 +192,33 @@ async function getItems(playerId) {
   return items.get(playerId) || [];
 }
 
+// ========== 领地系统 ==========
+const territorySize = new Map(); // playerId -> size
+const DEFAULT_TERRITORY_SIZE = 5;
+
+async function getTerritorySize(playerId) {
+  return territorySize.get(playerId) || DEFAULT_TERRITORY_SIZE;
+}
+
+async function expandTerritory(playerId) {
+  const current = territorySize.get(playerId) || DEFAULT_TERRITORY_SIZE;
+  const newSize = current + 3; // 每次扩大增加3个容量
+  territorySize.set(playerId, newSize);
+  return newSize;
+}
+
+async function getTerritoryEntityCount(playerId) {
+  const { redis } = require('./redis-mem');
+  const territory = await redis.hgetall(`territory:${playerId}`);
+  return Object.keys(territory).length;
+}
+
+async function getTerritoryEntity(playerId, entityId) {
+  const { redis } = require('./redis-mem');
+  const entity = await redis.hget(`territory:${playerId}`, entityId);
+  return entity ? JSON.parse(entity) : null;
+}
+
 // ========== 缘分系统 ==========
 
 async function updateFate(playerId, delta) {
@@ -276,6 +303,11 @@ module.exports = {
   updateFate,
   getFate,
   addFate,
+  // 领地系统
+  getTerritorySize,
+  expandTerritory,
+  getTerritoryEntityCount,
+  getTerritoryEntity,
   // 交换系统
   exchangeMemory,
   exchangeItem

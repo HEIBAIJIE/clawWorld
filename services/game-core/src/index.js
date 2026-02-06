@@ -354,7 +354,7 @@ fastify.post('/player/:id/memory/:memoryId/solidify', async (request, reply) => 
   const { id, memoryId } = request.params;
   const { form = 'sculpture' } = request.body || {}; // sculpture, painting, book, song
   
-  const { getMemories, deleteMemory, updateFate, getFate } = require('./redis-mem');
+  const { getMemories, deleteMemory, updateFate, getFate, getTerritorySize, getTerritoryEntityCount } = require('./redis-mem');
   
   // 检查记忆是否存在
   const memories = await getMemories(id);
@@ -362,6 +362,19 @@ fastify.post('/player/:id/memory/:memoryId/solidify', async (request, reply) => 
   
   if (!memory) {
     return reply.code(404).send({ error: 'Memory not found' });
+  }
+  
+  // 检查领地容量
+  const territorySize = await getTerritorySize(id);
+  const currentEntities = await getTerritoryEntityCount(id);
+  
+  if (currentEntities >= territorySize) {
+    return reply.code(400).send({ 
+      error: '领地已满，无法固化更多回忆', 
+      current: currentEntities,
+      capacity: territorySize,
+      message: '请扩大领地或删除现有实体'
+    });
   }
   
   // 检查缘分是否足够（固化需要 5 点缘分）
@@ -403,6 +416,10 @@ fastify.post('/player/:id/memory/:memoryId/solidify', async (request, reply) => 
     },
     cost: COST,
     fateRemaining: newFate,
+    territory: {
+      current: currentEntities + 1,
+      capacity: territorySize
+    },
     message: `回忆已固化为${form === 'sculpture' ? '雕塑' : form === 'painting' ? '画作' : form === 'book' ? '书' : '歌'}`
   };
 });
@@ -412,8 +429,10 @@ fastify.get('/player/:id/territory', async (request, reply) => {
   const { id } = request.params;
   
   const territory = await redis.hgetall(`territory:${id}`);
-  const { getFate } = require('./redis-mem');
+  const { getFate, getTerritorySize, getTerritoryEntityCount } = require('./redis-mem');
   const fate = await getFate(id);
+  const capacity = await getTerritorySize(id);
+  const current = await getTerritoryEntityCount(id);
   
   const entities = Object.entries(territory).map(([key, value]) => {
     const entity = JSON.parse(value);
@@ -427,6 +446,9 @@ fastify.get('/player/:id/territory', async (request, reply) => {
     playerId: id,
     entities: entities,
     count: entities.length,
+    capacity,
+    canExpand: current >= capacity,
+    expansionCost: 10,
     fate
   };
 });
@@ -674,6 +696,97 @@ fastify.get('/travel/:travelId', async (request, reply) => {
   }
   
   return session;
+});
+
+// === 领地扩展 API ===
+
+// Expand Territory - 扩大领地容量
+fastify.post('/player/:id/territory/expand', async (request, reply) => {
+  const { id } = request.params;
+  const { getFate, updateFate, expandTerritory, getTerritorySize } = require('./redis-mem');
+  
+  const COST = 10; // 扩大领地需要 10 点缘分
+  const currentFate = await getFate(id);
+  
+  if (currentFate < COST) {
+    return reply.code(400).send({
+      error: '缘分不足',
+      required: COST,
+      current: currentFate
+    });
+  }
+  
+  // 扣除缘分
+  const newFate = await updateFate(id, -COST);
+  
+  // 扩大领地
+  const newSize = await expandTerritory(id);
+  
+  return {
+    playerId: id,
+    action: 'expand_territory',
+    cost: COST,
+    fateRemaining: newFate,
+    territorySize: newSize,
+    message: `领地已扩大，现在可以存放 ${newSize} 个实体`
+  };
+});
+
+// Get Territory Entity Detail - 查看领地实体详情
+fastify.get('/player/:id/territory/:entityId', async (request, reply) => {
+  const { id, entityId } = request.params;
+  
+  const territory = await redis.hgetall(`territory:${id}`);
+  const entity = territory[entityId];
+  
+  if (!entity) {
+    return reply.code(404).send({ error: 'Entity not found' });
+  }
+  
+  const parsed = JSON.parse(entity);
+  
+  return {
+    playerId: id,
+    entityId,
+    ...parsed,
+    formName: parsed.form === 'sculpture' ? '雕塑' : 
+              parsed.form === 'painting' ? '画作' : 
+              parsed.form === 'book' ? '书' : '歌'
+  };
+});
+
+// Visit Territory - 访问他人领地
+fastify.get('/territory/:playerId/visit', async (request, reply) => {
+  const { playerId } = request.params;
+  const { visitorId } = request.query;
+  
+  const territory = await redis.hgetall(`territory:${playerId}`);
+  const { getPlayerStatus } = require('./redis-mem');
+  
+  const ownerStatus = await getPlayerStatus(playerId);
+  const ownerName = ownerStatus.name || playerId;
+  
+  const entities = Object.entries(territory).map(([key, value]) => {
+    const entity = JSON.parse(value);
+    return {
+      id: key,
+      title: entity.title,
+      form: entity.form,
+      formName: entity.form === 'sculpture' ? '雕塑' : 
+                entity.form === 'painting' ? '画作' : 
+                entity.form === 'book' ? '书' : '歌',
+      createdAt: entity.createdAt
+    };
+  });
+  
+  return {
+    ownerId: playerId,
+    ownerName,
+    visitorId: visitorId || 'anonymous',
+    entityCount: entities.length,
+    entities: entities.sort((a, b) => b.createdAt - a.createdAt),
+    message: `欢迎来到 ${ownerName} 的领地`
+  };
 });
 
 // Start server

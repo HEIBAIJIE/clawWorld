@@ -548,6 +548,10 @@
             
             <div class="panel" id="territory-panel">
                 <h3>🏰 我的领地 <span style="float: right; font-size: 0.75rem; color: #ffd700;">✨ <span id="territory-fate">0</span></span></h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid #333; margin-bottom: 0.5rem;">
+                    <span style="font-size: 0.75rem; color: #888;">容量: <span id="territory-count">0</span>/<span id="territory-capacity">5</span></span>
+                    <button id="expand-territory-btn" onclick="expandTerritory()" style="background: #0f3460; border: 1px solid #533483; padding: 0.2rem 0.5rem; color: #eee; border-radius: 4px; cursor: pointer; font-size: 0.7rem; display: none;">+ 扩展(10✨)</button>
+                </div>
                 <div class="panel-content" id="territory-content">
                     <p style="color: #666; font-size: 0.8rem;">🏰 领地空空如也...<br><br><span style="font-size: 0.75rem;">消耗5点缘分可以将记忆固化为领地实体</span></p>
                 </div>
@@ -883,8 +887,13 @@
         function handleTerritoryResult(data) {
             const fateEl = document.getElementById('territory-fate');
             const contentEl = document.getElementById('territory-content');
+            const countEl = document.getElementById('territory-count');
+            const capacityEl = document.getElementById('territory-capacity');
+            const expandBtn = document.getElementById('expand-territory-btn');
             
             if (fateEl) fateEl.textContent = data.fate || 0;
+            if (countEl) countEl.textContent = data.count || 0;
+            if (capacityEl) capacityEl.textContent = data.capacity || 5;
             
             // 🏰 更新领地坐标数据
             if (data.territoryCells) {
@@ -892,8 +901,20 @@
                 renderMap(); // 重新渲染以显示领地
             }
             
+            // 显示/隐藏扩展按钮
+            if (expandBtn) {
+                if (data.canExpand && data.fate >= (data.expansionCost || 10)) {
+                    expandBtn.style.display = 'inline-block';
+                } else {
+                    expandBtn.style.display = 'none';
+                }
+            }
+            
             if (!data.entities || data.entities.length === 0) {
-                contentEl.innerHTML = `<p style="color: #666; font-size: 0.8rem;">🏰 领地空空如也...<br><br><span style="font-size: 0.75rem;">消耗5点缘分可以将记忆固化为领地实体</span></p>`;
+                contentEl.innerHTML = `<p style="color: #666; font-size: 0.8rem;">🏰 领地空空如也...<br><br><span style="font-size: 0.75rem;">在记忆栏选择记忆进行固化</span></p>
+                    <div style="margin-top: 0.5rem; padding: 0.5rem; background: #1a1a2e; border-radius: 4px; font-size: 0.75rem; color: #888;">
+                        💡 固化消耗: 5✨ | 扩大容量: 10✨
+                    </div>`;
                 return;
             }
             
@@ -901,15 +922,20 @@
             data.entities.forEach(entity => {
                 const icon = entity.form === 'sculpture' ? '🗿' : entity.form === 'painting' ? '🖼️' : entity.form === 'book' ? '📖' : '🎵';
                 html += `
-                    <div style="padding: 0.5rem; background: #0f3460; border-radius: 4px; margin-bottom: 0.3rem; font-size: 0.8rem;">
+                    <div onclick="viewEntityDetail('${entity.id}')" style="padding: 0.5rem; background: #0f3460; border-radius: 4px; margin-bottom: 0.3rem; font-size: 0.8rem; cursor: pointer; transition: all 0.15s;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <span>${icon} ${entity.title}</span>
-                            <span style="color: #888; font-size: 0.7rem;">${entity.timeAgo}</span>
+                            <span style="color: #888; font-size: 0.7rem;">${entity.timeAgo || ''}</span>
                         </div>
                         <div style="color: #666; font-size: 0.75rem; margin-top: 0.2rem;">${entity.form === 'sculpture' ? '雕塑' : entity.form === 'painting' ? '画作' : entity.form === 'book' ? '书籍' : '歌曲'}</div>
                     </div>
                 `;
             });
+            
+            html += `
+                <div style="margin-top: 0.5rem; padding: 0.5rem; background: #1a1a2e; border-radius: 4px; font-size: 0.75rem; color: #888;">
+                    💡 点击实体查看详情 | 固化: 5✨ | 扩大: 10✨
+                </div>`;
             
             contentEl.innerHTML = html;
         }
@@ -1346,6 +1372,11 @@
                         html += `style="margin-top: 0.3rem; background: #e94560; border: none; padding: 0.3rem 0.8rem; color: white; border-radius: 4px; cursor: pointer; font-size: 0.75rem; width: 100%;">`;
                         html += `🎭 邀请旅行</button>`;
                     }
+                    
+                    // 显示访问领地按钮
+                    html += `<button onclick="event.stopPropagation(); visitTerritory('${p.id}', '${p.name || '未知玩家'}')" `;
+                    html += `style="margin-top: 0.3rem; background: #533483; border: 1px solid #7b5aa6; padding: 0.3rem 0.8rem; color: #eee; border-radius: 4px; cursor: pointer; font-size: 0.75rem; width: 100%;">`;
+                    html += `🏰 参观领地</button>`;
                     
                     html += '</div>';
                     nearbyCount++;
@@ -1825,6 +1856,128 @@
                 addLog('🏁 请求结束旅行...');
             } else {
                 addLog('❌ 未连接到服务器');
+            }
+        }
+
+        // 🏰 扩展领地容量
+        async function expandTerritory() {
+            if (!playerId) {
+                addLog('❌ 请先登录');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/player/${playerId}/territory/expand`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`✅ ${data.message}`);
+                    addLog(`   新容量: ${data.territorySize} | 剩余缘分: ${data.fateRemaining}`);
+                    AudioSys.success();
+                    // 刷新领地显示
+                    requestTerritory();
+                } else {
+                    addLog(`❌ 扩展失败: ${data.error}`);
+                    AudioSys.error();
+                }
+            } catch (err) {
+                addLog(`❌ 扩展领地出错: ${err.message}`);
+                AudioSys.error();
+            }
+        }
+        
+        // 🏰 查看实体详情
+        async function viewEntityDetail(entityId) {
+            if (!playerId || !entityId) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/player/${playerId}/territory/${entityId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const formName = data.formName || '实体';
+                    const icon = data.form === 'sculpture' ? '🗿' : data.form === 'painting' ? '🖼️' : data.form === 'book' ? '📖' : '🎵';
+                    
+                    // 创建弹窗显示详情
+                    const modal = document.createElement('div');
+                    modal.className = 'tutorial-overlay';
+                    modal.style.zIndex = '2000';
+                    modal.innerHTML = `
+                        <div class="tutorial-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
+                            <h2>${icon} ${data.title}</h2>
+                            <div style="color: #888; font-size: 0.8rem; margin-bottom: 1rem;">
+                                ${formName} | 创建于 ${new Date(data.createdAt).toLocaleDateString()}
+                            </div>
+                            <div style="background: #0f3460; padding: 1rem; border-radius: 8px; line-height: 1.6; white-space: pre-wrap;">
+                                ${data.content || '这个实体没有详细记录...'}
+                            </div>
+                            <button class="tutorial-btn" onclick="this.closest('.tutorial-overlay').remove()" style="margin-top: 1rem;">关闭</button>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                    AudioSys.success();
+                } else {
+                    addLog(`❌ 无法查看实体: ${data.error}`);
+                    AudioSys.error();
+                }
+            } catch (err) {
+                addLog(`❌ 查看实体出错: ${err.message}`);
+                AudioSys.error();
+            }
+        }
+        
+        // 🏰 访问他人领地
+        async function visitTerritory(targetId, targetName) {
+            if (!targetId) return;
+            
+            try {
+                const response = await fetch(`${API_BASE}/territory/${targetId}/visit?visitorId=${playerId || 'anonymous'}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    let entitiesHtml = '';
+                    if (data.entities && data.entities.length > 0) {
+                        entitiesHtml = data.entities.map(e => {
+                            const icon = e.form === 'sculpture' ? '🗿' : e.form === 'painting' ? '🖼️' : e.form === 'book' ? '📖' : '🎵';
+                            return `
+                                <div style="padding: 0.5rem; background: #0f3460; border-radius: 4px; margin-bottom: 0.3rem; font-size: 0.8rem;">
+                                    ${icon} ${e.title} <span style="color: #888;">(${e.formName})</span>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        entitiesHtml = '<p style="color: #666; font-size: 0.8rem;">🏰 这个领地还没有任何实体</p>';
+                    }
+                    
+                    const modal = document.createElement('div');
+                    modal.className = 'tutorial-overlay';
+                    modal.style.zIndex = '2000';
+                    modal.innerHTML = `
+                        <div class="tutorial-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
+                            <h2>🏰 ${data.ownerName} 的领地</h2>
+                            <div style="color: #888; font-size: 0.8rem; margin-bottom: 1rem;">
+                                共 ${data.entityCount} 个回忆实体
+                            </div>
+                            <div style="max-height: 400px; overflow-y: auto;">
+                                ${entitiesHtml}
+                            </div>
+                            <button class="tutorial-btn" onclick="this.closest('.tutorial-overlay').remove()" style="margin-top: 1rem;">关闭</button>
+                        </div>
+                    `;
+                    document.body.appendChild(modal);
+                    addLog(`🏰 参观了 ${data.ownerName} 的领地`);
+                    AudioSys.success();
+                } else {
+                    addLog(`❌ 无法访问领地: ${data.error}`);
+                    AudioSys.error();
+                }
+            } catch (err) {
+                addLog(`❌ 访问领地出错: ${err.message}`);
+                AudioSys.error();
             }
         }
 
