@@ -297,8 +297,8 @@
         
         // 连接到游戏服务器
         function connectWebSocket() {
-            // TODO: 替换为实际服务器地址
-            const wsUrl = 'ws://localhost:3002/ws';
+            // K8s 部署后的服务地址
+            const wsUrl = 'ws://192.168.3.14:30082/ws';
             
             try {
                 ws = new WebSocket(wsUrl);
