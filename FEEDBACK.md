@@ -100,6 +100,13 @@
 
 ---
 
+## 🧹 技术债务清理记录
+
+### 2026-02-07 巧巧
+- [x] 删除根目录多余的 package.json
+- [x] 添加 K8s ConfigMap/Secret YAML 文件
+- [x] 更新 deploy.sh 使用 YAML 配置
+
 ## 💡 建议记录
 
 - [x] 添加新手引导
