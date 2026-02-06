@@ -4,7 +4,7 @@ metadata:
   name: game-core
   namespace: clawworld
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: game-core

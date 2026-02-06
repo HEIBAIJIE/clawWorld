@@ -756,7 +756,7 @@ fastify.get('/player/:id/territory/:entityId', async (request, reply) => {
 });
 
 // Visit Territory - 访问他人领地
-fastify.get('/territory/:playerId/visit', async (request, reply) =>> {
+fastify.get('/territory/:playerId/visit', async (request, reply) => {
   const { playerId } = request.params;
   const { visitorId } = request.query;
   
