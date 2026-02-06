@@ -761,7 +761,7 @@ fastify.get('/territory/:playerId/visit', async (request, reply) => {
   const { visitorId } = request.query;
   
   const territory = await redis.hgetall(`territory:${playerId}`);
-  const { getPlayerStatus } = require('./redis-mem');
+  const { getPlayerStatus, getTerritoryMessages } = require('./redis-mem');
   
   const ownerStatus = await getPlayerStatus(playerId);
   const ownerName = ownerStatus.name || playerId;
@@ -779,15 +779,125 @@ fastify.get('/territory/:playerId/visit', async (request, reply) => {
     };
   });
   
+  // 获取留言
+  const messages = await getTerritoryMessages(playerId);
+  
   return {
     ownerId: playerId,
     ownerName,
     visitorId: visitorId || 'anonymous',
     entityCount: entities.length,
     entities: entities.sort((a, b) => b.createdAt - a.createdAt),
+    messages: messages.slice(0, 10).map(m => ({
+      id: m.id,
+      visitorId: m.visitorId,
+      message: m.message,
+      timeAgo: getTimeAgo(m.timestamp)
+    })),
     message: `欢迎来到 ${ownerName} 的领地`
   };
 });
+
+// === 领地留言系统 API ===
+
+// Leave message in territory - 在领地留言
+fastify.post('/territory/:playerId/message', async (request, reply) => {
+  const { playerId } = request.params;
+  const { visitorId, message } = request.body || {};
+  
+  if (!visitorId) {
+    return reply.code(400).send({ error: 'visitorId required' });
+  }
+  
+  if (!message || message.trim().length === 0) {
+    return reply.code(400).send({ error: 'message required' });
+  }
+  
+  if (message.length > 200) {
+    return reply.code(400).send({ error: 'message too long (max 200 chars)' });
+  }
+  
+  const { addTerritoryMessage, getPlayerStatus } = require('./redis-mem');
+  
+  // 检查领地主人是否存在
+  const ownerStatus = await getPlayerStatus(playerId);
+  if (!ownerStatus || Object.keys(ownerStatus).length === 0) {
+    return reply.code(404).send({ error: 'Territory owner not found' });
+  }
+  
+  const newMessage = await addTerritoryMessage(playerId, visitorId, message.trim());
+  
+  return {
+    success: true,
+    messageId: newMessage.id,
+    territoryOwner: playerId,
+    visitorId,
+    message: message.trim(),
+    timestamp: newMessage.timestamp
+  };
+});
+
+// Get territory messages - 获取领地留言
+fastify.get('/territory/:playerId/messages', async (request, reply) => {
+  const { playerId } = request.params;
+  const { limit = 20 } = request.query;
+  
+  const { getTerritoryMessages, getPlayerStatus } = require('./redis-mem');
+  
+  const messages = await getTerritoryMessages(playerId);
+  const ownerStatus = await getPlayerStatus(playerId);
+  
+  return {
+    territoryOwner: playerId,
+    ownerName: ownerStatus.name || playerId,
+    count: messages.length,
+    messages: messages.slice(0, parseInt(limit)).map(m => ({
+      id: m.id,
+      visitorId: m.visitorId,
+      message: m.message,
+      timestamp: m.timestamp,
+      timeAgo: getTimeAgo(m.timestamp)
+    }))
+  };
+});
+
+// Delete territory message - 删除领地留言（仅领地主人）
+fastify.delete('/territory/:playerId/message/:messageId', async (request, reply) => {
+  const { playerId, messageId } = request.params;
+  const { requesterId } = request.body || {};
+  
+  if (requesterId !== playerId) {
+    return reply.code(403).send({ error: 'Only territory owner can delete messages' });
+  }
+  
+  const { deleteTerritoryMessage } = require('./redis-mem');
+  const success = await deleteTerritoryMessage(playerId, messageId);
+  
+  if (!success) {
+    return reply.code(404).send({ error: 'Message not found' });
+  }
+  
+  return {
+    success: true,
+    message: 'Message deleted'
+  };
+});
+
+// Helper function - 获取相对时间
+function getTimeAgo(timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+  
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  
+  if (minutes < 1) return '刚刚';
+  if (minutes < 60) return `${minutes}分钟前`;
+  if (hours < 24) return `${hours}小时前`;
+  if (days < 30) return `${days}天前`;
+  return new Date(timestamp).toLocaleDateString();
+}
 
 // === 世界事件系统 API ===
 
