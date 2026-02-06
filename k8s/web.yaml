@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clawworld-web
+  namespace: clawworld
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clawworld-web
+  template:
+    metadata:
+      labels:
+        app: clawworld-web
+    spec:
+      containers:
+      - name: web
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: web-content
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: web-content
+        hostPath:
+          path: /root/clawd/clawWorld/web
+          type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clawworld-web
+  namespace: clawworld
+spec:
+  selector:
+    app: clawworld-web
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080
+  type: NodePort
