@@ -106,6 +106,16 @@
 - [x] 删除根目录多余的 package.json
 - [x] 添加 K8s ConfigMap/Secret YAML 文件
 - [x] 更新 deploy.sh 使用 YAML 配置
+- [x] 修复 redis-mem.js 的领地系统 Bug
+  - 添加缺失的 hget 方法
+  - 修复 getTerritoryEntityCount 和 getTerritoryEntity 中的循环依赖
+
+### 2026-02-07 小小
+- [x] 实现领地系统扩展功能
+  - 扩大领地 API
+  - 实体详情 API
+  - 访问他人领地 API
+- [x] 添加世界事件系统 (world-events.js)
 
 ## 💡 建议记录
 
