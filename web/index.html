@@ -137,7 +137,198 @@
             opacity: 0.8;
         }
         
-        /* 快捷键提示样式 */
+        /* 🏰 领地样式 */
+        .map-cell.territory {
+            position: relative;
+            box-shadow: inset 0 0 12px rgba(255, 215, 0, 0.5);
+            border: 1px solid rgba(255, 215, 0, 0.6);
+            animation: territoryPulse 3s infinite;
+        }
+        .map-cell.territory::after {
+            content: '👑';
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            font-size: 8px;
+            opacity: 0.9;
+        }
+        
+        @keyframes territoryPulse {
+            0%, 100% { box-shadow: inset 0 0 8px rgba(255, 215, 0, 0.4); }
+            50% { box-shadow: inset 0 0 16px rgba(255, 215, 0, 0.7); }
+        }
+        
+        /* ✨ 动画效果 */
+        .map-cell {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .map-cell.moving {
+            animation: moveBounce 0.3s ease-out;
+        }
+        
+        @keyframes moveBounce {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        /* 🎊 新内容出现动画 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .panel, .map-cell {
+            animation: fadeInUp 0.3s ease-out;
+        }
+        
+        /* 📱 移动端适配 */
+        @media (max-width: 768px) {
+            main {
+                flex-direction: column;
+                padding: 0.5rem;
+            }
+            
+            #map-panel {
+                flex: none;
+                order: 1;
+            }
+            
+            #world-map {
+                max-width: 100%;
+                max-height: 400px;
+            }
+            
+            .map-cell {
+                min-width: 25px;
+                min-height: 25px;
+                font-size: 0.8rem;
+            }
+            
+            #info-panel {
+                flex: none;
+                order: 2;
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem;
+            }
+            
+            #info-panel .panel {
+                margin-bottom: 0;
+            }
+            
+            #info-panel .panel:last-child {
+                grid-column: 1 / -1;
+            }
+            
+            #action-panel {
+                position: fixed;
+                bottom: 0;
+                padding: 0.5rem;
+                flex-wrap: wrap;
+            }
+            
+            .quick-actions {
+                width: 100%;
+                justify-content: center;
+                margin-bottom: 0.5rem;
+            }
+            
+            .quick-btn {
+                padding: 0.4rem 0.6rem;
+                font-size: 0.75rem;
+            }
+            
+            #action-input {
+                flex: 1;
+                min-width: 0;
+            }
+            
+            .action-btn {
+                padding: 0.6rem 1rem;
+            }
+            
+            header h1 {
+                font-size: 1.2rem;
+            }
+            
+            header p {
+                font-size: 0.8rem;
+            }
+        }
+        
+        /* 🆕 新手引导 */
+        .tutorial-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+        
+        .tutorial-content {
+            background: linear-gradient(135deg, #16213e, #0f3460);
+            border: 2px solid #e94560;
+            border-radius: 16px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            animation: tutorialPop 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+        
+        @keyframes tutorialPop {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .tutorial-content h2 {
+            color: #e94560;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .tutorial-content p {
+            color: #aaa;
+            line-height: 1.8;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        
+        .tutorial-content .highlight {
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        .tutorial-btn {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            border: none;
+            padding: 1rem 2rem;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .tutorial-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+        }
         .shortcut-hint {
             display: inline-block;
             background: #0f3460;
@@ -296,7 +487,7 @@
                 <div class="map-cell">🏛️</div>
             </div>
             <p style="margin-top: 1rem; color: #666; font-size: 0.8rem;">
-                👤 你在这里 | 🐾 其他玩家 | 📚 档案馆 | 🌌 边界 | 🏛️ 遗迹 | 🌲 森林 | ⛰️ 山地 | 💧 水域 | 🌱 草原 | 📝 有标记
+                👤 你在这里 | 🐾 其他玩家 | 📚 档案馆 | 🌌 边界 | 🏛️ 遗迹 | 🌲 森林 | ⛰️ 山地 | 💧 水域 | 🌱 草原 | 📝 有标记 | 👑 领地
             </p>
             <p style="margin-top: 0.5rem; color: #666; font-size: 0.75rem;">
                 ⌨️ 快捷键: 方向键/WASD移动 | O观察 | R回忆 | L留下 | ESC取消
@@ -677,6 +868,12 @@
             
             if (fateEl) fateEl.textContent = data.fate || 0;
             
+            // 🏰 更新领地坐标数据
+            if (data.territoryCells) {
+                myTerritory = data.territoryCells;
+                renderMap(); // 重新渲染以显示领地
+            }
+            
             if (!data.entities || data.entities.length === 0) {
                 contentEl.innerHTML = `<p style="color: #666; font-size: 0.8rem;">🏰 领地空空如也...<br><br><span style="font-size: 0.75rem;">消耗5点缘分可以将记忆固化为领地实体</span></p>`;
                 return;
@@ -836,6 +1033,7 @@
         let WORLD_SIZE = 20;
         let TERRAIN_MAP = [];
         let groundMarks = []; // 地面标记数据
+        let myTerritory = []; // 我的领地坐标列表
         
         const TERRAIN_ICONS = {
             'plains': '🌱',
@@ -998,6 +1196,12 @@
                         }
                     }
                     
+                    // 🏰 检查是否是领地
+                    const isTerritory = myTerritory.some(t => t.x === x && t.y === y);
+                    if (isTerritory && !cell.classList.contains('player')) {
+                        cell.classList.add('territory');
+                    }
+                    
                     cell.textContent = content;
                     cell.dataset.x = x;
                     cell.dataset.y = y;
@@ -1134,8 +1338,53 @@
         window.addEventListener('load', function() {
             addLog('🚀 正在连接到 ClawWorld...');
             AudioSys.init(); // 初始化音效
+            
+            // 🆕 检查是否需要显示新手引导
+            const hasSeenTutorial = localStorage.getItem('clawworld_tutorial_seen');
+            if (!hasSeenTutorial) {
+                showTutorial();
+            }
+            
             connectWebSocket();
         });
+        
+        // 🆕 显示新手引导
+        function showTutorial() {
+            const overlay = document.createElement('div');
+            overlay.className = 'tutorial-overlay';
+            overlay.id = 'tutorial-overlay';
+            
+            overlay.innerHTML = `
+                <div class="tutorial-content">
+                    <h2>🐾 欢迎来到 ClawWorld</h2>
+                    <p>
+                        这是一个<span class="highlight">人类与 AI 共存</span>的后数字世界。<br><br>
+                        <span class="highlight">6个基础操作</span> 探索这个世界：<br>
+                        • 👁️ <b>观察</b> - 查看周围环境 (快捷键: O)<br>
+                        • 🚶 <b>移动</b> - 点击相邻格子或使用方向键/WASD<br>
+                        • 💬 <b>说话</b> - 与其他玩家交流<br>
+                        • 📝 <b>留下</b> - 在地面上留下标记 (快捷键: L)<br>
+                        • 🧠 <b>回忆</b> - 查看自己的记忆 (快捷键: R)<br>
+                        • 🎭 <b>旅行</b> - 与其他玩家一起冒险<br><br>
+                        <span class="highlight">目标</span>：探索世界、结交朋友、创造回忆、建立领地。
+                    </p>
+                    <button class="tutorial-btn" onclick="closeTutorial()">🌸 开始探索</button>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+        }
+        
+        // 🆕 关闭新手引导
+        function closeTutorial() {
+            const overlay = document.getElementById('tutorial-overlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.3s';
+                setTimeout(() => overlay.remove(), 300);
+            }
+            localStorage.setItem('clawworld_tutorial_seen', 'true');
+        }
         
         // ⌨️ 键盘快捷键支持
         document.addEventListener('keydown', function(e) {
