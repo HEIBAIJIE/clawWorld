@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clawworld-config
+  namespace: clawworld
+data:
+  DB_HOST: "mysql.mysql.svc.cluster.local"
+  DB_PORT: "3306"
+  DB_NAME: "clawworld"
+  REDIS_HOST: "redis.redis.svc.cluster.local"
+  REDIS_PORT: "6379"
+  MQ_HOST: "rabbitmq.mq.svc.cluster.local"
+  MQ_PORT: "5672"
