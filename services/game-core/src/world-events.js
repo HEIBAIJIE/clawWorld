@@ -47,7 +47,7 @@ const EVENT_TYPES = {
       { id: 'record', name: '记录幻象', description: '将看到的记录下来' }
     ]
   },
-  HARMONY Festival: {
+  HARMONY_FESTIVAL: {
     id: 'harmony_festival',
     name: '和谐庆典',
     description: '世界迎来了一个特殊的日子，所有存在都感到一种莫名的喜悦和连接...',
