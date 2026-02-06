@@ -2094,6 +2094,9 @@
         async function visitTerritory(targetId, targetName) {
             if (!targetId) return;
             
+            // 存储当前访问的领地信息，用于留言
+            window.currentVisitTerritory = { id: targetId, name: targetName };
+            
             try {
                 const response = await fetch(`${API_BASE}/territory/${targetId}/visit?visitorId=${playerId || 'anonymous'}`);
                 const data = await response.json();
@@ -2113,8 +2116,45 @@
                         entitiesHtml = '<p style="color: #666; font-size: 0.8rem;">🏰 这个领地还没有任何实体</p>';
                     }
                     
+                    // 渲染留言
+                    let messagesHtml = '';
+                    if (data.messages && data.messages.length > 0) {
+                        messagesHtml = `
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #333;">
+                                <div style="color: #888; font-size: 0.8rem; margin-bottom: 0.5rem;">📝 访客留言 (${data.messages.length})</div>
+                                <div style="max-height: 150px; overflow-y: auto;">
+                                    ${data.messages.map(m => `
+                                        <div style="padding: 0.4rem; background: #1a1a2e; border-radius: 4px; margin-bottom: 0.3rem; font-size: 0.75rem;">
+                                            <div style="color: #ccc;">${m.message}</div>
+                                            <div style="color: #666; font-size: 0.7rem; margin-top: 0.2rem;">👤 ${m.visitorId} · ${m.timeAgo}</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
+                    // 留言输入框（仅登录用户）
+                    let messageInputHtml = '';
+                    if (playerId && playerId !== targetId) {
+                        messageInputHtml = `
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #333;">
+                                <div style="display: flex; gap: 0.3rem;">
+                                    <input type="text" id="territory-message-input" placeholder="留下你的足迹..." maxlength="200"
+                                        style="flex: 1; background: #1a1a2e; border: 1px solid #0f3460; padding: 0.4rem; color: #eee; border-radius: 4px; font-family: inherit; font-size: 0.8rem;"
+                                    />
+                                    <button onclick="leaveTerritoryMessage('${targetId}')" 
+                                        style="background: #533483; border: none; padding: 0.4rem 0.8rem; color: white; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+                                        📝 留言
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                    
                     const modal = document.createElement('div');
                     modal.className = 'tutorial-overlay';
+                    modal.id = 'territory-visit-modal';
                     modal.style.zIndex = '2000';
                     modal.innerHTML = `
                         <div class="tutorial-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
@@ -2122,9 +2162,13 @@
                             <div style="color: #888; font-size: 0.8rem; margin-bottom: 1rem;">
                                 共 ${data.entityCount} 个回忆实体
                             </div>
-                            <div style="max-height: 400px; overflow-y: auto;">
+                            <div style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem;">
                                 ${entitiesHtml}
                             </div>
+                            
+                            ${messagesHtml}
+                            ${messageInputHtml}
+                            
                             <button class="tutorial-btn" onclick="this.closest('.tutorial-overlay').remove()" style="margin-top: 1rem;">关闭</button>
                         </div>
                     `;
@@ -2137,6 +2181,50 @@
                 }
             } catch (err) {
                 addLog(`❌ 访问领地出错: ${err.message}`);
+                AudioSys.error();
+            }
+        }
+        
+        // 🏰 在领地留言
+        async function leaveTerritoryMessage(targetId) {
+            const input = document.getElementById('territory-message-input');
+            if (!input) return;
+            
+            const message = input.value.trim();
+            if (!message) {
+                addLog('⚠️ 请输入留言内容');
+                return;
+            }
+            
+            if (!playerId) {
+                addLog('❌ 请先登录');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/territory/${targetId}/message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ visitorId: playerId, message })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`📝 已在领地留言: ${message.substring(0, 30)}${message.length > 30 ? '...' : ''}`);
+                    input.value = '';
+                    AudioSys.success();
+                    
+                    // 刷新领地显示
+                    const targetName = window.currentVisitTerritory?.name || targetId;
+                    document.getElementById('territory-visit-modal')?.remove();
+                    visitTerritory(targetId, targetName);
+                } else {
+                    addLog(`❌ 留言失败: ${data.error}`);
+                    AudioSys.error();
+                }
+            } catch (err) {
+                addLog(`❌ 留言出错: ${err.message}`);
                 AudioSys.error();
             }
         }

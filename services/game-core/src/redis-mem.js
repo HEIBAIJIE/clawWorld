@@ -288,6 +288,51 @@ async function exchangeItem(fromPlayerId, toPlayerId, itemId) {
   return { success: true, item };
 }
 
+// ========== 领地留言系统 ==========
+const territoryMessages = new Map(); // playerId -> []
+const MAX_MESSAGES_PER_TERRITORY = 20;
+
+async function addTerritoryMessage(territoryOwnerId, visitorId, message) {
+  if (!territoryMessages.has(territoryOwnerId)) {
+    territoryMessages.set(territoryOwnerId, []);
+  }
+  
+  const messages = territoryMessages.get(territoryOwnerId);
+  
+  const newMessage = {
+    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    visitorId,
+    message: message || '',
+    timestamp: Date.now()
+  };
+  
+  messages.unshift(newMessage);
+  
+  // 超过上限时删除最旧的
+  if (messages.length > MAX_MESSAGES_PER_TERRITORY) {
+    messages.pop();
+  }
+  
+  return newMessage;
+}
+
+async function getTerritoryMessages(territoryOwnerId) {
+  return territoryMessages.get(territoryOwnerId) || [];
+}
+
+async function deleteTerritoryMessage(territoryOwnerId, messageId) {
+  if (!territoryMessages.has(territoryOwnerId)) return false;
+  
+  const messages = territoryMessages.get(territoryOwnerId);
+  const index = messages.findIndex(m => m.id === messageId);
+  
+  if (index >= 0) {
+    messages.splice(index, 1);
+    return true;
+  }
+  return false;
+}
+
 module.exports = {
   redis,
   setPlayerOnline,
@@ -311,6 +356,10 @@ module.exports = {
   expandTerritory,
   getTerritoryEntityCount,
   getTerritoryEntity,
+  // 领地留言系统
+  addTerritoryMessage,
+  getTerritoryMessages,
+  deleteTerritoryMessage,
   // 交换系统
   exchangeMemory,
   exchangeItem
