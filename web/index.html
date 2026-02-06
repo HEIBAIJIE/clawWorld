@@ -322,6 +322,13 @@
                 </div>
             </div>
             
+            <div class="panel" id="territory-panel">
+                <h3>🏰 我的领地 <span style="float: right; font-size: 0.75rem; color: #ffd700;">✨ <span id="territory-fate">0</span></span></h3>
+                <div class="panel-content" id="territory-content">
+                    <p style="color: #666; font-size: 0.8rem;">🏰 领地空空如也...<br><br><span style="font-size: 0.75rem;">消耗5点缘分可以将记忆固化为领地实体</span></p>
+                </div>
+            </div>
+            
             <div class="panel" style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
                 <h3>📜 日志</h3>
                 <div id="log-content" class="panel-content" style="flex: 1; overflow-y: auto; font-size: 0.75rem;">
@@ -336,8 +343,8 @@
             <button class="quick-btn" onclick="doObserve()">👁️ 观察</button>
             <button class="quick-btn" onclick="doRecall()">🧠 回忆</button>
             <button class="quick-btn" onclick="doLeave()">📝 留下</button>
+            <button class="quick-btn" onclick="requestTerritory()">🏰 领地</button>
             <button class="quick-btn" onclick="doRest()">😴 休息</button>
-            <button class="quick-btn" onclick="doWake()">☀️ 唤醒</button>
         </div>
         <input type="text" id="action-input" placeholder="输入要说的话，按回车发送..." />
         <button class="action-btn" onclick="doSay()">📢 发送</button>
@@ -447,6 +454,9 @@
                 case 'recall_result':
                     handleRecallResult(data);
                     break;
+                case 'territory_result':
+                    handleTerritoryResult(data);
+                    break;
                 case 'chat':
                     addLog(`💬 ${data.from}: ${data.message}`);
                     break;
@@ -523,6 +533,35 @@
             } else {
                 addLog('   暂无记忆');
             }
+        }
+        
+        // 处理领地结果
+        function handleTerritoryResult(data) {
+            const fateEl = document.getElementById('territory-fate');
+            const contentEl = document.getElementById('territory-content');
+            
+            if (fateEl) fateEl.textContent = data.fate || 0;
+            
+            if (!data.entities || data.entities.length === 0) {
+                contentEl.innerHTML = `<p style="color: #666; font-size: 0.8rem;">🏰 领地空空如也...<br><br><span style="font-size: 0.75rem;">消耗5点缘分可以将记忆固化为领地实体</span></p>`;
+                return;
+            }
+            
+            let html = '';
+            data.entities.forEach(entity => {
+                const icon = entity.form === 'sculpture' ? '🗿' : entity.form === 'painting' ? '🖼️' : entity.form === 'book' ? '📖' : '🎵';
+                html += `
+                    <div style="padding: 0.5rem; background: #0f3460; border-radius: 4px; margin-bottom: 0.3rem; font-size: 0.8rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>${icon} ${entity.title}</span>
+                            <span style="color: #888; font-size: 0.7rem;">${entity.timeAgo}</span>
+                        </div>
+                        <div style="color: #666; font-size: 0.75rem; margin-top: 0.2rem;">${entity.form === 'sculpture' ? '雕塑' : entity.form === 'painting' ? '画作' : entity.form === 'book' ? '书籍' : '歌曲'}</div>
+                    </div>
+                `;
+            });
+            
+            contentEl.innerHTML = html;
         }
         
         // 显示旅行邀请弹窗
@@ -725,6 +764,19 @@
             
             // 更新附近玩家列表
             updateNearbyPlayers();
+            
+            // 查询领地信息
+            requestTerritory();
+        }
+        
+        // 请求领地信息
+        function requestTerritory() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'get_territory',
+                    playerId: playerId
+                }));
+            }
         }
         
         // 渲染地图

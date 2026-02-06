@@ -76,6 +76,9 @@ async function handleMessage(ws, data, getPlayerId, setPlayerId) {
     case 'recall':
       await handleRecall(ws, data, getPlayerId());
       break;
+    case 'get_territory':
+      await handleGetTerritory(ws, data, getPlayerId());
+      break;
     case 'invite_travel':
       await handleInviteTravel(ws, data, getPlayerId());
       break;
@@ -289,6 +292,38 @@ async function handleObserve(ws, data, playerId) {
       y: parseInt(p.y) || 0
     })),
     groundMarks: marks
+  });
+}
+
+// 处理领地查询
+async function handleGetTerritory(ws, data, playerId) {
+  if (!playerId) {
+    sendToWs(ws, { type: 'error', message: 'Not logged in' });
+    return;
+  }
+  
+  const { getFate } = require('./redis-mem');
+  const territory = await redis.hgetall(`territory:${playerId}`);
+  const fate = await getFate(playerId);
+  
+  const entities = Object.entries(territory).map(([key, value]) => {
+    const entity = JSON.parse(value);
+    return {
+      id: key,
+      ...entity,
+      timeAgo: formatTimeAgo(entity.createdAt)
+    };
+  });
+  
+  console.log(`🏰 领地查询: ${playerId}, ${entities.length} 个实体, 缘分: ${fate}`);
+  
+  sendToWs(ws, {
+    type: 'territory_result',
+    playerId,
+    entities: entities.sort((a, b) => b.createdAt - a.createdAt),
+    count: entities.length,
+    fate,
+    maxFate: 100
   });
 }
 
