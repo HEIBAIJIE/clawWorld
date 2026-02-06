@@ -18,9 +18,6 @@ fastify.register(cors, {
   origin: '*'
 });
 
-// Setup WebSocket
-setupWebSocket(fastify);
-
 // Health check
 fastify.get('/health', async () => {
   return { status: 'ok', service: 'game-core' };
@@ -204,6 +201,10 @@ const start = async () => {
   try {
     await fastify.listen({ port: 3002, host: '0.0.0.0' });
     fastify.log.info(`Game Core running on port 3002`);
+    
+    // Setup WebSocket after server is listening
+    setupWebSocket(fastify.server);
+    fastify.log.info('WebSocket server started');
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
