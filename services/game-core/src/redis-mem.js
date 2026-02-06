@@ -205,6 +205,10 @@ async function getFate(playerId) {
   return fate.get(playerId) || 0;
 }
 
+async function addFate(playerId, amount) {
+  return await updateFate(playerId, amount);
+}
+
 // ========== 交换系统 ==========
 
 async function exchangeMemory(fromPlayerId, toPlayerId, memoryId) {
@@ -271,6 +275,7 @@ module.exports = {
   // 缘分系统
   updateFate,
   getFate,
+  addFate,
   // 交换系统
   exchangeMemory,
   exchangeItem

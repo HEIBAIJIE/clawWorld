@@ -2,7 +2,7 @@
 const WebSocket = require('ws');
 const { getOnlinePlayers, setPlayerOnline, setPlayerOffline, redis, addMemory, getMemories } = require('./redis-mem');
 const { getTerrainInfo, canMoveTo, WORLD_SIZE, TERRAIN_MAP } = require('./world');
-const { createInvitation, acceptInvitation, rejectInvitation, getTravelSession, recordPlayerAction, getNarrativeHistory } = require('./travel');
+const { createInvitation, acceptInvitation, rejectInvitation, getTravelSession, recordPlayerAction, getNarrativeHistory, getOpeningFromReferee } = require('./travel');
 
 // 存储所有 WebSocket 连接
 const connections = new Map();
@@ -85,8 +85,8 @@ async function handleMessage(ws, data, getPlayerId, setPlayerId) {
     case 'travel_response':
       await handleTravelResponse(ws, data, getPlayerId());
       break;
-    case 'travel_say':
-      await handleTravelSay(ws, data, getPlayerId());
+    case 'travel_end':
+      await handleTravelEnd(ws, data, getPlayerId());
       break;
     case 'ping':
       sendToWs(ws, { type: 'pong', timestamp: Date.now() });
@@ -507,6 +507,35 @@ async function handleTravelResponse(ws, data, playerId) {
       }
     }
     
+    // 等待开场生成后推送
+    setTimeout(async () => {
+      const session = await getTravelSession(result.travelId);
+      if (session) {
+        const openingData = await redis.hget(`travel:${result.travelId}:narrative`, 'opening');
+        if (openingData) {
+          try {
+            const opening = JSON.parse(openingData);
+            // 广播开场给所有成员
+            for (const memberId of result.members) {
+              const memberWs = connections.get(memberId);
+              if (memberWs) {
+                sendToWs(memberWs, {
+                  type: 'travel_round',
+                  round: 0,
+                  narrative: opening.content,
+                  player: '裁判',
+                  action: null
+                });
+              }
+            }
+            console.log(`📖 旅行 ${result.travelId} 开场已推送`);
+          } catch (e) {
+            console.error('解析开场失败:', e);
+          }
+        }
+      }
+    }, 3000); // 等待3秒让 Referee 生成开场
+    
     // 自动添加一条记忆记录
     for (const memberId of result.members) {
       await addMemory(memberId, {
@@ -573,6 +602,49 @@ async function handleTravelSay(ws, data, playerId) {
       }
     }
   }
+  
+  // 等待裁定结果并推送（轮询方式）
+  const currentRound = parseInt(session.round) || 0;
+  let pollCount = 0;
+  const maxPolls = 30; // 最多轮询30次
+  
+  const pollInterval = setInterval(async () => {
+    pollCount++;
+    
+    // 查询是否有新的裁定
+    const narratives = await redis.hgetall(`travel:${travelId}:narrative`);
+    const adjudicationKey = Object.keys(narratives).find(k => 
+      k.startsWith('adjudication_') && JSON.parse(narratives[k]).round === currentRound
+    );
+    
+    if (adjudicationKey) {
+      clearInterval(pollInterval);
+      try {
+        const adjudication = JSON.parse(narratives[adjudicationKey]);
+        
+        // 广播裁定结果给所有成员
+        for (const memberId of session.members) {
+          const memberWs = connections.get(memberId);
+          if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+            sendToWs(memberWs, {
+              type: 'travel_round',
+              round: adjudication.round + 1,
+              narrative: adjudication.content,
+              player: name,
+              action: action
+            });
+          }
+        }
+      } catch (e) {
+        console.error('解析裁定结果失败:', e);
+      }
+    }
+    
+    if (pollCount >= maxPolls) {
+      clearInterval(pollInterval);
+      console.log(`⏱️ 旅行 ${travelId} 第 ${currentRound} 轮裁定超时`);
+    }
+  }, 1000); // 每秒轮询一次
 }
 
 // 发送给特定玩家
@@ -623,6 +695,61 @@ async function getServerStats() {
     memory: process.memoryUsage(),
     timestamp: Date.now()
   };
+}
+
+// 处理结束旅行
+async function handleTravelEnd(ws, data, playerId) {
+  if (!playerId) {
+    sendToWs(ws, { type: 'error', message: 'Not logged in' });
+    return;
+  }
+  
+  const { endTravel } = require('./travel');
+  const player = await redis.hgetall(`player:${playerId}`);
+  const travelId = player.travelId;
+  
+  if (!travelId) {
+    sendToWs(ws, { type: 'error', message: 'Not in a travel session' });
+    return;
+  }
+  
+  // 获取会话信息
+  const session = await getTravelSession(travelId);
+  if (!session) {
+    sendToWs(ws, { type: 'error', message: 'Travel session not found' });
+    return;
+  }
+  
+  // 结束旅行
+  const result = await endTravel(travelId, '玩家主动结束');
+  
+  if (result.error) {
+    sendToWs(ws, { type: 'error', message: result.error });
+    return;
+  }
+  
+  console.log(`🏁 旅行结束: ${travelId}, 结局: ${result.ending?.substring(0, 50)}..., 缘分: +${result.fate}`);
+  
+  // 通知所有成员
+  for (const memberId of result.members) {
+    const memberWs = connections.get(memberId);
+    if (memberWs && memberWs.readyState === WebSocket.OPEN) {
+      sendToWs(memberWs, {
+        type: 'travel_ended',
+        travelId,
+        ending: result.ending,
+        fate: result.fate,
+        round: result.round,
+        message: '旅行已结束'
+      });
+    }
+  }
+  
+  // 发放缘分奖励
+  const { addFate } = require('./redis-mem');
+  for (const memberId of result.members) {
+    await addFate(memberId, result.fate);
+  }
 }
 
 // 导出给 HTTP API 使用

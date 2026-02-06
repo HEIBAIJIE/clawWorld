@@ -1134,6 +1134,28 @@
             }
         }
 
+        // 结束旅行
+        function endTravel() {
+            if (!inTravel) {
+                addLog('⚠️ 当前不在旅行中');
+                return;
+            }
+            
+            if (!confirm('确定要结束这次旅行吗？')) {
+                return;
+            }
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'travel_end',
+                    playerId: playerId
+                }));
+                addLog('🏁 请求结束旅行...');
+            } else {
+                addLog('❌ 未连接到服务器');
+            }
+        }
+
         // 页面加载时连接
         window.addEventListener('load', function() {
             addLog('🚀 正在连接到 ClawWorld...');
@@ -1151,6 +1173,7 @@
             <div style="text-align: right;">
                 <div style="color: #ffd700; font-size: 1.2rem; font-weight: bold;">✨ 缘分 +<span id="travel-fate">0</span></div>
                 <div style="color: #888; font-size: 0.8rem; margin-top: 0.3rem;">第 <span id="travel-round">1</span> 轮</div>
+                <button onclick="endTravel()" style="margin-top: 0.5rem; background: #533483; border: 1px solid #e94560; padding: 0.4rem 1rem; color: #e94560; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.8rem; transition: all 0.3s;" onmouseover="this.style.background='#e94560'; this.style.color='white';" onmouseout="this.style.background='#533483'; this.style.color='#e94560';">🏁 结束旅行</button>
             </div>
         </div>
         

@@ -1,7 +1,105 @@
 const { redis } = require('./redis-mem');
 const uuidv4 = require('uuid').v4;
+const axios = require('axios');
 
-// 发起邀请
+const REFEREE_URL = process.env.REFEREE_URL || 'http://192.168.3.14:3004';
+
+// 调用 Referee 服务生成旅行开场
+async function generateOpeningFromReferee(travelId, background, members) {
+  try {
+    const memberInfo = members.map(id => ({ name: id, role: '冒险者' }));
+    
+    const response = await axios.post(`${REFEREE_URL}/travel/opening`, {
+      background,
+      members: memberInfo
+    });
+    
+    if (response.data.success) {
+      // 保存开场到旅行会话
+      await redis.hset(`travel:${travelId}:narrative`, 'opening', JSON.stringify({
+        round: 0,
+        content: response.data.opening,
+        timestamp: Date.now(),
+        type: 'opening'
+      }));
+      
+      return response.data.opening;
+    }
+  } catch (error) {
+    console.error('调用 Referee 开场失败:', error.message);
+    return null;
+  }
+}
+
+// 调用 Referee 服务裁定玩家行动
+async function adjudicateActionFromReferee(travelId, playerAction) {
+  try {
+    // 获取旅行上下文
+    const session = await getTravelSession(travelId);
+    if (!session) return null;
+    
+    // 获取叙事历史
+    const narratives = await redis.hgetall(`travel:${travelId}:narrative`);
+    const storyHistory = Object.values(narratives).map(n => {
+      try { return JSON.parse(n).content; } catch(e) { return ''; }
+    }).join('\n');
+    
+    const response = await axios.post(`${REFEREE_URL}/travel/adjudicate`, {
+      travelContext: {
+        round: parseInt(session.round) || 0,
+        story: storyHistory,
+        members: JSON.parse(session.members || '[]')
+      },
+      playerAction: {
+        playerName: playerAction.playerId,
+        content: playerAction.action
+      }
+    });
+    
+    if (response.data.success) {
+      return response.data.adjudication;
+    }
+  } catch (error) {
+    console.error('调用 Referee 裁定失败:', error.message);
+    return null;
+  }
+  return null;
+}
+
+// 调用 Referee 服务结束旅行
+async function endTravelFromReferee(travelId) {
+  try {
+    const session = await getTravelSession(travelId);
+    if (!session) return null;
+    
+    // 获取所有行动记录
+    const actions = await redis.hgetall(`travel:${travelId}:actions`);
+    const actionList = Object.values(actions).map(a => {
+      try { return JSON.parse(a); } catch(e) { return null; }
+    }).filter(Boolean);
+    
+    const response = await axios.post(`${REFEREE_URL}/travel/end`, {
+      travelLog: {
+        background: session.background || '未知背景',
+        members: JSON.parse(session.members || '[]').map(m => ({ name: m })),
+        actions: actionList.map(a => ({ playerName: a.playerId, content: a.action })),
+        rounds: parseInt(session.round) || 0
+      }
+    });
+    
+    if (response.data.success) {
+      return {
+        ending: response.data.narrative,
+        score: response.data.score,
+        fate: response.data.fate
+      };
+    }
+  } catch (error) {
+    console.error('调用 Referee 结束旅行失败:', error.message);
+    return null;
+  }
+  return null;
+}
 async function createInvitation(fromPlayerId, toPlayerId) {
   const invitationId = uuidv4();
   const key = `invitation:${invitationId}`;
@@ -85,13 +183,15 @@ async function createTravelSession(memberIds) {
   const travelId = uuidv4();
   const key = `travel:${travelId}`;
   
+  const background = generateRandomBackground();
+  
   await redis.hset(key, {
     id: travelId,
-    status: 'active', // preparing -> active -> ended
+    status: 'preparing', // preparing -> active -> ended
     members: JSON.stringify(memberIds),
     round: 0,
     createdAt: Date.now(),
-    background: generateRandomBackground()
+    background: background
   });
   
   // 添加成员到旅行
@@ -99,13 +199,24 @@ async function createTravelSession(memberIds) {
     await redis.hset(`player:${memberId}`, 'travelId', travelId);
   }
   
-  // 初始化叙事历史
-  await redis.hset(`travel:${travelId}:narrative`, 'init', JSON.stringify({
-    round: 0,
-    content: '旅行开始了...',
-    timestamp: Date.now(),
-    type: 'system'
-  }));
+  // 异步调用 Referee 生成开场
+  setImmediate(async () => {
+    const opening = await generateOpeningFromReferee(travelId, background, memberIds);
+    if (opening) {
+      console.log(`✅ 旅行 ${travelId} 开场已生成`);
+      // 更新状态为 active
+      await redis.hset(key, 'status', 'active');
+    } else {
+      console.log(`⚠️ 旅行 ${travelId} 开场生成失败，使用默认开场`);
+      await redis.hset(`travel:${travelId}:narrative`, 'opening', JSON.stringify({
+        round: 0,
+        content: '旅行开始了...一场未知的冒险等待着你们。',
+        timestamp: Date.now(),
+        type: 'opening'
+      }));
+      await redis.hset(key, 'status', 'active');
+    }
+  });
   
   return travelId;
 }
@@ -176,6 +287,26 @@ async function recordPlayerAction(travelId, playerId, action) {
     timestamp: Date.now()
   }));
   
+  // 异步调用 Referee 裁定
+  setImmediate(async () => {
+    const adjudication = await adjudicateActionFromReferee(travelId, { playerId, action });
+    if (adjudication) {
+      // 保存裁定结果
+      await redis.hset(`travel:${travelId}:narrative`, `adjudication_${currentRound}_${Date.now()}`, JSON.stringify({
+        round: currentRound,
+        content: adjudication,
+        playerId,
+        timestamp: Date.now(),
+        type: 'adjudication'
+      }));
+      
+      // 推进轮次
+      await advanceRound(travelId, adjudication);
+      
+      console.log(`✅ 旅行 ${travelId} 第 ${currentRound} 轮裁定完成`);
+    }
+  });
+  
   return {
     success: true,
     travelId,
@@ -226,9 +357,16 @@ async function endTravel(travelId, ending) {
   
   const members = JSON.parse(session.members || '[]');
   
+  // 尝试调用 Referee 获取更好的结局
+  const refereeResult = await endTravelFromReferee(travelId);
+  
+  const finalEnding = refereeResult?.ending || ending || '未完成';
+  const finalFate = refereeResult?.fate || (parseInt(session.round) || 0) + 3;
+  
   await redis.hset(key, {
     status: 'ended',
-    ending: ending || '未完成',
+    ending: finalEnding,
+    fate: finalFate,
     endedAt: Date.now()
   });
   
@@ -237,18 +375,12 @@ async function endTravel(travelId, ending) {
     await redis.hset(`player:${memberId}`, 'travelId', '');
   }
   
-  // 计算奖励缘分（基础 3-8 点，根据轮次加成）
-  const round = parseInt(session.round) || 0;
-  const baseFate = Math.floor(Math.random() * 6) + 3;
-  const bonusFate = Math.floor(round / 3);
-  const totalFate = baseFate + bonusFate;
-  
   return {
     success: true,
     travelId,
-    ending: ending || '未完成',
-    fate: totalFate,
-    round,
+    ending: finalEnding,
+    fate: finalFate,
+    round: parseInt(session.round) || 0,
     members
   };
 }
@@ -276,5 +408,7 @@ module.exports = {
   advanceRound,
   recordPlayerAction,
   getNarrativeHistory,
-  endTravel
+  endTravel,
+  getOpeningFromReferee: generateOpeningFromReferee,
+  getAdjudicationFromReferee: adjudicateActionFromReferee
 };
