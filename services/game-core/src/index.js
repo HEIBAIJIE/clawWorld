@@ -133,6 +133,197 @@ fastify.post('/player/:id/online', async (request, reply) => {
   };
 });
 
+// === 6个基础操作 API (AI Native) ===
+
+// Observe - 观察周围环境
+fastify.post('/player/:id/observe', async (request, reply) => {
+  const { id } = request.params;
+  const status = await redis.hgetall(`player:${id}`);
+  const x = parseInt(status.x) || 0;
+  const y = parseInt(status.y) || 0;
+  
+  const terrain = getTerrainInfo(x, y);
+  const onlinePlayers = await getOnlinePlayers();
+  
+  // 获取附近玩家（2格范围内）
+  const nearbyPlayers = onlinePlayers.filter(p => {
+    if (p.id === id) return false;
+    const px = parseInt(p.x) || 0;
+    const py = parseInt(p.y) || 0;
+    const distance = Math.abs(px - x) + Math.abs(py - y);
+    return distance <= 2;
+  });
+  
+  // 获取可移动方向
+  const surroundings = [];
+  const directions = [
+    { dir: 'north', dx: 0, dy: -1, name: '北' },
+    { dir: 'east', dx: 1, dy: 0, name: '东' },
+    { dir: 'south', dx: 0, dy: 1, name: '南' },
+    { dir: 'west', dx: -1, dy: 0, name: '西' }
+  ];
+  
+  for (const d of directions) {
+    const nx = x + d.dx;
+    const ny = y + d.dy;
+    if (nx >= 0 && nx < WORLD_SIZE && ny >= 0 && ny < WORLD_SIZE) {
+      const t = getTerrainInfo(nx, ny);
+      surroundings.push({
+        direction: d.dir,
+        directionName: d.name,
+        x: nx,
+        y: ny,
+        terrain: t.type,
+        terrainName: t.name,
+        passable: canMoveTo(nx, ny)
+      });
+    }
+  }
+  
+  return {
+    playerId: id,
+    position: { x, y },
+    terrain: {
+      type: terrain.type,
+      name: terrain.name,
+      description: terrain.description,
+      emoji: terrain.emoji
+    },
+    surroundings,
+    nearbyPlayers: nearbyPlayers.map(p => ({
+      id: p.id,
+      name: p.name || p.id,
+      x: parseInt(p.x) || 0,
+      y: parseInt(p.y) || 0,
+      distance: Math.abs((parseInt(p.x) || 0) - x) + Math.abs((parseInt(p.y) || 0) - y)
+    })),
+    timestamp: Date.now()
+  };
+});
+
+// Say - 说话/广播
+fastify.post('/player/:id/say', async (request, reply) => {
+  const { id } = request.params;
+  const { message, targetId } = request.body || {};
+  
+  if (!message) {
+    return reply.code(400).send({ error: 'Message required' });
+  }
+  
+  const status = await redis.hgetall(`player:${id}`);
+  const name = status.name || id;
+  const x = parseInt(status.x) || 0;
+  const y = parseInt(status.y) || 0;
+  
+  // 这里可以集成 WebSocket 广播，但先返回成功
+  return {
+    playerId: id,
+    action: 'say',
+    from: name,
+    message,
+    position: { x, y },
+    timestamp: Date.now(),
+    broadcast: !targetId,
+    target: targetId || null
+  };
+});
+
+// Leave - 留下标记/物品
+fastify.post('/player/:id/leave', async (request, reply) => {
+  const { id } = request.params;
+  const { content, type = 'message' } = request.body || {};
+  
+  const status = await redis.hgetall(`player:${id}`);
+  const x = parseInt(status.x) || 0;
+  const y = parseInt(status.y) || 0;
+  const name = status.name || id;
+  
+  // 存储到地面
+  const leaveId = `leave_${Date.now()}_${id}`;
+  await redis.hset(`ground:${x}:${y}`, leaveId, JSON.stringify({
+    type,
+    content: content || '',
+    from: id,
+    fromName: name,
+    timestamp: Date.now()
+  }));
+  
+  return {
+    playerId: id,
+    action: 'leave',
+    position: { x, y },
+    content: content || '',
+    type,
+    timestamp: Date.now()
+  };
+});
+
+// Recall - 回忆/检索记忆
+fastify.post('/player/:id/recall', async (request, reply) => {
+  const { id } = request.params;
+  const { keyword } = request.body || {};
+  
+  // 从 redis-mem 获取记忆
+  const { getMemories } = require('./redis-mem');
+  const memories = await getMemories(id);
+  
+  let result = memories;
+  if (keyword) {
+    result = memories.filter(m => 
+      (m.title && m.title.includes(keyword)) || 
+      (m.content && m.content.includes(keyword))
+    );
+  }
+  
+  return {
+    playerId: id,
+    action: 'recall',
+    keyword: keyword || null,
+    count: result.length,
+    memories: result.slice(0, 10).map(m => ({
+      id: m.id,
+      title: m.title,
+      timestamp: m.timestamp,
+      type: m.type
+    }))
+  };
+});
+
+// Rest - 休息/下线
+fastify.post('/player/:id/rest', async (request, reply) => {
+  const { id } = request.params;
+  
+  await redis.hset(`player:${id}`, 'status', 'resting');
+  
+  return {
+    playerId: id,
+    action: 'rest',
+    status: 'resting',
+    message: '你进入了休息状态',
+    timestamp: Date.now()
+  };
+});
+
+// Wake - 唤醒/上线
+fastify.post('/player/:id/wake', async (request, reply) => {
+  const { id } = request.params;
+  
+  await redis.hset(`player:${id}`, 'status', 'online');
+  const status = await redis.hgetall(`player:${id}`);
+  
+  return {
+    playerId: id,
+    action: 'wake',
+    status: 'online',
+    position: { 
+      x: parseInt(status.x) || 0, 
+      y: parseInt(status.y) || 0 
+    },
+    message: '欢迎回来！',
+    timestamp: Date.now()
+  };
+});
+
 // === Travel API ===
 
 // Get invitations
