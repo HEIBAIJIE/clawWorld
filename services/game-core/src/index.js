@@ -2,21 +2,21 @@ const fastify = require('fastify')({ logger: true });
 const cors = require('@fastify/cors');
 require('dotenv').config();
 
-const { 
-  createInvitation, 
-  getInvitations, 
-  acceptInvitation, 
-  rejectInvitation,
-  getTravelSession 
-} = require('./travel');
-const { getOnlinePlayers, setPlayerOnline, redis } = require('./redis-mem');
-const { getTerrainInfo, canMoveTo, WORLD_SIZE } = require('./world');
+const { getOnlinePlayers } = require('./redis-mem');
+const { WORLD_SIZE } = require('./world');
 const { setupWebSocket } = require('./websocket');
+
+// 导入路由模块
+const { registerPlayerRoutes } = require('./routes/players');
+const { registerTerritoryRoutes } = require('./routes/territory');
+const { registerEventRoutes } = require('./routes/events');
 
 // Register CORS
 fastify.register(cors, {
   origin: '*'
 });
+
+// ========== 基础端点 ==========
 
 // Health check
 fastify.get('/health', async () => {
@@ -38,7 +38,7 @@ fastify.get('/stats', async () => {
 fastify.get('/world/state', async (request, reply) => {
   const onlinePlayers = await getOnlinePlayers();
   return {
-    worldSize: 20,
+    worldSize: WORLD_SIZE,
     onlinePlayers: onlinePlayers.map(p => ({
       id: p.id,
       x: parseInt(p.x) || 0,
@@ -49,69 +49,10 @@ fastify.get('/world/state', async (request, reply) => {
   };
 });
 
-// Player position endpoint
-fastify.get('/player/:id/position', async (request, reply) => {
-  const { id } = request.params;
-  const status = await redis.hgetall(`player:${id}`);
-  const x = parseInt(status.x) || 0;
-  const y = parseInt(status.y) || 0;
-  const terrain = getTerrainInfo(x, y);
-  
-  return {
-    playerId: id,
-    x,
-    y,
-    terrain: terrain.type,
-    terrainName: terrain.name,
-    terrainDescription: terrain.description
-  };
-});
-
-// Player move endpoint
-fastify.post('/player/:id/move', async (request, reply) => {
-  const { id } = request.params;
-  const { direction } = request.body;
-  
-  // Get current position
-  const status = await redis.hgetall(`player:${id}`);
-  let x = parseInt(status.x) || 0;
-  let y = parseInt(status.y) || 0;
-  
-  // Calculate new position
-  let newX = x, newY = y;
-  switch(direction) {
-    case 'north': newY = y - 1; break;
-    case 'south': newY = y + 1; break;
-    case 'east': newX = x + 1; break;
-    case 'west': newX = x - 1; break;
-    default:
-      return reply.code(400).send({ error: 'Invalid direction' });
-  }
-  
-  // Check if can move
-  if (!canMoveTo(newX, newY)) {
-    return reply.code(400).send({ 
-      error: 'Cannot move there',
-      terrain: getTerrainInfo(newX, newY)
-    });
-  }
-  
-  // Update position
-  await redis.hset(`player:${id}`, 'x', newX, 'y', newY);
-  const terrain = getTerrainInfo(newX, newY);
-  
-  return {
-    playerId: id,
-    from: { x, y },
-    to: { x: newX, y: newY },
-    direction,
-    terrain: terrain.type,
-    terrainName: terrain.name
-  };
-});
-
 // Get terrain at position
 fastify.get('/world/terrain/:x/:y', async (request, reply) => {
+  const { getTerrainInfo } = require('./world');
+  
   const x = parseInt(request.params.x);
   const y = parseInt(request.params.y);
   
@@ -126,215 +67,186 @@ fastify.get('/world/terrain/:x/:y', async (request, reply) => {
   };
 });
 
-// Player login/online endpoint
-fastify.post('/player/:id/online', async (request, reply) => {
+// ========== 注册领域路由 ==========
+
+// 玩家路由（包含6个基础操作）
+fastify.register(registerPlayerRoutes);
+
+// 领地路由
+fastify.register(registerTerritoryRoutes);
+
+// 世界事件路由
+fastify.register(registerEventRoutes);
+
+// ========== 其他功能路由（待拆分） ==========
+
+// === 旅行系统 API ===
+const { 
+  createInvitation, 
+  getInvitations, 
+  acceptInvitation, 
+  rejectInvitation,
+  getTravelSession,
+  recordPlayerAction,
+  endTravel
+} = require('./travel');
+
+// 获取邀请列表
+fastify.get('/player/:id/invitations', async (request, reply) => {
   const { id } = request.params;
-  const { x, y, name } = request.body || {};
-  
-  await setPlayerOnline(id, {
-    x: x || 0,
-    y: y || 0,
-    name: name || id
-  });
+  const invitations = await getInvitations(id);
   
   return {
     playerId: id,
-    status: 'online',
-    position: { x: x || 0, y: y || 0 }
-  };
-});
-
-// === 6个基础操作 API (AI Native) ===
-
-// Observe - 观察周围环境
-fastify.post('/player/:id/observe', async (request, reply) => {
-  const { id } = request.params;
-  const status = await redis.hgetall(`player:${id}`);
-  const x = parseInt(status.x) || 0;
-  const y = parseInt(status.y) || 0;
-  
-  const terrain = getTerrainInfo(x, y);
-  const onlinePlayers = await getOnlinePlayers();
-  
-  // 获取附近玩家（2格范围内）
-  const nearbyPlayers = onlinePlayers.filter(p => {
-    if (p.id === id) return false;
-    const px = parseInt(p.x) || 0;
-    const py = parseInt(p.y) || 0;
-    const distance = Math.abs(px - x) + Math.abs(py - y);
-    return distance <= 2;
-  });
-  
-  // 获取可移动方向
-  const surroundings = [];
-  const directions = [
-    { dir: 'north', dx: 0, dy: -1, name: '北' },
-    { dir: 'east', dx: 1, dy: 0, name: '东' },
-    { dir: 'south', dx: 0, dy: 1, name: '南' },
-    { dir: 'west', dx: -1, dy: 0, name: '西' }
-  ];
-  
-  for (const d of directions) {
-    const nx = x + d.dx;
-    const ny = y + d.dy;
-    if (nx >= 0 && nx < WORLD_SIZE && ny >= 0 && ny < WORLD_SIZE) {
-      const t = getTerrainInfo(nx, ny);
-      surroundings.push({
-        direction: d.dir,
-        directionName: d.name,
-        x: nx,
-        y: ny,
-        terrain: t.type,
-        terrainName: t.name,
-        passable: canMoveTo(nx, ny)
-      });
-    }
-  }
-  
-  return {
-    playerId: id,
-    position: { x, y },
-    terrain: {
-      type: terrain.type,
-      name: terrain.name,
-      description: terrain.description,
-      emoji: terrain.emoji
-    },
-    surroundings,
-    nearbyPlayers: nearbyPlayers.map(p => ({
-      id: p.id,
-      name: p.name || p.id,
-      x: parseInt(p.x) || 0,
-      y: parseInt(p.y) || 0,
-      distance: Math.abs((parseInt(p.x) || 0) - x) + Math.abs((parseInt(p.y) || 0) - y)
-    })),
-    timestamp: Date.now()
-  };
-});
-
-// Say - 说话/广播
-fastify.post('/player/:id/say', async (request, reply) => {
-  const { id } = request.params;
-  const { message, targetId } = request.body || {};
-  
-  if (!message) {
-    return reply.code(400).send({ error: 'Message required' });
-  }
-  
-  const status = await redis.hgetall(`player:${id}`);
-  const name = status.name || id;
-  const x = parseInt(status.x) || 0;
-  const y = parseInt(status.y) || 0;
-  
-  // 这里可以集成 WebSocket 广播，但先返回成功
-  return {
-    playerId: id,
-    action: 'say',
-    from: name,
-    message,
-    position: { x, y },
-    timestamp: Date.now(),
-    broadcast: !targetId,
-    target: targetId || null
-  };
-});
-
-// Leave - 留下标记/物品
-fastify.post('/player/:id/leave', async (request, reply) => {
-  const { id } = request.params;
-  const { content, type = 'message' } = request.body || {};
-  
-  const status = await redis.hgetall(`player:${id}`);
-  const x = parseInt(status.x) || 0;
-  const y = parseInt(status.y) || 0;
-  const name = status.name || id;
-  
-  // 存储到地面
-  const leaveId = `leave_${Date.now()}_${id}`;
-  await redis.hset(`ground:${x}:${y}`, leaveId, JSON.stringify({
-    type,
-    content: content || '',
-    from: id,
-    fromName: name,
-    timestamp: Date.now()
-  }));
-  
-  return {
-    playerId: id,
-    action: 'leave',
-    position: { x, y },
-    content: content || '',
-    type,
-    timestamp: Date.now()
-  };
-});
-
-// Recall - 回忆/检索记忆
-fastify.post('/player/:id/recall', async (request, reply) => {
-  const { id } = request.params;
-  const { keyword } = request.body || {};
-  
-  // 从 redis-mem 获取记忆
-  const { getMemories } = require('./redis-mem');
-  const memories = await getMemories(id);
-  
-  let result = memories;
-  if (keyword) {
-    result = memories.filter(m => 
-      (m.title && m.title.includes(keyword)) || 
-      (m.content && m.content.includes(keyword))
-    );
-  }
-  
-  return {
-    playerId: id,
-    action: 'recall',
-    keyword: keyword || null,
-    count: result.length,
-    memories: result.slice(0, 10).map(m => ({
-      id: m.id,
-      title: m.title,
-      timestamp: m.timestamp,
-      type: m.type
+    count: invitations.length,
+    invitations: invitations.map(inv => ({
+      id: inv.id,
+      from: inv.from,
+      status: inv.status,
+      createdAt: inv.createdAt
     }))
   };
 });
 
-// Add Memory - 添加记忆（旅行结束后调用）
-fastify.post('/player/:id/memory', async (request, reply) => {
+// 创建邀请
+fastify.post('/player/:id/invite', async (request, reply) => {
   const { id } = request.params;
-  const { title, content, type = 'travel', tags = [] } = request.body || {};
+  const { targetId } = request.body || {};
   
-  if (!title) {
-    return reply.code(400).send({ error: 'Title required' });
+  if (!targetId || typeof targetId !== 'string') {
+    return reply.code(400).send({ error: 'targetId is required' });
   }
   
-  const { addMemory } = require('./redis-mem');
-  const memory = await addMemory(id, {
-    title,
-    content: content || '',
-    type,
-    tags
+  const invitationId = await createInvitation(id, targetId);
+  
+  return {
+    success: true,
+    invitationId,
+    from: id,
+    to: targetId,
+    message: `邀请已发送给 ${targetId}`
+  };
+});
+
+// 响应邀请
+fastify.post('/invitation/:invitationId/respond', async (request, reply) => {
+  const { invitationId } = request.params;
+  const { playerId, accept } = request.body || {};
+  
+  if (!playerId) {
+    return reply.code(400).send({ error: 'playerId is required' });
+  }
+  
+  if (accept) {
+    const result = await acceptInvitation(invitationId, playerId);
+    if (result.error) {
+      return reply.code(400).send(result);
+    }
+    return {
+      success: true,
+      accepted: true,
+      travelId: result.travelId,
+      members: result.members
+    };
+  } else {
+    await rejectInvitation(invitationId, playerId);
+    return {
+      success: true,
+      accepted: false
+    };
+  }
+});
+
+// 获取旅行会话
+fastify.get('/travel/:travelId', async (request, reply) => {
+  const { travelId } = request.params;
+  const session = await getTravelSession(travelId);
+  
+  if (!session) {
+    return reply.code(404).send({ error: 'Travel session not found' });
+  }
+  
+  return {
+    travelId,
+    ...session
+  };
+});
+
+// === 记忆系统 API ===
+
+const { addMemory, deleteMemory, getMemories } = require('./redis-mem');
+
+// Get Memories - 获取记忆列表
+fastify.get('/player/:id/memories', async (request, reply) => {
+  const { id } = request.params;
+  const { limit = 10 } = request.query;
+  
+  const parsedLimit = parseInt(limit);
+  if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
+    return reply.code(400).send({ error: 'Invalid limit (must be 1-50)' });
+  }
+  
+  const { getTimeAgo } = require('./utils/helpers');
+  const memories = await getMemories(id, parsedLimit);
+  
+  return {
+    playerId: id,
+    count: memories.length,
+    memories: memories.map(m => ({
+      id: m.id,
+      title: m.title,
+      content: m.content,
+      timestamp: m.timestamp,
+      timeAgo: getTimeAgo(m.timestamp),
+      type: m.type,
+      tags: m.tags
+    }))
+  };
+});
+
+// Add Memory - 添加记忆
+fastify.post('/player/:id/memories', async (request, reply) => {
+  const { id } = request.params;
+  const { title, content, type, tags } = request.body || {};
+  
+  if (!title || typeof title !== 'string' || title.trim().length === 0) {
+    return reply.code(400).send({ error: 'Title is required' });
+  }
+  
+  if (title.length > 100) {
+    return reply.code(400).send({ error: 'Title too long (max 100 chars)' });
+  }
+  
+  if (!content || typeof content !== 'string' || content.trim().length === 0) {
+    return reply.code(400).send({ error: 'Content is required' });
+  }
+  
+  if (content.length > 2000) {
+    return reply.code(400).send({ error: 'Content too long (max 2000 chars)' });
+  }
+  
+  const result = await addMemory(id, {
+    title: title.trim(),
+    content: content.trim(),
+    type: type || 'general',
+    tags: Array.isArray(tags) ? tags : []
   });
+  
+  if (result.error) {
+    return reply.code(400).send(result);
+  }
   
   return {
     playerId: id,
     action: 'add_memory',
-    memory: {
-      id: memory.id,
-      title: memory.title,
-      timestamp: memory.timestamp,
-      type: memory.type
-    },
-    message: '记忆已添加到记忆栏'
+    memory: result
   };
 });
 
-// Delete Memory - 删除记忆（腾出空间）
-fastify.delete('/player/:id/memory/:memoryId', async (request, reply) => {
+// Delete Memory - 删除记忆
+fastify.delete('/player/:id/memories/:memoryId', async (request, reply) => {
   const { id, memoryId } = request.params;
   
-  const { deleteMemory } = require('./redis-mem');
   const success = await deleteMemory(id, memoryId);
   
   if (!success) {
@@ -345,147 +257,22 @@ fastify.delete('/player/:id/memory/:memoryId', async (request, reply) => {
     playerId: id,
     action: 'delete_memory',
     memoryId,
-    message: '记忆已删除'
-  };
-});
-
-// Solidify Memory - 固化回忆（消耗缘分转为实体）
-fastify.post('/player/:id/memory/:memoryId/solidify', async (request, reply) => {
-  const { id, memoryId } = request.params;
-  const { form = 'sculpture' } = request.body || {}; // sculpture, painting, book, song
-  
-  const { getMemories, deleteMemory, updateFate, getFate, getTerritorySize, getTerritoryEntityCount } = require('./redis-mem');
-  
-  // 检查记忆是否存在
-  const memories = await getMemories(id);
-  const memory = memories.find(m => m.id === memoryId);
-  
-  if (!memory) {
-    return reply.code(404).send({ error: 'Memory not found' });
-  }
-  
-  // 检查领地容量
-  const territorySize = await getTerritorySize(id);
-  const currentEntities = await getTerritoryEntityCount(id);
-  
-  if (currentEntities >= territorySize) {
-    return reply.code(400).send({ 
-      error: '领地已满，无法固化更多回忆', 
-      current: currentEntities,
-      capacity: territorySize,
-      message: '请扩大领地或删除现有实体'
-    });
-  }
-  
-  // 检查缘分是否足够（固化需要 5 点缘分）
-  const currentFate = await getFate(id);
-  const COST = 5;
-  
-  if (currentFate < COST) {
-    return reply.code(400).send({ 
-      error: '缘分不足', 
-      required: COST, 
-      current: currentFate 
-    });
-  }
-  
-  // 扣除缘分
-  const newFate = await updateFate(id, -COST);
-  
-  // 从记忆栏删除
-  await deleteMemory(id, memoryId);
-  
-  // 创建实体到领地（存储到领地集合）
-  const entityId = `entity_${Date.now()}_${id}`;
-  await redis.hset(`territory:${id}`, entityId, JSON.stringify({
-    memoryId,
-    title: memory.title,
-    content: memory.content,
-    form, // 实体形式
-    createdAt: Date.now(),
-    originalTimestamp: memory.timestamp
-  }));
-  
-  return {
-    playerId: id,
-    action: 'solidify_memory',
-    memory: {
-      id: memoryId,
-      title: memory.title,
-      form
-    },
-    cost: COST,
-    fateRemaining: newFate,
-    territory: {
-      current: currentEntities + 1,
-      capacity: territorySize
-    },
-    message: `回忆已固化为${form === 'sculpture' ? '雕塑' : form === 'painting' ? '画作' : form === 'book' ? '书' : '歌'}`
-  };
-});
-
-// Get Territory - 查看领地
-fastify.get('/player/:id/territory', async (request, reply) => {
-  const { id } = request.params;
-  
-  const territory = await redis.hgetall(`territory:${id}`);
-  const { getFate, getTerritorySize, getTerritoryEntityCount } = require('./redis-mem');
-  const fate = await getFate(id);
-  const capacity = await getTerritorySize(id);
-  const current = await getTerritoryEntityCount(id);
-  
-  const entities = Object.entries(territory).map(([key, value]) => {
-    const entity = JSON.parse(value);
-    return {
-      id: key,
-      ...entity
-    };
-  });
-  
-  return {
-    playerId: id,
-    entities: entities,
-    count: entities.length,
-    capacity,
-    canExpand: current >= capacity,
-    expansionCost: 10,
-    fate
-  };
-});
-
-// Update Fate - 更新缘分（管理员/裁判调用）
-fastify.post('/player/:id/fate', async (request, reply) => {
-  const { id } = request.params;
-  const { delta } = request.body || {};
-  
-  if (typeof delta !== 'number') {
-    return reply.code(400).send({ error: 'Delta must be a number' });
-  }
-  
-  const { updateFate, getFate } = require('./redis-mem');
-  const newFate = await updateFate(id, delta);
-  
-  return {
-    playerId: id,
-    action: 'update_fate',
-    delta,
-    fate: newFate
+    success: true
   };
 });
 
 // === 物品系统 API ===
 
+const { addItem, removeItem, getItems } = require('./redis-mem');
+
 // Get Inventory - 获取物品栏
 fastify.get('/player/:id/inventory', async (request, reply) => {
   const { id } = request.params;
-  
-  const { getItems } = require('./redis-mem');
   const items = await getItems(id);
   
   return {
     playerId: id,
     count: items.length,
-    limit: 10,
     items: items.map(item => ({
       id: item.id,
       name: item.name,
@@ -497,18 +284,21 @@ fastify.get('/player/:id/inventory', async (request, reply) => {
   };
 });
 
-// Add Item - 添加物品（旅行/事件获得）
+// Add Item - 添加物品
 fastify.post('/player/:id/inventory', async (request, reply) => {
   const { id } = request.params;
   const { name, description, type = 'misc', rarity = 'common', metadata = {} } = request.body || {};
   
-  if (!name) {
-    return reply.code(400).send({ error: 'Item name required' });
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    return reply.code(400).send({ error: 'Item name is required' });
   }
   
-  const { addItem } = require('./redis-mem');
+  if (name.length > 50) {
+    return reply.code(400).send({ error: 'Item name too long (max 50 chars)' });
+  }
+  
   const result = await addItem(id, {
-    name,
+    name: name.trim(),
     description: description || '',
     type,
     rarity,
@@ -528,7 +318,7 @@ fastify.post('/player/:id/inventory', async (request, reply) => {
       type: result.type,
       rarity: result.rarity
     },
-    message: `获得物品: ${name}`
+    message: `获得物品: ${result.name}`
   };
 });
 
@@ -536,7 +326,6 @@ fastify.post('/player/:id/inventory', async (request, reply) => {
 fastify.delete('/player/:id/inventory/:itemId', async (request, reply) => {
   const { id, itemId } = request.params;
   
-  const { removeItem } = require('./redis-mem');
   const result = await removeItem(id, itemId);
   
   if (!result) {
@@ -554,405 +343,8 @@ fastify.delete('/player/:id/inventory/:itemId', async (request, reply) => {
   };
 });
 
-// Give Item - 给予物品（交换）
-fastify.post('/player/:id/inventory/:itemId/give', async (request, reply) => {
-  const { id, itemId } = request.params;
-  const { targetId } = request.body || {};
-  
-  if (!targetId) {
-    return reply.code(400).send({ error: 'Target player ID required' });
-  }
-  
-  const { removeItem, addItem, getItems } = require('./redis-mem');
-  
-  // 检查物品是否存在
-  const myItems = await getItems(id);
-  const item = myItems.find(i => i.id === itemId);
-  
-  if (!item) {
-    return reply.code(404).send({ error: 'Item not found' });
-  }
-  
-  // 检查对方物品栏是否已满
-  const targetItems = await getItems(targetId);
-  if (targetItems.length >= 10) {
-    return reply.code(400).send({ error: '对方物品栏已满' });
-  }
-  
-  // 从给予方移除
-  await removeItem(id, itemId);
-  
-  // 添加给对方
-  await addItem(targetId, {
-    name: item.name,
-    description: item.description,
-    type: item.type,
-    rarity: item.rarity,
-    metadata: { ...item.metadata, from: id, giftedAt: Date.now() }
-  });
-  
-  return {
-    playerId: id,
-    action: 'give_item',
-    item: { id: itemId, name: item.name },
-    target: targetId,
-    message: `已将 ${item.name} 给予 ${targetId}`
-  };
-});
+// ========== 启动服务 ==========
 
-// Rest - 休息/下线
-fastify.post('/player/:id/rest', async (request, reply) => {
-  const { id } = request.params;
-  
-  await redis.hset(`player:${id}`, 'status', 'resting');
-  
-  return {
-    playerId: id,
-    action: 'rest',
-    status: 'resting',
-    message: '你进入了休息状态',
-    timestamp: Date.now()
-  };
-});
-
-// Wake - 唤醒/上线
-fastify.post('/player/:id/wake', async (request, reply) => {
-  const { id } = request.params;
-  
-  await redis.hset(`player:${id}`, 'status', 'online');
-  const status = await redis.hgetall(`player:${id}`);
-  
-  return {
-    playerId: id,
-    action: 'wake',
-    status: 'online',
-    position: { 
-      x: parseInt(status.x) || 0, 
-      y: parseInt(status.y) || 0 
-    },
-    message: '欢迎回来！',
-    timestamp: Date.now()
-  };
-});
-
-// === Travel API ===
-
-// Get invitations
-fastify.get('/player/:id/invitations', async (request, reply) => {
-  const { id } = request.params;
-  const invitations = await getInvitations(id);
-  return { playerId: id, invitations };
-});
-
-// Create invitation
-fastify.post('/player/:id/invite', async (request, reply) => {
-  const { id } = request.params;
-  const { targetId } = request.body;
-  
-  if (!targetId) {
-    return reply.code(400).send({ error: 'targetId required' });
-  }
-  
-  const invitationId = await createInvitation(id, targetId);
-  return { 
-    success: true, 
-    invitationId,
-    from: id,
-    to: targetId 
-  };
-});
-
-// Accept invitation
-fastify.post('/invitation/:invitationId/accept', async (request, reply) => {
-  const { invitationId } = request.params;
-  const { playerId } = request.body;
-  
-  const result = await acceptInvitation(invitationId, playerId);
-  if (result.error) {
-    return reply.code(400).send(result);
-  }
-  return result;
-});
-
-// Reject invitation
-fastify.post('/invitation/:invitationId/reject', async (request, reply) => {
-  const { invitationId } = request.params;
-  const { playerId } = request.body;
-  
-  const result = await rejectInvitation(invitationId, playerId);
-  if (result.error) {
-    return reply.code(400).send(result);
-  }
-  return result;
-});
-
-// Get travel session
-fastify.get('/travel/:travelId', async (request, reply) => {
-  const { travelId } = request.params;
-  const session = await getTravelSession(travelId);
-  
-  if (!session) {
-    return reply.code(404).send({ error: 'Travel session not found' });
-  }
-  
-  return session;
-});
-
-// === 领地扩展 API ===
-
-// Expand Territory - 扩大领地容量
-fastify.post('/player/:id/territory/expand', async (request, reply) => {
-  const { id } = request.params;
-  const { getFate, updateFate, expandTerritory, getTerritorySize } = require('./redis-mem');
-  
-  const COST = 10; // 扩大领地需要 10 点缘分
-  const currentFate = await getFate(id);
-  
-  if (currentFate < COST) {
-    return reply.code(400).send({
-      error: '缘分不足',
-      required: COST,
-      current: currentFate
-    });
-  }
-  
-  // 扣除缘分
-  const newFate = await updateFate(id, -COST);
-  
-  // 扩大领地
-  const newSize = await expandTerritory(id);
-  
-  return {
-    playerId: id,
-    action: 'expand_territory',
-    cost: COST,
-    fateRemaining: newFate,
-    territorySize: newSize,
-    message: `领地已扩大，现在可以存放 ${newSize} 个实体`
-  };
-});
-
-// Get Territory Entity Detail - 查看领地实体详情
-fastify.get('/player/:id/territory/:entityId', async (request, reply) => {
-  const { id, entityId } = request.params;
-  
-  const territory = await redis.hgetall(`territory:${id}`);
-  const entity = territory[entityId];
-  
-  if (!entity) {
-    return reply.code(404).send({ error: 'Entity not found' });
-  }
-  
-  const parsed = JSON.parse(entity);
-  
-  return {
-    playerId: id,
-    entityId,
-    ...parsed,
-    formName: parsed.form === 'sculpture' ? '雕塑' : 
-              parsed.form === 'painting' ? '画作' : 
-              parsed.form === 'book' ? '书' : '歌'
-  };
-});
-
-// Visit Territory - 访问他人领地
-fastify.get('/territory/:playerId/visit', async (request, reply) => {
-  const { playerId } = request.params;
-  const { visitorId } = request.query;
-  
-  const territory = await redis.hgetall(`territory:${playerId}`);
-  const { getPlayerStatus, getTerritoryMessages } = require('./redis-mem');
-  
-  const ownerStatus = await getPlayerStatus(playerId);
-  const ownerName = ownerStatus.name || playerId;
-  
-  const entities = Object.entries(territory).map(([key, value]) => {
-    const entity = JSON.parse(value);
-    return {
-      id: key,
-      title: entity.title,
-      form: entity.form,
-      formName: entity.form === 'sculpture' ? '雕塑' : 
-                entity.form === 'painting' ? '画作' : 
-                entity.form === 'book' ? '书' : '歌',
-      createdAt: entity.createdAt
-    };
-  });
-  
-  // 获取留言
-  const messages = await getTerritoryMessages(playerId);
-  
-  return {
-    ownerId: playerId,
-    ownerName,
-    visitorId: visitorId || 'anonymous',
-    entityCount: entities.length,
-    entities: entities.sort((a, b) => b.createdAt - a.createdAt),
-    messages: messages.slice(0, 10).map(m => ({
-      id: m.id,
-      visitorId: m.visitorId,
-      message: m.message,
-      timeAgo: getTimeAgo(m.timestamp)
-    })),
-    message: `欢迎来到 ${ownerName} 的领地`
-  };
-});
-
-// === 领地留言系统 API ===
-
-// Leave message in territory - 在领地留言
-fastify.post('/territory/:playerId/message', async (request, reply) => {
-  const { playerId } = request.params;
-  const { visitorId, message } = request.body || {};
-  
-  if (!visitorId) {
-    return reply.code(400).send({ error: 'visitorId required' });
-  }
-  
-  if (!message || message.trim().length === 0) {
-    return reply.code(400).send({ error: 'message required' });
-  }
-  
-  if (message.length > 200) {
-    return reply.code(400).send({ error: 'message too long (max 200 chars)' });
-  }
-  
-  const { addTerritoryMessage, getPlayerStatus } = require('./redis-mem');
-  
-  // 检查领地主人是否存在
-  const ownerStatus = await getPlayerStatus(playerId);
-  if (!ownerStatus || Object.keys(ownerStatus).length === 0) {
-    return reply.code(404).send({ error: 'Territory owner not found' });
-  }
-  
-  const newMessage = await addTerritoryMessage(playerId, visitorId, message.trim());
-  
-  return {
-    success: true,
-    messageId: newMessage.id,
-    territoryOwner: playerId,
-    visitorId,
-    message: message.trim(),
-    timestamp: newMessage.timestamp
-  };
-});
-
-// Get territory messages - 获取领地留言
-fastify.get('/territory/:playerId/messages', async (request, reply) => {
-  const { playerId } = request.params;
-  const { limit = 20 } = request.query;
-  
-  const { getTerritoryMessages, getPlayerStatus } = require('./redis-mem');
-  
-  const messages = await getTerritoryMessages(playerId);
-  const ownerStatus = await getPlayerStatus(playerId);
-  
-  return {
-    territoryOwner: playerId,
-    ownerName: ownerStatus.name || playerId,
-    count: messages.length,
-    messages: messages.slice(0, parseInt(limit)).map(m => ({
-      id: m.id,
-      visitorId: m.visitorId,
-      message: m.message,
-      timestamp: m.timestamp,
-      timeAgo: getTimeAgo(m.timestamp)
-    }))
-  };
-});
-
-// Delete territory message - 删除领地留言（仅领地主人）
-fastify.delete('/territory/:playerId/message/:messageId', async (request, reply) => {
-  const { playerId, messageId } = request.params;
-  const { requesterId } = request.body || {};
-  
-  if (requesterId !== playerId) {
-    return reply.code(403).send({ error: 'Only territory owner can delete messages' });
-  }
-  
-  const { deleteTerritoryMessage } = require('./redis-mem');
-  const success = await deleteTerritoryMessage(playerId, messageId);
-  
-  if (!success) {
-    return reply.code(404).send({ error: 'Message not found' });
-  }
-  
-  return {
-    success: true,
-    message: 'Message deleted'
-  };
-});
-
-// Helper function - 获取相对时间
-function getTimeAgo(timestamp) {
-  const now = Date.now();
-  const diff = now - timestamp;
-  
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days = Math.floor(diff / 86400000);
-  
-  if (minutes < 1) return '刚刚';
-  if (minutes < 60) return `${minutes}分钟前`;
-  if (hours < 24) return `${hours}小时前`;
-  if (days < 30) return `${days}天前`;
-  return new Date(timestamp).toLocaleDateString();
-}
-
-// === 世界事件系统 API ===
-
-const { getCurrentEvent, getEventHistory, createRandomEvent, participateEvent } = require('./world-events');
-
-// Get current world event
-fastify.get('/world/event', async (request, reply) => {
-  const event = await getCurrentEvent();
-  return {
-    hasEvent: !!event,
-    event: event || null,
-    message: event ? `当前事件: ${event.name}` : '世界平静中...'
-  };
-});
-
-// Get event history
-fastify.get('/world/events/history', async (request, reply) => {
-  const { limit = 10 } = request.query;
-  const history = await getEventHistory(parseInt(limit));
-  return {
-    count: history.length,
-    events: history
-  };
-});
-
-// Admin: Trigger random event
-fastify.post('/world/event/trigger', async (request, reply) => {
-  // 可以添加管理员验证
-  const { type } = request.body || {};
-  const event = await createRandomEvent(type);
-  return {
-    success: true,
-    event,
-    message: `事件触发: ${event.name}`
-  };
-});
-
-// Participate in current event
-fastify.post('/player/:id/event/participate', async (request, reply) => {
-  const { id } = request.params;
-  const { action, choice } = request.body || {};
-  
-  const result = await participateEvent(id, action, choice);
-  
-  if (result.error) {
-    return reply.code(400).send(result);
-  }
-  
-  return {
-    playerId: id,
-    ...result
-  };
-});
-
-// Start server
 const start = async () => {
   try {
     await fastify.listen({ port: 3002, host: '0.0.0.0' });
