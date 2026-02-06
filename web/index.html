@@ -521,6 +521,18 @@
                 </div>
             </div>
             
+            <!-- 🌍 世界事件面板 -->
+            <div class="panel" id="world-event-panel" style="display: none;">
+                <h3>🌍 世界事件 <span id="event-timer" style="float: right; font-size: 0.75rem; color: #e94560;"></span></h3>
+                <div class="panel-content" id="event-content">
+                    <div style="padding: 0.5rem; background: linear-gradient(135deg, #0f3460, #16213e); border-radius: 4px;">
+                        <div id="event-name" style="font-weight: bold; color: #e94560; margin-bottom: 0.3rem;"></div>
+                        <div id="event-description" style="font-size: 0.8rem; color: #ccc; margin-bottom: 0.5rem;"></div>
+                        <div id="event-choices" style="display: flex; flex-direction: column; gap: 0.3rem;"></div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="panel">
                 <h3>📝 最近记忆</h3>
                 <div id="memory-list" class="panel-content" style="max-height: 120px; overflow-y: auto;">
@@ -834,6 +846,12 @@
                 case 'pong':
                     lastPongTime = Date.now();
                     break;
+                case 'world_event_start':
+                    handleWorldEventStart(data.event);
+                    break;
+                case 'world_event_end':
+                    handleWorldEventEnd(data);
+                    break;
                 case 'travel_invite':
                     showTravelInvite(data);
                     AudioSys.invite(); // 🎵 邀请音效
@@ -1071,6 +1089,148 @@
             }
             
             input.value = '';
+        }
+        
+        // 🌍 世界事件处理
+        let currentEventId = null;
+        let eventTimerInterval = null;
+        
+        function handleWorldEventStart(event) {
+            currentEventId = event.id;
+            
+            // 显示事件面板
+            const panel = document.getElementById('world-event-panel');
+            const nameEl = document.getElementById('event-name');
+            const descEl = document.getElementById('event-description');
+            const choicesEl = document.getElementById('event-choices');
+            
+            if (panel) panel.style.display = 'block';
+            if (nameEl) nameEl.textContent = event.name;
+            if (descEl) descEl.textContent = event.description;
+            
+            // 渲染选择按钮
+            if (choicesEl && event.choices) {
+                let html = '';
+                event.choices.forEach(choice => {
+                    let costText = '';
+                    if (choice.cost) {
+                        if (choice.cost.fate) costText = `(${choice.cost.fate}✨)`;
+                        if (choice.cost.memory) costText = `(${choice.cost.memory}条记忆)`;
+                    }
+                    html += `
+                        <button onclick="participateEvent('${choice.id}', '${choice.name}')" 
+                            style="padding: 0.5rem; background: #533483; border: 1px solid #7b5aa6; color: #eee; border-radius: 4px; cursor: pointer; font-size: 0.8rem; text-align: left; transition: all 0.15s;"
+                            onmouseover="this.style.background='#7b5aa6'" onmouseout="this.style.background='#533483'"
+                            onmousedown="this.style.transform='scale(0.98)'" onmouseup="this.style.transform='scale(1)'">
+                            <strong>${choice.name} ${costText}</strong>
+                            <div style="font-size: 0.75rem; color: #888; margin-top: 0.2rem;">${choice.description}</div>
+                        </button>
+                    `;
+                });
+                choicesEl.innerHTML = html;
+            }
+            
+            // 启动倒计时
+            startEventTimer(event.endTime);
+            
+            addLog(`🌍 世界事件开始: ${event.name}`);
+            addLog(`   ${event.description}`);
+            AudioSys.success();
+        }
+        
+        function handleWorldEventEnd(data) {
+            currentEventId = null;
+            
+            // 隐藏事件面板
+            const panel = document.getElementById('world-event-panel');
+            if (panel) panel.style.display = 'none';
+            
+            // 停止倒计时
+            if (eventTimerInterval) {
+                clearInterval(eventTimerInterval);
+                eventTimerInterval = null;
+            }
+            
+            const summary = data.summary || {};
+            addLog(`🌍 事件结束: ${data.event?.name}`);
+            addLog(`   参与者: ${summary.totalParticipants || 0}人`);
+            
+            AudioSys.success();
+        }
+        
+        function startEventTimer(endTime) {
+            if (eventTimerInterval) {
+                clearInterval(eventTimerInterval);
+            }
+            
+            const updateTimer = () => {
+                const now = Date.now();
+                const remaining = Math.max(0, endTime - now);
+                const minutes = Math.floor(remaining / 60000);
+                const seconds = Math.floor((remaining % 60000) / 1000);
+                
+                const timerEl = document.getElementById('event-timer');
+                if (timerEl) {
+                    timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                }
+                
+                if (remaining <= 0) {
+                    clearInterval(eventTimerInterval);
+                }
+            };
+            
+            updateTimer();
+            eventTimerInterval = setInterval(updateTimer, 1000);
+        }
+        
+        async function participateEvent(choiceId, choiceName) {
+            if (!currentEventId || !playerId) {
+                addLog('❌ 当前没有正在进行的事件');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/player/${playerId}/event/participate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'participate', choice: choiceId })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addLog(`🌍 ${data.message}`);
+                    
+                    // 显示奖励
+                    if (data.reward) {
+                        if (data.reward.fate > 0) {
+                            addLog(`   ✨ 获得缘分: +${data.reward.fate}`);
+                        }
+                        if (data.reward.memory) {
+                            addLog(`   🧠 获得记忆: ${data.reward.memory.title}`);
+                        }
+                        if (data.reward.item) {
+                            addLog(`   🎒 获得物品: ${data.reward.item.name}`);
+                        }
+                    }
+                    
+                    // 禁用选择按钮
+                    const choicesEl = document.getElementById('event-choices');
+                    if (choicesEl) {
+                        choicesEl.innerHTML = `<div style="padding: 0.5rem; background: #0f3460; border-radius: 4px; color: #4ade80; text-align: center;">
+                            ✅ 已选择: ${choiceName}
+                        </div>`;
+                    }
+                    
+                    AudioSys.success();
+                } else {
+                    addLog(`❌ ${data.error}`);
+                    AudioSys.error();
+                }
+            } catch (err) {
+                addLog(`❌ 参与事件出错: ${err.message}`);
+                AudioSys.error();
+            }
         }
         
         // 地形配置（从服务器获取）

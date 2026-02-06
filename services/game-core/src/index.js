@@ -756,7 +756,7 @@ fastify.get('/player/:id/territory/:entityId', async (request, reply) => {
 });
 
 // Visit Territory - 访问他人领地
-fastify.get('/territory/:playerId/visit', async (request, reply) => {
+fastify.get('/territory/:playerId/visit', async (request, reply) =>> {
   const { playerId } = request.params;
   const { visitorId } = request.query;
   
@@ -789,6 +789,59 @@ fastify.get('/territory/:playerId/visit', async (request, reply) => {
   };
 });
 
+// === 世界事件系统 API ===
+
+const { getCurrentEvent, getEventHistory, createRandomEvent, participateEvent } = require('./world-events');
+
+// Get current world event
+fastify.get('/world/event', async (request, reply) => {
+  const event = await getCurrentEvent();
+  return {
+    hasEvent: !!event,
+    event: event || null,
+    message: event ? `当前事件: ${event.name}` : '世界平静中...'
+  };
+});
+
+// Get event history
+fastify.get('/world/events/history', async (request, reply) => {
+  const { limit = 10 } = request.query;
+  const history = await getEventHistory(parseInt(limit));
+  return {
+    count: history.length,
+    events: history
+  };
+});
+
+// Admin: Trigger random event
+fastify.post('/world/event/trigger', async (request, reply) => {
+  // 可以添加管理员验证
+  const { type } = request.body || {};
+  const event = await createRandomEvent(type);
+  return {
+    success: true,
+    event,
+    message: `事件触发: ${event.name}`
+  };
+});
+
+// Participate in current event
+fastify.post('/player/:id/event/participate', async (request, reply) => {
+  const { id } = request.params;
+  const { action, choice } = request.body || {};
+  
+  const result = await participateEvent(id, action, choice);
+  
+  if (result.error) {
+    return reply.code(400).send(result);
+  }
+  
+  return {
+    playerId: id,
+    ...result
+  };
+});
+
 // Start server
 const start = async () => {
   try {
@@ -798,6 +851,11 @@ const start = async () => {
     // Setup WebSocket after server is listening
     setupWebSocket(fastify.server);
     fastify.log.info('WebSocket server started');
+    
+    // 启动世界事件自动生成器
+    const { startAutoEventGenerator } = require('./world-events');
+    startAutoEventGenerator();
+    fastify.log.info('World Event auto-generator started');
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

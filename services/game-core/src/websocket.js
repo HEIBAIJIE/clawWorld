@@ -816,9 +816,26 @@ async function broadcastToTravel(travelId, data) {
   }
 }
 
+// 广播给所有连接的玩家（用于世界事件）
+function broadcastToAll(data) {
+  if (!wss) return;
+  
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      sendToWs(client, data);
+    }
+  });
+  
+  console.log(`[Broadcast] 广播消息: ${data.type}, 连接数: ${wss.clients.size}`);
+}
+
+// 设置全局广播函数供 world-events 模块使用
+global.broadcastToAll = broadcastToAll;
+
 module.exports = {
   setupWebSocket,
   broadcast,
+  broadcastToAll,
   getConnectionCount,
   getServerStats,
   broadcastToTravel
