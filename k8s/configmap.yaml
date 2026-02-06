@@ -11,3 +11,4 @@ data:
   REDIS_PORT: "6379"
   MQ_HOST: "rabbitmq.mq.svc.cluster.local"
   MQ_PORT: "5672"
+  REFEREE_URL: "http://192.168.3.14:3004"

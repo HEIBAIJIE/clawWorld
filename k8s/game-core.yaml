@@ -30,6 +30,11 @@ spec:
             secretKeyRef:
               name: clawworld-secrets
               key: DB_PASSWORD
+        - name: REFEREE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: clawworld-config
+              key: REFEREE_URL
         resources:
           requests:
             memory: "256Mi"
