@@ -86,10 +86,34 @@ const {
   getInvitations, 
   acceptInvitation, 
   rejectInvitation,
+  createTravelSession,
   getTravelSession,
   recordPlayerAction,
-  endTravel
+  endTravel,
+  getNarrativeHistory
 } = require('./travel');
+
+// 创建多人旅行（直接创建，无需邀请）
+fastify.post('/travel/create', async (request, reply) => {
+  const { members, background } = request.body || {};
+  
+  if (!members || !Array.isArray(members) || members.length < 2) {
+    return reply.code(400).send({ error: 'members array with at least 2 players required' });
+  }
+  
+  if (members.length > 5) {
+    return reply.code(400).send({ error: 'Maximum 5 members allowed' });
+  }
+  
+  const travelId = await createTravelSession(members, background);
+  
+  return {
+    success: true,
+    travelId,
+    members,
+    message: `旅行会话已创建，共 ${members.length} 人`
+  };
+});
 
 // 获取邀请列表
 fastify.get('/player/:id/invitations', async (request, reply) => {
@@ -169,6 +193,120 @@ fastify.get('/travel/:travelId', async (request, reply) => {
   return {
     travelId,
     ...session
+  };
+});
+
+// 获取旅行状态（简化版）
+fastify.get('/travel/status', async (request, reply) => {
+  const { playerId } = request.query;
+  
+  if (!playerId) {
+    return reply.code(400).send({ error: 'playerId query parameter required' });
+  }
+  
+  const { redis } = require('./redis-mem');
+  const player = await redis.hgetall(`player:${playerId}`);
+  const travelId = player?.travelId;
+  
+  if (!travelId) {
+    return { inTravel: false, travelId: null };
+  }
+  
+  const session = await getTravelSession(travelId);
+  if (!session) {
+    return { inTravel: false, travelId: null };
+  }
+  
+  return {
+    inTravel: session.status === 'active' || session.status === 'preparing',
+    travelId,
+    status: session.status,
+    round: parseInt(session.round) || 0,
+    members: session.members
+  };
+});
+
+// 提交旅行行动
+fastify.post('/travel/:travelId/action', async (request, reply) => {
+  const { travelId } = request.params;
+  const { playerId, action } = request.body || {};
+  
+  if (!playerId) {
+    return reply.code(400).send({ error: 'playerId is required' });
+  }
+  
+  if (!action || typeof action !== 'string') {
+    return reply.code(400).send({ error: 'action is required' });
+  }
+  
+  const result = await recordPlayerAction(travelId, playerId, action);
+  
+  if (result.error) {
+    return reply.code(400).send(result);
+  }
+  
+  return {
+    success: true,
+    travelId,
+    playerId,
+    round: result.round,
+    message: '行动已提交，等待裁判裁定...'
+  };
+});
+
+// 结束旅行
+fastify.post('/travel/:travelId/end', async (request, reply) => {
+  const { travelId } = request.params;
+  const { playerId, ending } = request.body || {};
+  
+  // 验证玩家是否是旅行成员
+  const session = await getTravelSession(travelId);
+  if (!session) {
+    return reply.code(404).send({ error: 'Travel session not found' });
+  }
+  
+  if (!session.members.includes(playerId)) {
+    return reply.code(403).send({ error: 'Not a member of this travel' });
+  }
+  
+  const result = await endTravel(travelId, ending);
+  
+  if (result.error) {
+    return reply.code(400).send(result);
+  }
+  
+  return {
+    success: true,
+    travelId,
+    ending: result.ending,
+    fate: result.fate,
+    round: result.round,
+    message: '旅行已结束'
+  };
+});
+
+// 获取叙事历史
+fastify.get('/travel/:travelId/narrative', async (request, reply) => {
+  const { travelId } = request.params;
+  
+  const session = await getTravelSession(travelId);
+  if (!session) {
+    return reply.code(404).send({ error: 'Travel session not found' });
+  }
+  
+  const history = await getNarrativeHistory(travelId);
+  
+  return {
+    travelId,
+    round: parseInt(session.round) || 0,
+    status: session.status,
+    history: history.map(h => ({
+      type: h.type,
+      round: h.round,
+      content: h.content,
+      playerId: h.playerId,
+      timestamp: h.timestamp
+    }))
   };
 });
 
