@@ -606,6 +606,11 @@
     </div>
     
     <script>
+        // 🌐 API 配置
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3002' 
+            : 'http://192.168.3.14:30082';
+
         // 🎵 音效系统
         const AudioSys = {
             enabled: true,

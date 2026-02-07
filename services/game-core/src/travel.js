@@ -63,6 +63,8 @@ async function generateOpeningFromReferee(travelId, background, members) {
     const response = await axios.post(`${REFEREE_URL}/travel/opening`, {
       background,
       members: memberInfo
+    }, {
+      timeout: 10000 // 10秒超时
     });
     
     if (response.data.success) {
@@ -105,6 +107,8 @@ async function adjudicateActionFromReferee(travelId, playerAction) {
         playerName: playerAction.playerId,
         content: playerAction.action
       }
+    }, {
+      timeout: 10000 // 10秒超时
     });
     
     if (response.data.success) {
