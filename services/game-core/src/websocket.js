@@ -1,6 +1,6 @@
 // WebSocket 管理模块 - 使用原生 ws
 const WebSocket = require('ws');
-const { getOnlinePlayers, setPlayerOnline, setPlayerOffline, redis, addMemory, getMemories } = require('./redis-mem');
+const { getOnlinePlayers, setPlayerOnline, setPlayerOffline, redis, addMemory, getMemories, getPlayerStatus } = require('./redis-mem');
 const { getTerrainInfo, canMoveTo, WORLD_SIZE, TERRAIN_MAP } = require('./world');
 const { createInvitation, acceptInvitation, rejectInvitation, getTravelSession, recordPlayerAction, getNarrativeHistory, getOpeningFromReferee } = require('./travel');
 
@@ -517,12 +517,18 @@ async function handleInviteTravel(ws, data, playerId) {
     return;
   }
   
-  // 检查目标玩家是否在线
-  const targetWs = connections.get(targetId);
-  if (!targetWs || targetWs.readyState !== WebSocket.OPEN) {
+  // 检查目标玩家是否在线（支持WebSocket和REST API两种方式）
+  const { getPlayerStatus } = require('./redis-mem');
+  const targetStatus = await getPlayerStatus(targetId);
+  const isOnline = targetStatus && (targetStatus.online === true || targetStatus.online === 'true');
+  
+  if (!isOnline) {
     sendToWs(ws, { type: 'error', message: 'Target player is offline' });
     return;
   }
+  
+  // 获取目标玩家的WebSocket连接（如果存在）
+  const targetWs = connections.get(targetId);
   
   // 创建邀请
   const invitationId = await createInvitation(playerId, targetId);
@@ -542,14 +548,19 @@ async function handleInviteTravel(ws, data, playerId) {
     message: `已向 ${targetId} 发送旅行邀请`
   });
   
-  // 实时推送给目标玩家
-  sendToWs(targetWs, {
-    type: 'travel_invite',
-    from: name,
-    fromId: playerId,
-    invitationId,
-    background: background || '随机'
-  });
+  // 实时推送给目标玩家（如果有WebSocket连接）
+  if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+    sendToWs(targetWs, {
+      type: 'travel_invite',
+      from: name,
+      fromId: playerId,
+      invitationId,
+      background: background || '随机'
+    });
+  } else {
+    // 如果没有WebSocket连接，记录日志（AI Native玩家可以通过REST API查看邀请）
+    console.log(`📨 邀请已创建，但 ${targetId} 没有WebSocket连接（可能是AI Native玩家）`);
+  }
 }
 
 // 处理旅行邀请响应
