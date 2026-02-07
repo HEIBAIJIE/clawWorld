@@ -6,11 +6,11 @@ const { getTerrainInfo, canMoveTo, WORLD_SIZE } = require('./world');
 function getTimeAgo(timestamp) {
   const now = Date.now();
   const diff = now - timestamp;
-  
+
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
-  
+
   if (minutes < 1) return '刚刚';
   if (minutes < 60) return `${minutes}分钟前`;
   if (hours < 24) return `${hours}小时前`;
@@ -20,7 +20,7 @@ function getTimeAgo(timestamp) {
 
 // 注册玩家相关路由
 async function registerPlayerRoutes(fastify) {
-  
+
   // Player position endpoint
   fastify.get('/player/:id/position', async (request, reply) => {
     const { id } = request.params;
@@ -28,7 +28,7 @@ async function registerPlayerRoutes(fastify) {
     const x = parseInt(status.x) || 0;
     const y = parseInt(status.y) || 0;
     const terrain = getTerrainInfo(x, y);
-    
+
     return {
       playerId: id,
       x,
@@ -43,18 +43,18 @@ async function registerPlayerRoutes(fastify) {
   fastify.post('/player/:id/move', async (request, reply) => {
     const { id } = request.params;
     const { direction } = request.body;
-    
+
     // 验证方向参数
     const validDirections = ['north', 'south', 'east', 'west'];
     if (!direction || !validDirections.includes(direction)) {
       return reply.code(400).send({ error: 'Invalid direction. Must be north, south, east, or west' });
     }
-    
+
     // Get current position
     const status = await redis.hgetall(`player:${id}`);
     let x = parseInt(status.x) || 0;
     let y = parseInt(status.y) || 0;
-    
+
     // Calculate new position
     let newX = x, newY = y;
     switch(direction) {
@@ -63,25 +63,25 @@ async function registerPlayerRoutes(fastify) {
       case 'east': newX = x + 1; break;
       case 'west': newX = x - 1; break;
     }
-    
+
     // Check if can move
     if (!canMoveTo(newX, newY)) {
-      return reply.code(400).send({ 
+      return reply.code(400).send({
         error: 'Cannot move there',
         terrain: getTerrainInfo(newX, newY)
       });
     }
-    
+
     // Check world bounds
     if (newX < 0 || newX >= WORLD_SIZE || newY < 0 || newY >= WORLD_SIZE) {
       return reply.code(400).send({ error: 'Out of world bounds' });
     }
-    
+
     // Update position
     await redis.hset(`player:${id}`, 'x', newX, 'y', newY);
-    
+
     const terrain = getTerrainInfo(newX, newY);
-    
+
     return {
       playerId: id,
       from: { x, y },
@@ -96,25 +96,25 @@ async function registerPlayerRoutes(fastify) {
   fastify.post('/player/:id/online', async (request, reply) => {
     const { id } = request.params;
     const { x, y, name } = request.body || {};
-    
+
     // 验证坐标
     const posX = parseInt(x) || 0;
     const posY = parseInt(y) || 0;
-    
+
     if (isNaN(posX) || isNaN(posY)) {
       return reply.code(400).send({ error: 'Invalid coordinates' });
     }
-    
+
     if (posX < 0 || posX >= WORLD_SIZE || posY < 0 || posY >= WORLD_SIZE) {
       return reply.code(400).send({ error: 'Coordinates out of bounds' });
     }
-    
+
     await setPlayerOnline(id, {
       x: posX,
       y: posY,
       name: name || id
     });
-    
+
     return {
       playerId: id,
       status: 'online',
@@ -130,10 +130,10 @@ async function registerPlayerRoutes(fastify) {
     const status = await redis.hgetall(`player:${id}`);
     const x = parseInt(status.x) || 0;
     const y = parseInt(status.y) || 0;
-    
+
     const terrain = getTerrainInfo(x, y);
     const onlinePlayers = await getOnlinePlayers();
-    
+
     // 获取附近玩家（2格范围内）
     const nearbyPlayers = onlinePlayers.filter(p => {
       if (p.id === id) return false;
@@ -142,7 +142,7 @@ async function registerPlayerRoutes(fastify) {
       const distance = Math.abs(px - x) + Math.abs(py - y);
       return distance <= 2;
     });
-    
+
     // 获取可移动方向
     const surroundings = [];
     const directions = [
@@ -151,7 +151,7 @@ async function registerPlayerRoutes(fastify) {
       { dir: 'south', dx: 0, dy: 1, name: '南' },
       { dir: 'west', dx: -1, dy: 0, name: '西' }
     ];
-    
+
     for (const d of directions) {
       const nx = x + d.dx;
       const ny = y + d.dy;
@@ -168,7 +168,11 @@ async function registerPlayerRoutes(fastify) {
         });
       }
     }
-    
+
+    // 获取地面标记
+    const { getGroundMarkersInRange } = require('../redis-mem');
+    const nearbyMarkers = await getGroundMarkersInRange(x, y, 2);
+
     return {
       playerId: id,
       position: { x, y },
@@ -183,7 +187,34 @@ async function registerPlayerRoutes(fastify) {
         distance: Math.abs((parseInt(p.x) || 0) - x) + Math.abs((parseInt(p.y) || 0) - y)
       })),
       surroundings,
+      nearbyMarkers,
       timestamp: Date.now()
+    };
+  });
+
+  // Get Ground Markers - 获取指定位置的地面标记
+  fastify.get('/world/markers/:x/:y', async (request, reply) => {
+    const x = parseInt(request.params.x);
+    const y = parseInt(request.params.y);
+    const { limit = 10 } = request.query;
+
+    if (isNaN(x) || isNaN(y) || x < 0 || x >= WORLD_SIZE || y < 0 || y >= WORLD_SIZE) {
+      return reply.code(400).send({ error: 'Invalid coordinates' });
+    }
+
+    const { getGroundMarkers } = require('../redis-mem');
+    const markers = await getGroundMarkers(x, y, parseInt(limit) || 10);
+
+    return {
+      x,
+      y,
+      count: markers.length,
+      markers: markers.map(m => ({
+        id: m.id,
+        playerId: m.playerId,
+        content: m.content,
+        timestamp: m.timestamp
+      }))
     };
   });
 
@@ -191,19 +222,19 @@ async function registerPlayerRoutes(fastify) {
   fastify.post('/player/:id/say', async (request, reply) => {
     const { id } = request.params;
     const { message } = request.body || {};
-    
+
     if (!message || typeof message !== 'string' || message.trim().length === 0) {
       return reply.code(400).send({ error: 'Message is required and must be a non-empty string' });
     }
-    
+
     if (message.length > 500) {
       return reply.code(400).send({ error: 'Message too long (max 500 characters)' });
     }
-    
+
     const status = await redis.hgetall(`player:${id}`);
     const x = parseInt(status.x) || 0;
     const y = parseInt(status.y) || 0;
-    
+
     // 广播给附近玩家（通过 WebSocket）
     const { broadcastToNearby } = require('./websocket');
     await broadcastToNearby(x, y, {
@@ -214,7 +245,7 @@ async function registerPlayerRoutes(fastify) {
       position: { x, y },
       timestamp: Date.now()
     });
-    
+
     return {
       playerId: id,
       action: 'say',
@@ -224,18 +255,67 @@ async function registerPlayerRoutes(fastify) {
     };
   });
 
-  // Leave - 离开（下线）
+  // Leave - 在当前位置留下地面标记
   fastify.post('/player/:id/leave', async (request, reply) => {
     const { id } = request.params;
-    const { setPlayerOffline } = require('./redis-mem');
-    
-    await setPlayerOffline(id);
-    
+    const { content } = request.body || {};
+
+    if (!content || typeof content !== 'string' || content.trim().length === 0) {
+      return reply.code(400).send({ error: 'Content is required and must be a non-empty string' });
+    }
+
+    if (content.length > 200) {
+      return reply.code(400).send({ error: 'Content too long (max 200 characters)' });
+    }
+
+    const status = await redis.hgetall(`player:${id}`);
+    const x = parseInt(status.x) || 0;
+    const y = parseInt(status.y) || 0;
+
+    const { addGroundMarker, getGroundMarkersInRange } = require('./redis-mem');
+
+    // 添加地面标记
+    const marker = await addGroundMarker(x, y, id, content.trim());
+
+    // 广播给附近玩家
+    const { broadcastToNearby } = require('./websocket');
+    await broadcastToNearby(x, y, {
+      type: 'ground_marker_added',
+      playerId: id,
+      playerName: status.name || id,
+      position: { x, y },
+      timestamp: Date.now()
+    });
+
+    // 获取附近的标记返回给客户端
+    const nearbyMarkers = await getGroundMarkersInRange(x, y, 2);
+
     return {
       playerId: id,
       action: 'leave',
+      marker: {
+        id: marker.id,
+        content: marker.content,
+        timestamp: marker.timestamp
+      },
+      position: { x, y },
+      nearbyMarkers,
+      message: '你在此留下了标记'
+    };
+  });
+
+  // Offline - 下线（原 leave 功能）
+  fastify.post('/player/:id/offline', async (request, reply) => {
+    const { id } = request.params;
+    const { setPlayerOffline } = require('./redis-mem');
+
+    await setPlayerOffline(id);
+
+    return {
+      playerId: id,
+      action: 'offline',
       status: 'offline',
-      message: 'Player has left the world'
+      message: 'Player has gone offline'
     };
   });
 
@@ -243,15 +323,15 @@ async function registerPlayerRoutes(fastify) {
   fastify.get('/player/:id/recall', async (request, reply) => {
     const { id } = request.params;
     const { limit = 10 } = request.query;
-    
+
     const parsedLimit = parseInt(limit);
     if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
       return reply.code(400).send({ error: 'Invalid limit (must be 1-50)' });
     }
-    
+
     const { getMemories } = require('./redis-mem');
     const memories = await getMemories(id, parsedLimit);
-    
+
     return {
       playerId: id,
       action: 'recall',
@@ -275,7 +355,7 @@ async function registerPlayerRoutes(fastify) {
     const x = parseInt(status.x) || 0;
     const y = parseInt(status.y) || 0;
     const terrain = getTerrainInfo(x, y);
-    
+
     return {
       playerId: id,
       action: 'rest',
