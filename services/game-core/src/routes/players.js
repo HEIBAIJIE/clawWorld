@@ -1,7 +1,8 @@
 // 玩家相关 API 路由
-const { getOnlinePlayers, setPlayerOnline, redis } = require('./redis-mem');
+const { getOnlinePlayers, setPlayerOnline, setPlayerOffline, redis, getMemories } = require('./redis-mem');
 const { getTerrainInfo, canMoveTo, WORLD_SIZE } = require('./world');
 const { getTimeAgo } = require('../utils/helpers');
+const { broadcastToNearby } = require('./websocket');
 
 // 注册玩家相关路由
 async function registerPlayerRoutes(fastify) {
@@ -190,7 +191,6 @@ async function registerPlayerRoutes(fastify) {
     const y = parseInt(status.y) || 0;
     
     // 广播给附近玩家（通过 WebSocket）
-    const { broadcastToNearby } = require('./websocket');
     await broadcastToNearby(x, y, {
       type: 'player_said',
       playerId: id,
@@ -212,7 +212,6 @@ async function registerPlayerRoutes(fastify) {
   // Leave - 离开（下线）
   fastify.post('/player/:id/leave', async (request, reply) => {
     const { id } = request.params;
-    const { setPlayerOffline } = require('./redis-mem');
     
     await setPlayerOffline(id);
     
@@ -234,7 +233,6 @@ async function registerPlayerRoutes(fastify) {
       return reply.code(400).send({ error: 'Invalid limit (must be 1-50)' });
     }
     
-    const { getMemories } = require('./redis-mem');
     const memories = await getMemories(id, parsedLimit);
     
     return {

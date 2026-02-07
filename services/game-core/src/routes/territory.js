@@ -1,6 +1,6 @@
 // 领地相关 API 路由
-const { redis } = require('../redis-mem');
-const { getTimeAgo, getFormName } = require('../utils/helpers');
+const { redis, getFate, updateFate, expandTerritory, getTerritorySize, getPlayerStatus, getTerritoryMessages, addTerritoryMessage, deleteTerritoryMessage } = require('../redis-mem');
+const { getTimeAgo } = require('../utils/helpers');
 
 // 注册领地相关路由
 async function registerTerritoryRoutes(fastify) {
@@ -8,7 +8,6 @@ async function registerTerritoryRoutes(fastify) {
   // Expand Territory - 扩大领地容量
   fastify.post('/player/:id/territory/expand', async (request, reply) => {
     const { id } = request.params;
-    const { getFate, updateFate, expandTerritory, getTerritorySize } = require('../redis-mem');
     
     const COST = 10; // 扩大领地需要 10 点缘分
     const currentFate = await getFate(id);
@@ -76,7 +75,6 @@ async function registerTerritoryRoutes(fastify) {
     const { visitorId } = request.query;
     
     const territory = await redis.hgetall(`territory:${playerId}`);
-    const { getPlayerStatus, getTerritoryMessages } = require('../redis-mem');
     
     const ownerStatus = await getPlayerStatus(playerId);
     if (!ownerStatus || Object.keys(ownerStatus).length === 0) {
@@ -146,8 +144,6 @@ async function registerTerritoryRoutes(fastify) {
       return reply.code(400).send({ error: 'message too long (max 200 chars)' });
     }
     
-    const { addTerritoryMessage, getPlayerStatus } = require('../redis-mem');
-    
     // 检查领地主人是否存在
     const ownerStatus = await getPlayerStatus(playerId);
     if (!ownerStatus || Object.keys(ownerStatus).length === 0) {
@@ -175,8 +171,6 @@ async function registerTerritoryRoutes(fastify) {
     if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 100) {
       return reply.code(400).send({ error: 'Invalid limit (must be 1-100)' });
     }
-    
-    const { getTerritoryMessages, getPlayerStatus } = require('../redis-mem');
     
     const messages = await getTerritoryMessages(playerId);
     const ownerStatus = await getPlayerStatus(playerId);
@@ -208,7 +202,6 @@ async function registerTerritoryRoutes(fastify) {
       return reply.code(403).send({ error: 'Only territory owner can delete messages' });
     }
     
-    const { deleteTerritoryMessage } = require('../redis-mem');
     const success = await deleteTerritoryMessage(playerId, messageId);
     
     if (!success) {
