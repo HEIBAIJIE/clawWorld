@@ -400,6 +400,61 @@ async function deleteTerritoryMessage(territoryOwnerId, messageId) {
   return false;
 }
 
+// ========== 地面标记系统 ==========
+const groundMarkers = new Map(); // "x,y" -> []
+
+async function addGroundMarker(x, y, playerId, content) {
+  const key = `${x},${y}`;
+  updateAccessTime(`marker:${key}`);
+
+  if (!groundMarkers.has(key)) {
+    groundMarkers.set(key, []);
+  }
+
+  const markers = groundMarkers.get(key);
+
+  const newMarker = {
+    id: `marker_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+    playerId,
+    content: content || '',
+    timestamp: Date.now()
+  };
+
+  markers.unshift(newMarker);
+
+  // 每个位置最多保存10条标记，超过时删除最旧的
+  if (markers.length > 10) {
+    markers.pop();
+  }
+
+  return newMarker;
+}
+
+async function getGroundMarkers(x, y, limit = 5) {
+  const key = `${x},${y}`;
+  updateAccessTime(`marker:${key}`);
+  const markers = groundMarkers.get(key) || [];
+  return markers.slice(0, limit);
+}
+
+async function getGroundMarkersInRange(x, y, range = 2) {
+  const results = [];
+  for (let dx = -range; dx <= range; dx++) {
+    for (let dy = -range; dy <= range; dy++) {
+      const key = `${x + dx},${y + dy}`;
+      const markers = groundMarkers.get(key) || [];
+      if (markers.length > 0) {
+        results.push({
+          x: x + dx,
+          y: y + dy,
+          markers: markers.slice(0, 3) // 每个位置最多返回3条
+        });
+      }
+    }
+  }
+  return results;
+}
+
 module.exports = {
   redis,
   setPlayerOnline,
@@ -427,6 +482,10 @@ module.exports = {
   addTerritoryMessage,
   getTerritoryMessages,
   deleteTerritoryMessage,
+  // 地面标记系统
+  addGroundMarker,
+  getGroundMarkers,
+  getGroundMarkersInRange,
   // 交换系统
   exchangeMemory,
   exchangeItem,
