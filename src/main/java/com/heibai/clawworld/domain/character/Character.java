@@ -36,8 +36,8 @@ public abstract class Character extends MapEntity {
     private double hitRate;
     private double dodgeRate;
 
-    // 技能
-    private List<Skill> skills;
+    // 技能（存储技能ID列表）
+    private List<String> skills;
 
     // 战斗状态
     private boolean inCombat;

@@ -127,6 +127,7 @@ public class MapConfigLoader {
                 entity.setY(csvReader.getInt(record, "y"));
                 entity.setEntityType(csvReader.getString(record, "entityType"));
                 entity.setEntityId(csvReader.getString(record, "entityId"));
+                entity.setInstanceId(csvReader.getStringOrNull(record, "instanceId"));
                 return entity;
             });
 

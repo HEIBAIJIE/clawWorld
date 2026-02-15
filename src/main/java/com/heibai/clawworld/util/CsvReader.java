@@ -63,4 +63,9 @@ public class CsvReader {
         String value = record.get(column);
         return value.isEmpty() ? null : Integer.parseInt(value);
     }
+
+    public String getStringOrNull(CSVRecord record, String column) {
+        String value = record.get(column);
+        return value.isEmpty() ? null : value;
+    }
 }

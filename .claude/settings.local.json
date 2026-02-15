@@ -3,7 +3,12 @@
     "allow": [
       "Bash(mvn clean compile:*)",
       "Bash(./mvnw.cmd clean compile)",
-      "Bash(./mvnw.cmd test -Dtest=MongoConnectionTest)"
+      "Bash(./mvnw.cmd test -Dtest=MongoConnectionTest)",
+      "Bash(mvn test:*)",
+      "Bash(./mvnw test -Dtest=MapInitializationServiceTest)",
+      "Bash(mvnw.cmd test:*)",
+      "Bash(cmd /c \"mvnw.cmd test -Dtest=MapInitializationServiceTest\")",
+      "Bash(cmd /c \"mvnw.cmd clean compile 2>&1 | tail -50\")"
     ]
   }
 }
