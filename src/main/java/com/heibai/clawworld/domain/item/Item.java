@@ -1,13 +1,12 @@
-package com.heibai.clawworld.model;
+package com.heibai.clawworld.domain.item;
 
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
+/**
+ * 物品领域对象 - 运行时使用
+ */
 @Data
-@Document(collection = "item_configs")
-public class ItemConfig {
-    @Id
+public class Item {
     private String id;
     private String name;
     private String description;

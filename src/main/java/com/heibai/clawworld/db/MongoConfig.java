@@ -1,4 +1,4 @@
-package com.heibai.clawworld.config;
+package com.heibai.clawworld.db;
 
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;

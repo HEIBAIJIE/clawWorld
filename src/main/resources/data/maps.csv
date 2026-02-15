@@ -1,7 +1,7 @@
-id,name,description,width,height,isSafe,recommendedLevel
-starter_village,新手村,安全宁静的起始村庄,10,10,true,
-town_square,城镇广场,繁华的城镇中心,15,15,true,
-forest_entrance,森林入口,通往黑暗森林的入口,12,12,false,3
-dark_forest,黑暗森林,危险的森林深处,15,15,false,5
-training_ground,训练场,供冒险者训练的场地,8,8,false,1
-ancient_ruins,远古遗迹,神秘的古代遗迹,20,20,false,10
+id,name,description,width,height,isSafe,recommendedLevel,defaultTerrain
+starter_village,新手村,安全宁静的起始村庄,10,10,true,,GRASS
+town_square,城镇广场,繁华的城镇中心,15,15,true,,STONE
+forest_entrance,森林入口,通往黑暗森林的入口,12,12,false,3,GRASS
+dark_forest,黑暗森林,危险的森林深处,15,15,false,5,GRASS
+training_ground,训练场,供冒险者训练的场地,8,8,false,1,STONE
+ancient_ruins,远古遗迹,神秘的古代遗迹,20,20,false,10,STONE

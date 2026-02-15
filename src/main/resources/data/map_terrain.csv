@@ -1,0 +1,10 @@
+mapId,x,y,terrainTypes
+dark_forest,0,0,ROCK
+dark_forest,0,1,ROCK
+dark_forest,0,2,ROCK
+dark_forest,1,1,TREE
+dark_forest,5,5,SHALLOW_WATER
+dark_forest,5,6,SHALLOW_WATER
+ancient_ruins,0,0,WALL
+ancient_ruins,1,0,WALL
+ancient_ruins,2,0,WALL

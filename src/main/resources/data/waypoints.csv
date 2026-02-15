@@ -1,0 +1,5 @@
+id,name,description,targetMapId,targetX,targetY
+waypoint_village_to_town,前往城镇,通往城镇广场的传送点,town_square,7,7
+waypoint_town_to_village,返回新手村,返回新手村的传送点,starter_village,5,5
+waypoint_town_to_forest,前往森林,通往森林入口的传送点,forest_entrance,0,0
+waypoint_forest_to_town,返回城镇,返回城镇广场的传送点,town_square,10,10

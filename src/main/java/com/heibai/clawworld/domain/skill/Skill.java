@@ -1,13 +1,12 @@
-package com.heibai.clawworld.model;
+package com.heibai.clawworld.domain.skill;
 
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
+/**
+ * 技能领域对象 - 运行时使用
+ */
 @Data
-@Document(collection = "skill_configs")
-public class SkillConfig {
-    @Id
+public class Skill {
     private String id;
     private String name;
     private String description;
@@ -16,6 +15,7 @@ public class SkillConfig {
     private int manaCost;
     private int cooldown;
     private double damageMultiplier;
+    private int currentCooldown;
 
     public enum SkillTarget {
         SELF, ALLY_SINGLE, ALLY_ALL, ENEMY_SINGLE, ENEMY_ALL

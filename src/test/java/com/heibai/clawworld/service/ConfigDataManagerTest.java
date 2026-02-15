@@ -1,6 +1,6 @@
 package com.heibai.clawworld.service;
 
-import com.heibai.clawworld.model.*;
+import com.heibai.clawworld.config.*;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +27,7 @@ class ConfigDataManagerTest {
         log.info("NPC数量: {}", configDataManager.getAllNpcs().size());
         log.info("地图数量: {}", configDataManager.getAllMaps().size());
         log.info("职业数量: {}", configDataManager.getAllRoles().size());
+        log.info("传送点数量: {}", configDataManager.getAllWaypoints().size());
 
         assertFalse(configDataManager.getAllItems().isEmpty(), "应该加载了物品数据");
         assertFalse(configDataManager.getAllEquipment().isEmpty(), "应该加载了装备数据");
@@ -35,28 +36,14 @@ class ConfigDataManagerTest {
         assertFalse(configDataManager.getAllNpcs().isEmpty(), "应该加载了NPC数据");
         assertFalse(configDataManager.getAllMaps().isEmpty(), "应该加载了地图数据");
         assertFalse(configDataManager.getAllRoles().isEmpty(), "应该加载了职业数据");
+        assertFalse(configDataManager.getAllWaypoints().isEmpty(), "应该加载了传送点数据");
 
-        log.info("\n=== 示例数据 ===");
-        configDataManager.getAllItems().stream().limit(3).forEach(item ->
-            log.info("物品: {} - {} (基础价格: {})", item.getName(), item.getDescription(), item.getBasePrice())
-        );
-
-        configDataManager.getAllSkills().stream().limit(3).forEach(skill ->
-            log.info("技能: {} - {} (伤害倍率: {})", skill.getName(), skill.getDescription(), skill.getDamageMultiplier())
-        );
-
-        configDataManager.getAllEnemies().stream().limit(3).forEach(enemy ->
-            log.info("敌人: {} Lv.{} - {} (生命: {}, 攻击: {}, 命中: {}, 闪避: {})",
-                enemy.getName(), enemy.getLevel(), enemy.getTier(), enemy.getHealth(),
-                enemy.getPhysicalAttack(), enemy.getHitRate(), enemy.getDodgeRate())
-        );
-
-        configDataManager.getAllRoles().forEach(role ->
-            log.info("职业: {} - 基础属性 HP:{} MP:{} STR:{} AGI:{} INT:{} VIT:{} (技能数: {})",
-                role.getName(), role.getBaseHealth(), role.getBaseMana(),
-                role.getBaseStrength(), role.getBaseAgility(), role.getBaseIntelligence(),
-                role.getBaseVitality(), role.getSkillLearns().size())
-        );
+        log.info("\n=== 关联配置数据 ===");
+        log.info("敌人掉落配置: {} 条", configDataManager.getEnemyLoot("slime").size());
+        log.info("地图地形配置: {} 条", configDataManager.getMapTerrain("dark_forest").size());
+        log.info("地图实体配置: {} 条", configDataManager.getMapEntities("starter_village").size());
+        log.info("NPC商店物品: {} 条", configDataManager.getNpcShopItems("merchant_john").size());
+        log.info("职业技能映射: {} 条", configDataManager.getRoleSkills("WARRIOR").size());
 
         log.info("=== 配置加载完成 ===");
     }

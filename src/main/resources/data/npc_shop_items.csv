@@ -1,0 +1,10 @@
+npcId,itemId,quantity
+merchant_john,health_potion_small,50
+merchant_john,mana_potion_small,50
+merchant_john,health_potion_medium,20
+merchant_john,mana_potion_medium,20
+blacksmith_tom,iron_sword,5
+blacksmith_tom,wooden_shield,5
+blacksmith_tom,leather_armor,10
+priest_mary,health_potion_small,30
+priest_mary,mana_potion_small,30

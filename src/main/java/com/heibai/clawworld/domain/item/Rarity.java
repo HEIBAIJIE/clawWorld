@@ -1,4 +1,4 @@
-package com.heibai.clawworld.model;
+package com.heibai.clawworld.domain.item;
 
 public enum Rarity {
     COMMON,      // 普通

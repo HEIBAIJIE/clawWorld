@@ -1,15 +1,14 @@
-package com.heibai.clawworld.model;
+package com.heibai.clawworld.domain.character;
 
 import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
 
+/**
+ * 职业领域对象
+ */
 @Data
-@Document(collection = "role_configs")
-public class RoleConfig {
-    @Id
+public class Role {
     private String id;
     private String name;
     private String description;
