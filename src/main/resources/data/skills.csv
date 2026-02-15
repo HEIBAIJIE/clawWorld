@@ -1,0 +1,11 @@
+id,name,description,targetType,damageType,manaCost,cooldown,damageMultiplier,allowedRoles,learnLevel
+basic_attack,普通攻击,基础物理攻击,ENEMY_SINGLE,PHYSICAL,0,0,1.0,,1
+power_strike,强力打击,造成150%物理伤害,ENEMY_SINGLE,PHYSICAL,10,2,1.5,WARRIOR,3
+shield_bash,盾击,造成120%物理伤害并眩晕,ENEMY_SINGLE,PHYSICAL,15,3,1.2,WARRIOR,5
+quick_shot,快速射击,造成100%物理伤害,ENEMY_SINGLE,PHYSICAL,5,1,1.0,RANGER,3
+multi_shot,多重射击,对所有敌人造成80%物理伤害,ENEMY_ALL,PHYSICAL,20,4,0.8,RANGER,7
+fireball,火球术,造成200%法术伤害,ENEMY_SINGLE,MAGICAL,20,2,2.0,MAGE,3
+ice_storm,冰风暴,对所有敌人造成150%法术伤害,ENEMY_ALL,MAGICAL,40,5,1.5,MAGE,8
+heal,治疗术,恢复目标150%法术攻击力的生命值,ALLY_SINGLE,NONE,15,2,1.5,PRIEST,3
+group_heal,群体治疗,恢复所有队友100%法术攻击力的生命值,ALLY_ALL,NONE,30,4,1.0,PRIEST,7
+divine_shield,神圣护盾,为自己增加护盾,SELF,NONE,25,5,0.0,PRIEST,5

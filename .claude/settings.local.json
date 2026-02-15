@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn clean compile:*)",
+      "Bash(./mvnw.cmd clean compile)",
+      "Bash(./mvnw.cmd test -Dtest=MongoConnectionTest)"
+    ]
+  }
+}

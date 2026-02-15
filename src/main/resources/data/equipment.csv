@@ -1,0 +1,10 @@
+id,name,description,slot,rarity,requiredLevel,strength,agility,intelligence,vitality,physicalAttack,physicalDefense,magicAttack,magicDefense,speed,critRate,critDamage
+iron_sword,铁剑,基础的铁制长剑,RIGHT_HAND,COMMON,1,2,0,0,0,15,0,0,0,0,0.0,0.0
+wooden_shield,木盾,简单的木制盾牌,LEFT_HAND,COMMON,1,0,0,0,3,0,10,0,5,0,0.0,0.0
+leather_helmet,皮革头盔,轻便的皮革头盔,HEAD,COMMON,1,0,1,0,2,0,5,0,3,1,0.0,0.0
+leather_armor,皮革护甲,基础的皮革护甲,CHEST,COMMON,1,0,2,0,3,0,8,0,5,0,0.0,0.0
+leather_pants,皮革护腿,轻便的皮革护腿,LEGS,COMMON,1,0,1,0,2,0,5,0,3,1,0.0,0.0
+leather_boots,皮革靴子,舒适的皮革靴子,FEET,COMMON,1,0,2,0,1,0,3,0,2,2,0.0,0.0
+steel_sword,钢剑,锋利的钢制长剑,RIGHT_HAND,EXCELLENT,5,5,0,0,0,35,0,0,0,0,0.02,0.0
+magic_staff,魔法杖,蕴含魔力的法杖,RIGHT_HAND,EXCELLENT,5,0,0,8,0,0,0,30,0,0,0.0,0.0
+silver_ring,银戒指,精致的银戒指,ACCESSORY1,RARE,3,1,1,1,1,5,5,5,5,1,0.01,0.05

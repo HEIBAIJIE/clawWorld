@@ -1,0 +1,14 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/clawworld
+  application:
+    name: ClawWorld
+
+server:
+  port: 8080
+
+# CSV配置路径
+csv:
+  data-path: classpath:data/
+  reload-interval: 60000
