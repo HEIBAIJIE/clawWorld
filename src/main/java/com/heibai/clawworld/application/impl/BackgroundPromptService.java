@@ -39,15 +39,19 @@ public class BackgroundPromptService {
         prompt.append(generateGameGoals());
         prompt.append("\n\n");
 
-        // 3. 指令手册
+        // 3. 游玩建议
+        prompt.append(generateGameplayTips());
+        prompt.append("\n\n");
+
+        // 4. 指令手册
         prompt.append(generateCommandManual());
         prompt.append("\n\n");
 
-        // 4. 地图信息和连接关系
+        // 5. 地图信息和连接关系
         prompt.append(generateMapInformation());
         prompt.append("\n\n");
 
-        // 5. 如果已有账号，生成玩家信息摘要
+        // 6. 如果已有账号，生成玩家信息摘要
         if (player != null) {
             prompt.append(generatePlayerSummary(player));
         } else {
@@ -94,6 +98,16 @@ public class BackgroundPromptService {
                 - 积累金币购买物品
                 - 探索地图，挑战更强的敌人
                 - 可选择与其他玩家组队
+                """;
+    }
+
+    /**
+     * 生成游玩建议
+     */
+    private String generateGameplayTips() {
+        return """
+                === 游玩建议 ===
+                - 建议在说话后等待3-5秒，如果有人回复，会在等待结束后的状态更新中显示
                 """;
     }
 

@@ -8,11 +8,16 @@ import com.heibai.clawworld.domain.map.GameMap;
 import com.heibai.clawworld.domain.map.MapEntity;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.infrastructure.config.data.character.RoleConfig;
+import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
+import com.heibai.clawworld.infrastructure.persistence.mapper.PlayerMapper;
+import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 窗口内容生成服务实现
@@ -22,6 +27,8 @@ import java.util.Map;
 public class WindowContentServiceImpl implements WindowContentService {
 
     private final ConfigDataManager configDataManager;
+    private final PlayerRepository playerRepository;
+    private final PlayerMapper playerMapper;
 
     @Override
     public String generateRegisterWindowContent() {
@@ -59,6 +66,20 @@ public class WindowContentServiceImpl implements WindowContentService {
         }
         sb.append("\n");
 
+        // 获取地图上的所有实体（包括静态实体和动态玩家）
+        List<MapEntity> allEntities = new ArrayList<>();
+        if (map.getEntities() != null) {
+            allEntities.addAll(map.getEntities()); // 静态实体（NPC、敌人、传送点等）
+        }
+        // 添加当前地图上的所有玩家
+        List<PlayerEntity> playersOnMap = playerRepository.findAll().stream()
+                .filter(p -> p.getCurrentMapId() != null && p.getCurrentMapId().equals(map.getId()))
+                .collect(Collectors.toList());
+        for (PlayerEntity p : playersOnMap) {
+            Player domainPlayer = playerMapper.toDomain(p);
+            allEntities.add(domainPlayer);
+        }
+
         // 地图网格
         sb.append("--- 地图 ---\n");
         if (map.getTerrain() != null && !map.getTerrain().isEmpty()) {
@@ -66,13 +87,13 @@ public class WindowContentServiceImpl implements WindowContentService {
                 for (int x = 0; x < map.getWidth(); x++) {
                     sb.append(String.format("(%d,%d) ", x, y));
 
-                    // 查找该位置的实体
+                    // 查找该位置的实体（优先显示玩家）
                     MapEntity entityAtPos = null;
-                    if (map.getEntities() != null) {
-                        for (MapEntity entity : map.getEntities()) {
-                            if (entity.getX() == x && entity.getY() == y) {
+                    for (MapEntity entity : allEntities) {
+                        if (entity.getX() == x && entity.getY() == y) {
+                            // 优先显示玩家
+                            if (entityAtPos == null || "PLAYER".equals(entity.getEntityType())) {
                                 entityAtPos = entity;
-                                break;
                             }
                         }
                     }
@@ -148,8 +169,13 @@ public class WindowContentServiceImpl implements WindowContentService {
 
         // 地图实体列表
         sb.append("--- 地图实体 ---\n");
-        if (map.getEntities() != null && !map.getEntities().isEmpty()) {
-            for (MapEntity entity : map.getEntities()) {
+        if (!allEntities.isEmpty()) {
+            for (MapEntity entity : allEntities) {
+                // 不显示自己
+                if (entity.getName().equals(player.getName())) {
+                    continue;
+                }
+
                 sb.append(String.format("%s (%d,%d)", entity.getName(), entity.getX(), entity.getY()));
 
                 // 计算是否可达（简单判断：曼哈顿距离）
@@ -162,7 +188,7 @@ public class WindowContentServiceImpl implements WindowContentService {
 
                 // 显示实体类型
                 if (entity.getEntityType() != null) {
-                    sb.append(" [实体类型：").append(entity.getEntityType()).append("]");
+                    sb.append(" [类型：").append(entity.getEntityType()).append("]");
                 }
 
                 // 显示交互选项
@@ -211,16 +237,19 @@ public class WindowContentServiceImpl implements WindowContentService {
         // 可达的有意义格子
         sb.append("--- 可达目标 ---\n");
         boolean hasReachableTarget = false;
-        if (map.getEntities() != null) {
-            for (MapEntity entity : map.getEntities()) {
-                int dx = Math.abs(entity.getX() - player.getX());
-                int dy = Math.abs(entity.getY() - player.getY());
-                // 如果实体不在周围9格内，但可能是有意义的目标
-                if ((dx > 1 || dy > 1) && entity.isInteractable()) {
-                    sb.append(String.format("- %s: 移动到 (%d,%d) 可交互\n",
-                        entity.getName(), entity.getX(), entity.getY()));
-                    hasReachableTarget = true;
-                }
+        for (MapEntity entity : allEntities) {
+            // 不显示自己
+            if (entity.getName().equals(player.getName())) {
+                continue;
+            }
+
+            int dx = Math.abs(entity.getX() - player.getX());
+            int dy = Math.abs(entity.getY() - player.getY());
+            // 如果实体不在周围9格内，但可能是有意义的目标
+            if ((dx > 1 || dy > 1) && entity.isInteractable()) {
+                sb.append(String.format("- %s: 移动到 (%d,%d) 可交互\n",
+                    entity.getName(), entity.getX(), entity.getY()));
+                hasReachableTarget = true;
             }
         }
         if (!hasReachableTarget) {

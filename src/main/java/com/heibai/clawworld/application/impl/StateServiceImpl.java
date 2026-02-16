@@ -1,8 +1,12 @@
 package com.heibai.clawworld.application.impl;
 
 import com.heibai.clawworld.application.service.ChatService;
+import com.heibai.clawworld.application.service.MapEntityService;
+import com.heibai.clawworld.application.service.PlayerSessionService;
 import com.heibai.clawworld.application.service.StateService;
+import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.chat.ChatMessage;
+import com.heibai.clawworld.domain.map.MapEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +24,8 @@ public class StateServiceImpl implements StateService {
 
     private final AccountRepository accountRepository;
     private final ChatService chatService;
+    private final MapEntityService mapEntityService;
+    private final PlayerSessionService playerSessionService;
 
     @Override
     public String generateMapState(String playerId, String commandResult) {
@@ -35,7 +41,38 @@ public class StateServiceImpl implements StateService {
         // 3. 收集环境变化
         state.append("=== 环境变化 ===\n");
 
-        // 3.1 聊天消息变化
+        // 3.1 实体变化（特别是其他玩家的变化）
+        Player currentPlayer = playerSessionService.getPlayerState(playerId);
+        if (currentPlayer != null && currentPlayer.getMapId() != null) {
+            List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(currentPlayer.getMapId());
+
+            if (!entitiesOnMap.isEmpty()) {
+                state.append("\n【地图实体更新】\n");
+                boolean hasOtherPlayers = false;
+                for (MapEntity entity : entitiesOnMap) {
+                    // 不显示自己
+                    if (entity.getName().equals(currentPlayer.getName())) {
+                        continue;
+                    }
+
+                    // 显示其他玩家的位置
+                    if ("PLAYER".equals(entity.getEntityType())) {
+                        state.append(String.format("- 玩家 %s 在 (%d,%d)\n",
+                            entity.getName(), entity.getX(), entity.getY()));
+                        hasOtherPlayers = true;
+                    }
+                }
+
+                if (!hasOtherPlayers) {
+                    state.append("- 当前地图上没有其他玩家\n");
+                }
+            } else {
+                state.append("\n【地图实体更新】\n");
+                state.append("- 当前地图上没有其他玩家\n");
+            }
+        }
+
+        // 3.2 聊天消息变化
         List<ChatMessage> chatHistory = chatService.getChatHistory(playerId);
         if (chatHistory != null && !chatHistory.isEmpty()) {
             // 过滤出上次状态之后的新消息
@@ -49,19 +86,13 @@ public class StateServiceImpl implements StateService {
                     state.append(formatChatMessage(msg)).append("\n");
                 }
             } else {
+                state.append("\n【聊天消息】\n");
                 state.append("- 没有新的聊天消息\n");
             }
         } else {
+            state.append("\n【聊天消息】\n");
             state.append("- 没有新的聊天消息\n");
         }
-
-        // TODO: 3.2 实体变化（需要实现实体变化追踪）
-        // state.append("\n【实体变化】\n");
-        // state.append("- 暂未实现\n");
-
-        // TODO: 3.3 交互变化（需要实现交互变化追踪）
-        // state.append("\n【交互变化】\n");
-        // state.append("- 暂未实现\n");
 
         // 4. 更新状态时间戳
         updateLastStateTimestamp(playerId);
