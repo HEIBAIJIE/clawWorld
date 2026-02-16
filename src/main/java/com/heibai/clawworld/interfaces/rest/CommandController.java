@@ -5,6 +5,7 @@ import com.heibai.clawworld.interfaces.dto.CommandRequest;
 import com.heibai.clawworld.interfaces.dto.CommandResponse;
 import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.application.impl.AuthService;
+import com.heibai.clawworld.application.service.StateService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,7 @@ public class CommandController {
     private final CommandParser commandParser;
     private final CommandExecutor commandExecutor;
     private final AuthService authService;
+    private final StateService stateService;
 
     /**
      * 执行指令
@@ -64,7 +66,7 @@ public class CommandController {
             // 执行指令
             CommandResult result = commandExecutor.execute(command, context);
 
-            // 如果窗口改变，更新账号的窗口状态
+            // 如果窗口改变,更新账号的窗口状态
             if (result.isWindowChanged()) {
                 authService.updateWindowState(
                         request.getSessionId(),
@@ -73,24 +75,44 @@ public class CommandController {
                 );
             }
 
-            // 构建完整的响应文本
-            StringBuilder responseText = new StringBuilder();
+            // 生成完整的响应文本（包含环境变化）
+            String responseText;
 
-            // 如果有窗口内容，先显示窗口内容
-            if (result.getWindowContent() != null && !result.getWindowContent().isEmpty()) {
-                responseText.append(result.getWindowContent());
-                responseText.append("\n\n");
+            // 根据窗口类型生成状态信息
+            if (windowType == CommandContext.WindowType.MAP) {
+                // 地图窗口：包含指令结果 + 环境变化
+                responseText = stateService.generateMapState(accountEntity.getPlayerId(), result.getMessage());
+            } else if (windowType == CommandContext.WindowType.COMBAT) {
+                // 战斗窗口：包含指令结果 + 战斗状态
+                responseText = stateService.generateCombatState(
+                        accountEntity.getPlayerId(),
+                        windowId,
+                        result.getMessage()
+                );
+            } else if (windowType == CommandContext.WindowType.TRADE) {
+                // 交易窗口：包含指令结果 + 交易状态
+                responseText = stateService.generateTradeState(
+                        accountEntity.getPlayerId(),
+                        windowId,
+                        result.getMessage()
+                );
+            } else {
+                // 其他窗口（如注册窗口）：只返回指令结果
+                StringBuilder sb = new StringBuilder();
+                if (result.getWindowContent() != null && !result.getWindowContent().isEmpty()) {
+                    sb.append(result.getWindowContent());
+                    sb.append("\n\n");
+                }
+                sb.append(">>> ").append(result.getMessage());
+                responseText = sb.toString();
             }
-
-            // 添加执行结果消息
-            responseText.append(">>> ").append(result.getMessage());
 
             // 返回结果
             if (result.isSuccess()) {
-                return ResponseEntity.ok(CommandResponse.success(responseText.toString()));
+                return ResponseEntity.ok(CommandResponse.success(responseText));
             } else {
                 return ResponseEntity.badRequest()
-                        .body(CommandResponse.error(responseText.toString()));
+                        .body(CommandResponse.error(responseText));
             }
 
         } catch (CommandParser.CommandParseException e) {

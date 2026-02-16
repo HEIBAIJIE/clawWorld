@@ -43,27 +43,38 @@ public class MapEntityServiceImpl implements MapEntityService {
                 .filter(p -> p.getCurrentMapId() != null && p.getCurrentMapId().equals(player.getCurrentMapId()))
                 .collect(Collectors.toList());
 
-        // 查找目标玩家
+        // 查找目标玩家（通过昵称匹配）
         for (PlayerEntity target : playersOnMap) {
-            // 通过账号查找昵称
-            // 这里简化处理，实际应该通过AccountRepository查找
-            if (target.getId().equals(characterName)) {
-                Map<String, Object> attributes = new HashMap<>();
-                attributes.put("level", target.getLevel());
-                attributes.put("health", target.getCurrentHealth() + "/" + target.getMaxHealth());
-                attributes.put("mana", target.getCurrentMana() + "/" + target.getMaxMana());
-                attributes.put("physicalAttack", target.getPhysicalAttack());
-                attributes.put("physicalDefense", target.getPhysicalDefense());
-                attributes.put("magicAttack", target.getMagicAttack());
-                attributes.put("magicDefense", target.getMagicDefense());
-                attributes.put("speed", target.getSpeed());
-                attributes.put("critRate", target.getCritRate());
-                attributes.put("critDamage", target.getCritDamage());
-                return EntityInfo.success(characterName, "PLAYER", attributes);
+            if (target.getName() != null && target.getName().equals(characterName)) {
+                // 构建详细的角色信息
+                StringBuilder info = new StringBuilder();
+
+                info.append("=== 角色信息 ===\n");
+                info.append("昵称: ").append(target.getName()).append("\n");
+                info.append("等级: ").append(target.getLevel()).append("\n");
+                info.append("位置: (").append(target.getX()).append(", ").append(target.getY()).append(")\n\n");
+
+                info.append("=== 生命与法力 ===\n");
+                info.append("生命值: ").append(target.getCurrentHealth()).append("/").append(target.getMaxHealth()).append("\n");
+                info.append("法力值: ").append(target.getCurrentMana()).append("/").append(target.getMaxMana()).append("\n\n");
+
+                info.append("=== 战斗属性 ===\n");
+                info.append("物理攻击: ").append(target.getPhysicalAttack()).append("\n");
+                info.append("物理防御: ").append(target.getPhysicalDefense()).append("\n");
+                info.append("法术攻击: ").append(target.getMagicAttack()).append("\n");
+                info.append("法术防御: ").append(target.getMagicDefense()).append("\n");
+                info.append("速度: ").append(target.getSpeed()).append("\n");
+                info.append("暴击率: ").append(String.format("%.1f%%", target.getCritRate() * 100)).append("\n");
+                info.append("暴击伤害: ").append(String.format("%.1f%%", target.getCritDamage() * 100)).append("\n");
+
+                return EntityInfo.success(characterName, "PLAYER", info.toString());
             }
         }
 
-        return EntityInfo.error("未找到目标角色");
+        // TODO: 查找敌人和NPC
+        // 这里需要从EnemyInstanceRepository和NpcInstanceRepository中查找
+
+        return EntityInfo.error("未找到目标角色: " + characterName);
     }
 
     @Override

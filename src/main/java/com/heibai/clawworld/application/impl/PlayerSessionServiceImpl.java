@@ -209,6 +209,132 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
     }
 
     @Override
+    public String getPlayerDetailedStatus(String playerId) {
+        Player player = getPlayerState(playerId);
+        if (player == null) {
+            return "玩家不存在";
+        }
+
+        StringBuilder status = new StringBuilder();
+
+        // 基础信息
+        status.append("=== 角色信息 ===\n");
+        status.append("昵称: ").append(player.getName()).append("\n");
+
+        // 获取职业名称
+        RoleConfig roleConfig = configDataManager.getRole(player.getRoleId());
+        if (roleConfig != null) {
+            status.append("职业: ").append(roleConfig.getName()).append("\n");
+        }
+
+        status.append("等级: ").append(player.getLevel()).append("\n");
+        status.append("经验: ").append(player.getExperience()).append("\n");
+        status.append("金钱: ").append(player.getGold()).append("\n\n");
+
+        // 生命和法力
+        status.append("=== 生命与法力 ===\n");
+        status.append("生命值: ").append(player.getCurrentHealth()).append("/").append(player.getMaxHealth()).append("\n");
+        status.append("法力值: ").append(player.getCurrentMana()).append("/").append(player.getMaxMana()).append("\n\n");
+
+        // 四维属性
+        status.append("=== 四维属性 ===\n");
+        status.append("力量: ").append(player.getStrength()).append("\n");
+        status.append("敏捷: ").append(player.getAgility()).append("\n");
+        status.append("智力: ").append(player.getIntelligence()).append("\n");
+        status.append("体力: ").append(player.getVitality()).append("\n");
+        status.append("可用属性点: ").append(player.getFreeAttributePoints()).append("\n\n");
+
+        // 战斗属性
+        status.append("=== 战斗属性 ===\n");
+        status.append("物理攻击: ").append(player.getPhysicalAttack()).append("\n");
+        status.append("物理防御: ").append(player.getPhysicalDefense()).append("\n");
+        status.append("法术攻击: ").append(player.getMagicAttack()).append("\n");
+        status.append("法术防御: ").append(player.getMagicDefense()).append("\n");
+        status.append("速度: ").append(player.getSpeed()).append("\n");
+        status.append("暴击率: ").append(String.format("%.1f%%", player.getCritRate() * 100)).append("\n");
+        status.append("暴击伤害: ").append(String.format("%.1f%%", player.getCritDamage() * 100)).append("\n");
+        status.append("命中率: ").append(String.format("%.1f%%", player.getHitRate() * 100)).append("\n");
+        status.append("闪避率: ").append(String.format("%.1f%%", player.getDodgeRate() * 100)).append("\n\n");
+
+        // 装备栏
+        status.append("=== 装备栏 ===\n");
+        if (player.getEquipment() == null || player.getEquipment().isEmpty()) {
+            status.append("- 无装备\n");
+        } else {
+            for (Map.Entry<Equipment.EquipmentSlot, Equipment> entry : player.getEquipment().entrySet()) {
+                Equipment eq = entry.getValue();
+                status.append(getSlotDisplayName(entry.getKey())).append(": ")
+                      .append(eq.getDisplayName())
+                      .append(" (").append(eq.getRarity().name()).append(")\n");
+            }
+        }
+        status.append("\n");
+
+        // 背包
+        status.append("=== 背包 (").append(player.getInventory() != null ? player.getInventory().size() : 0).append("/50) ===\n");
+        if (player.getInventory() == null || player.getInventory().isEmpty()) {
+            status.append("- 背包为空\n");
+        } else {
+            for (Player.InventorySlot slot : player.getInventory()) {
+                if (slot.isItem()) {
+                    status.append("- ").append(slot.getItem().getName())
+                          .append(" x").append(slot.getQuantity()).append("\n");
+                } else if (slot.isEquipment()) {
+                    status.append("- ").append(slot.getEquipment().getDisplayName())
+                          .append(" (").append(slot.getEquipment().getRarity().name()).append(")\n");
+                }
+            }
+        }
+        status.append("\n");
+
+        // 技能
+        status.append("=== 技能 (").append(player.getSkills() != null ? player.getSkills().size() : 0).append("/10) ===\n");
+        if (player.getSkills() == null || player.getSkills().isEmpty()) {
+            status.append("- 无技能\n");
+        } else {
+            for (String skillId : player.getSkills()) {
+                // 这里可以从配置中获取技能名称，暂时直接显示ID
+                status.append("- ").append(skillId).append("\n");
+            }
+        }
+        status.append("\n");
+
+        // 队伍信息
+        status.append("=== 队伍信息 ===\n");
+        if (player.getPartyId() != null) {
+            Optional<PartyEntity> partyOpt = partyRepository.findById(player.getPartyId());
+            if (partyOpt.isPresent()) {
+                PartyEntity party = partyOpt.get();
+                status.append("队伍人数: ").append(party.getMemberIds().size()).append("/4\n");
+                status.append("队长: ").append(player.isPartyLeader() ? "是" : "否").append("\n");
+            } else {
+                status.append("- 无队伍\n");
+            }
+        } else {
+            status.append("- 无队伍\n");
+        }
+
+        return status.toString();
+    }
+
+    /**
+     * 获取装备槽位的显示名称
+     */
+    private String getSlotDisplayName(Equipment.EquipmentSlot slot) {
+        switch (slot) {
+            case HEAD: return "头部";
+            case CHEST: return "上装";
+            case LEGS: return "下装";
+            case FEET: return "鞋子";
+            case LEFT_HAND: return "左手";
+            case RIGHT_HAND: return "右手";
+            case ACCESSORY1: return "饰品1";
+            case ACCESSORY2: return "饰品2";
+            default: return slot.name();
+        }
+    }
+
+    @Override
     @Transactional
     public OperationResult useItem(String playerId, String itemName) {
         Player player = getPlayerState(playerId);

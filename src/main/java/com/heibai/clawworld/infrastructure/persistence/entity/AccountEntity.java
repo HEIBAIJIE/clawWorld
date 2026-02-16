@@ -37,4 +37,7 @@ public class AccountEntity {
     // 当前窗口状态
     private String currentWindowId;
     private String currentWindowType; // REGISTER, MAP, COMBAT, TRADE
+
+    // 最后一次获取状态的时间戳（用于追踪环境变化）
+    private Long lastStateTimestamp;
 }

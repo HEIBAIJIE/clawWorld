@@ -130,7 +130,8 @@ public class CommandExecutor {
 
     private CommandResult executeInspectSelf(CommandContext context) {
         // 调用玩家会话服务获取自身状态
-        return CommandResult.success("查看自身状态");
+        String detailedStatus = playerSessionService.getPlayerDetailedStatus(context.getPlayerId());
+        return CommandResult.success(detailedStatus);
     }
 
     private CommandResult executeInspectCharacter(InspectCharacterCommand command, CommandContext context) {
@@ -140,10 +141,8 @@ public class CommandExecutor {
         );
 
         if (info.isSuccess()) {
-            return CommandResult.builder()
-                    .success(true)
-                    .message("查看角色: " + info.getEntityName() + "\n" + info.getAttributes())
-                    .build();
+            // attributes已经是格式化好的字符串
+            return CommandResult.success(info.getAttributes().toString());
         } else {
             return CommandResult.error(info.getMessage());
         }
