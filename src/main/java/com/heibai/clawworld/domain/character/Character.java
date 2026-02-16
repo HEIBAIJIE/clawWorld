@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import com.heibai.clawworld.domain.map.MapEntity;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -60,5 +62,15 @@ public abstract class Character extends MapEntity {
     @Override
     public boolean isInteractable() {
         return true; // 角色都可以交互（查看、攻击等）
+    }
+
+    @Override
+    public List<String> getInteractionOptions() {
+        List<String> options = new ArrayList<>();
+        options.add("查看");
+        // 根据设计文档：满足条件时（阵营不同、战斗地图），可以对某一个角色发起一场战斗
+        // 这里简化处理，总是显示攻击选项，具体条件在执行时检查
+        options.add("攻击");
+        return options;
     }
 }

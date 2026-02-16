@@ -3,6 +3,7 @@ package com.heibai.clawworld.domain.map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -30,5 +31,10 @@ public class Waypoint extends MapEntity {
     @Override
     public String getEntityType() {
         return "WAYPOINT";
+    }
+
+    @Override
+    public List<String> getInteractionOptions() {
+        return Arrays.asList("传送");
     }
 }

@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import com.heibai.clawworld.domain.item.Rarity;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -34,6 +35,11 @@ public class Enemy extends Character {
     @Override
     public boolean isPassable() {
         return false; // 敌人未被消灭前不可通过
+    }
+
+    @Override
+    public List<String> getInteractionOptions() {
+        return Arrays.asList("查看", "攻击");
     }
 
     public enum EnemyTier {

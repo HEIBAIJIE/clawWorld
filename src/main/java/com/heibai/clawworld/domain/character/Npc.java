@@ -3,6 +3,7 @@ package com.heibai.clawworld.domain.character;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -25,6 +26,19 @@ public class Npc extends Character {
     @Override
     public boolean isPassable() {
         return false; // NPC不可通过
+    }
+
+    @Override
+    public List<String> getInteractionOptions() {
+        List<String> options = new ArrayList<>();
+        options.add("查看");
+        if (hasDialogue) {
+            options.add("交谈");
+        }
+        if (hasShop) {
+            options.add("商店");
+        }
+        return options;
     }
 
     @Data

@@ -162,35 +162,20 @@ public class WindowContentServiceImpl implements WindowContentService {
 
                 // 显示实体类型
                 if (entity.getEntityType() != null) {
-                    sb.append(" [").append(entity.getEntityType()).append("]");
+                    sb.append(" [实体类型：").append(entity.getEntityType()).append("]");
+                }
+
+                // 显示交互选项
+                if (entity.isInteractable() && entity.getInteractionOptions() != null && !entity.getInteractionOptions().isEmpty()) {
+                    sb.append(" [交互选项: ");
+                    sb.append(String.join(", ", entity.getInteractionOptions()));
+                    sb.append("]");
                 }
 
                 sb.append("\n");
             }
         } else {
             sb.append("地图上没有其他实体\n");
-        }
-        sb.append("\n");
-
-        // 周围9格可交互实体
-        sb.append("--- 周围可交互实体 ---\n");
-        boolean hasNearbyEntity = false;
-        if (map.getEntities() != null) {
-            for (MapEntity entity : map.getEntities()) {
-                int dx = Math.abs(entity.getX() - player.getX());
-                int dy = Math.abs(entity.getY() - player.getY());
-                if (dx <= 1 && dy <= 1 && entity.isInteractable()) {
-                    sb.append(String.format("- %s (%d,%d)", entity.getName(), entity.getX(), entity.getY()));
-                    if (entity.getDescription() != null && !entity.getDescription().isEmpty()) {
-                        sb.append(" - ").append(entity.getDescription());
-                    }
-                    sb.append("\n");
-                    hasNearbyEntity = true;
-                }
-            }
-        }
-        if (!hasNearbyEntity) {
-            sb.append("周围没有可交互的实体\n");
         }
         sb.append("\n");
 
