@@ -71,11 +71,24 @@ public class MapConfigLoader {
             List<WaypointConfig> waypoints = csvReader.readCsv(resource.getInputStream(), record -> {
                 WaypointConfig waypoint = new WaypointConfig();
                 waypoint.setId(csvReader.getString(record, "id"));
+                waypoint.setMapId(csvReader.getString(record, "mapId"));
                 waypoint.setName(csvReader.getString(record, "name"));
                 waypoint.setDescription(csvReader.getString(record, "description"));
-                waypoint.setTargetMapId(csvReader.getString(record, "targetMapId"));
-                waypoint.setTargetX(csvReader.getInt(record, "targetX"));
-                waypoint.setTargetY(csvReader.getInt(record, "targetY"));
+                waypoint.setX(csvReader.getInt(record, "x"));
+                waypoint.setY(csvReader.getInt(record, "y"));
+
+                // 解析连接的传送点ID列表（分号分隔）
+                String connectedIds = csvReader.getStringOrNull(record, "connectedWaypointIds");
+                if (connectedIds != null && !connectedIds.trim().isEmpty()) {
+                    waypoint.setConnectedWaypointIds(
+                        java.util.Arrays.stream(connectedIds.split(";"))
+                            .map(String::trim)
+                            .filter(s -> !s.isEmpty())
+                            .collect(java.util.stream.Collectors.toList())
+                    );
+                } else {
+                    waypoint.setConnectedWaypointIds(new java.util.ArrayList<>());
+                }
                 return waypoint;
             });
 

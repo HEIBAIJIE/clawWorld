@@ -1,5 +1,7 @@
-id,name,description,targetMapId,targetX,targetY
-waypoint_village_to_town,前往城镇,通往城镇广场的传送点,town_square,7,7
-waypoint_town_to_village,返回新手村,返回新手村的传送点,starter_village,5,5
-waypoint_town_to_forest,前往森林,通往森林入口的传送点,forest_entrance,0,0
-waypoint_forest_to_town,返回城镇,返回城镇广场的传送点,town_square,10,10
+id,mapId,name,description,x,y,connectedWaypointIds
+wp_village_center,starter_village,村中心传送点,新手村的中心传送点,5,5,wp_town_entrance;wp_forest_entrance
+wp_town_entrance,town_square,城镇入口,城镇广场的传送点,7,7,wp_village_center;wp_forest_gate
+wp_forest_entrance,forest_entrance,森林入口,通往森林的传送点,0,0,wp_village_center
+wp_forest_gate,forest_entrance,森林大门,森林深处的传送点,10,10,wp_town_entrance;wp_dark_forest_portal
+wp_dark_forest_portal,dark_forest,黑暗森林传送门,黑暗森林的传送点,2,2,wp_forest_gate
+wp_training_ground,training_ground,训练场传送点,训练场的传送点,4,4,wp_town_entrance

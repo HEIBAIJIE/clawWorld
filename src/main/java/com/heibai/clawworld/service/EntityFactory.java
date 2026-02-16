@@ -192,9 +192,8 @@ public class EntityFactory {
         waypoint.setX(config.getX());
         waypoint.setY(config.getY());
 
-        waypoint.setTargetMapId(template.getTargetMapId());
-        waypoint.setTargetX(template.getTargetX());
-        waypoint.setTargetY(template.getTargetY());
+        // 设置连接的传送点ID列表
+        waypoint.setConnectedWaypointIds(template.getConnectedWaypointIds());
 
         log.debug("Created Waypoint instance: {} at ({}, {}) on map {}",
                 waypoint.getName(), waypoint.getX(), waypoint.getY(), mapId);

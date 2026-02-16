@@ -3,6 +3,8 @@ package com.heibai.clawworld.domain.map;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.List;
+
 /**
  * 传送点领域对象
  * 根据设计文档：传送点是一种特殊的地图实体，可交互
@@ -10,9 +12,10 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class Waypoint extends MapEntity {
-    private String targetMapId;
-    private int targetX;
-    private int targetY;
+    /**
+     * 可以传送到的其他传送点ID列表
+     */
+    private List<String> connectedWaypointIds;
 
     @Override
     public boolean isPassable() {
