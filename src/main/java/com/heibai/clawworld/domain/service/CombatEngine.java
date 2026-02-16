@@ -171,27 +171,18 @@ public class CombatEngine {
         CombatInstance combat = activeCombats.get(combatId);
 
         if (waitResult.isTimeout()) {
-            // 超时10秒，根据设计文档：视为掉线，玩家死亡并注销会话
-            log.warn("玩家 {} 在战斗 {} 中超时未行动，视为掉线", characterId, combatId);
+            // 超时10秒，根据设计文档：视为回合空过
+            log.warn("玩家 {} 在战斗 {} 中超时未行动，回合空过", characterId, combatId);
 
             if (combat != null) {
-                CombatCharacter character = combat.findCharacter(characterId);
-                if (character != null) {
-                    character.setDead(true);
-                    character.setCurrentHealth(0);
-                    combat.addLog(character.getName() + " 因超时掉线死亡");
-
-                    // 检查战斗是否结束
-                    if (checkAndFinishCombat(combat)) {
-                        previousResult.setCombatEnded(true);
-                        previousResult.setMessage("因超时掉线死亡，战斗结束");
-                    } else {
-                        previousResult.setMessage("因超时掉线死亡");
-                    }
-                }
+                // 跳过回合
+                CombatActionResult result = skipTurnInternal(combat, characterId);
+                result.setMessage("超时未行动，回合空过");
+                return result;
             }
 
-            previousResult.setSuccess(false);
+            previousResult.setSuccess(true);
+            previousResult.setMessage("超时未行动，回合空过");
             return previousResult;
         }
 
