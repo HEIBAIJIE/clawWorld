@@ -27,7 +27,28 @@ body {
   flex-direction: column;
 }
 
-.context-section {
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #4CAF50;
+}
+
+.header h1 {
+  color: #4CAF50;
+  font-size: 24px;
+  margin: 0;
+}
+
+.logout-button {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.game-content {
+  flex: 1;
   background-color: #2a2a2a;
   border: 1px solid #444;
   border-radius: 4px;
@@ -36,31 +57,13 @@ body {
   overflow-y: auto;
 }
 
-.context-section h2 {
-  color: #4CAF50;
-  font-size: 16px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid #444;
-  padding-bottom: 5px;
-}
-
-.context-content {
+.game-text {
   white-space: pre-wrap;
   font-size: 13px;
   color: #d0d0d0;
-}
-
-.background-context {
-  max-height: 200px;
-}
-
-.window-context {
-  flex: 1;
-  min-height: 300px;
-}
-
-.state-context {
-  max-height: 150px;
+  font-family: 'Courier New', monospace;
+  margin: 0;
+  line-height: 1.6;
 }
 
 .command-section {
@@ -186,16 +189,4 @@ body {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
-}
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.window-info {
-  font-size: 12px;
-  color: #888;
 }

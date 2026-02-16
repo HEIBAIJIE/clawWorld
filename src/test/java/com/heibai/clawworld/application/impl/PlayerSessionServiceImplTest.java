@@ -1,7 +1,10 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.service.WindowContentService;
 import com.heibai.clawworld.infrastructure.config.data.character.RoleConfig;
 import com.heibai.clawworld.domain.character.Player;
+import com.heibai.clawworld.domain.map.GameMap;
+import com.heibai.clawworld.infrastructure.factory.MapInitializationService;
 import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.PartyEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
@@ -41,6 +44,12 @@ class PlayerSessionServiceImplTest {
 
     @Mock
     private ConfigDataManager configDataManager;
+
+    @Mock
+    private WindowContentService windowContentService;
+
+    @Mock
+    private MapInitializationService mapInitializationService;
 
     @InjectMocks
     private PlayerSessionServiceImpl playerSessionService;
@@ -106,13 +115,22 @@ class PlayerSessionServiceImplTest {
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerMapper.toEntity(any(Player.class))).thenReturn(testPlayer);
 
+        // Mock map and window content
+        GameMap mockMap = new GameMap();
+        mockMap.setId("starter_village");
+        mockMap.setName("新手村");
+        when(mapInitializationService.getMap("starter_village")).thenReturn(mockMap);
+        when(windowContentService.generateMapWindowContent(any(Player.class), any(GameMap.class)))
+            .thenReturn("地图窗口内容");
+
         // Act
         PlayerSessionService.SessionResult result = playerSessionService.registerPlayer("session123", "战士", "TestPlayer");
 
         // Assert
         assertTrue(result.isSuccess());
-        assertEquals("注册成功", result.getMessage());
+        assertTrue(result.getMessage().contains("注册成功"));
         assertNotNull(result.getPlayerId());
+        assertNotNull(result.getWindowContent());
         verify(playerRepository, atLeastOnce()).save(any(PlayerEntity.class));
         verify(partyRepository).save(any(PartyEntity.class));
         verify(accountRepository).save(any(AccountEntity.class));

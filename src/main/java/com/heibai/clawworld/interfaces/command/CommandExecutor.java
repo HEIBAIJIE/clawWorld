@@ -118,8 +118,8 @@ public class CommandExecutor {
         if (result.isSuccess()) {
             return CommandResult.successWithWindowChange(
                     result.getMessage(),
-                    result.getWindowId(),
-                    CommandContext.WindowType.MAP
+                    CommandContext.WindowType.MAP,
+                    result.getWindowContent()
             );
         } else {
             return CommandResult.error(result.getMessage());
@@ -142,8 +142,7 @@ public class CommandExecutor {
         if (info.isSuccess()) {
             return CommandResult.builder()
                     .success(true)
-                    .message("查看角色: " + info.getEntityName())
-                    .data(info.getAttributes())
+                    .message("查看角色: " + info.getEntityName() + "\n" + info.getAttributes())
                     .build();
         } else {
             return CommandResult.error(info.getMessage());
@@ -194,8 +193,8 @@ public class CommandExecutor {
             if (result.isWindowChanged()) {
                 return CommandResult.successWithWindowChange(
                         result.getMessage(),
-                        result.getNewWindowId(),
-                        CommandContext.WindowType.valueOf(result.getNewWindowType())
+                        CommandContext.WindowType.valueOf(result.getNewWindowType()),
+                        "窗口已切换: " + result.getNewWindowType()
                 );
             } else {
                 return CommandResult.success(result.getMessage());
@@ -452,8 +451,8 @@ public class CommandExecutor {
                 // 交易完成，返回地图窗口
                 return CommandResult.successWithWindowChange(
                         result.getMessage(),
-                        null, // 需要从服务层获取新的窗口ID
-                        CommandContext.WindowType.MAP
+                        CommandContext.WindowType.MAP,
+                        "交易已完成，返回地图"
                 );
             } else {
                 return CommandResult.success(result.getMessage());
@@ -475,8 +474,8 @@ public class CommandExecutor {
             // 交易取消，返回地图窗口
             return CommandResult.successWithWindowChange(
                     result.getMessage(),
-                    null,
-                    CommandContext.WindowType.MAP
+                    CommandContext.WindowType.MAP,
+                    "交易已取消，返回地图"
             );
         } else {
             return CommandResult.error(result.getMessage());

@@ -1,5 +1,6 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.service.WindowContentService;
 import com.heibai.clawworld.infrastructure.config.data.character.RoleConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.EquipmentConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.ItemConfig;
@@ -8,6 +9,7 @@ import com.heibai.clawworld.domain.character.Role;
 import com.heibai.clawworld.domain.item.Equipment;
 import com.heibai.clawworld.domain.item.Item;
 import com.heibai.clawworld.domain.item.Rarity;
+import com.heibai.clawworld.domain.map.GameMap;
 import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.PartyEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
@@ -35,6 +37,8 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
     private final PartyRepository partyRepository;
     private final PlayerMapper playerMapper;
     private final ConfigDataManager configDataManager;
+    private final WindowContentService windowContentService;
+    private final com.heibai.clawworld.infrastructure.factory.MapInitializationService mapInitializationService;
 
     @Override
     @Transactional
@@ -138,7 +142,17 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         account.setPlayerId(player.getId());
         accountRepository.save(account);
 
-        return SessionResult.success(player.getId(), "map_window_" + player.getId(), "注册成功");
+        // 生成地图窗口内容
+        GameMap map = mapInitializationService.getMap(player.getMapId());
+        String windowContent = "";
+        if (map != null) {
+            windowContent = windowContentService.generateMapWindowContent(player, map);
+        } else {
+            windowContent = "地图加载失败，请联系管理员。";
+        }
+
+        return SessionResult.success(player.getId(), "map_window_" + player.getId(),
+            "注册成功！欢迎来到 " + map.getName(), windowContent);
     }
 
     @Override

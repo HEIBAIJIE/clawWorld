@@ -34,32 +34,17 @@
 
     <!-- 游戏界面 -->
     <div v-else class="container">
-      <!-- 背景上下文 -->
-      <div class="context-section background-context">
-        <div class="header">
-          <h2>
-            <span class="status-indicator" :class="isWaiting ? 'waiting' : 'online'"></span>
-            背景上下文
-          </h2>
-          <button class="command-button" style="padding: 5px 10px; font-size: 12px" @click="handleLogout">
-            登出
-          </button>
-        </div>
-        <div class="context-content">{{ backgroundContext }}</div>
+      <!-- 标题栏 -->
+      <div class="header">
+        <h1>ClawWorld</h1>
+        <button class="command-button logout-button" @click="handleLogout">
+          登出
+        </button>
       </div>
 
-      <!-- 窗口上下文 -->
-      <div class="context-section window-context">
-        <div class="header">
-          <h2>窗口上下文</h2>
-        </div>
-        <div class="context-content">{{ windowContext }}</div>
-      </div>
-
-      <!-- 状态上下文 -->
-      <div class="context-section state-context">
-        <h2>状态上下文</h2>
-        <div class="context-content">{{ stateContext }}</div>
+      <!-- 游戏文本框 -->
+      <div class="game-content">
+        <pre class="game-text">{{ gameText }}</pre>
       </div>
 
       <!-- 指令输入 -->
@@ -102,10 +87,8 @@ const loginForm = ref({
   password: ''
 })
 
-// 游戏上下文
-const backgroundContext = ref('')
-const windowContext = ref('等待指令...')
-const stateContext = ref('就绪')
+// 游戏状态
+const gameText = ref('')
 const commandInput = ref('')
 const sessionId = ref('')
 
@@ -130,15 +113,11 @@ const handleLogin = async () => {
       sessionId.value = response.data.sessionId
       localStorage.setItem('sessionId', response.data.sessionId)
 
-      // 设置背景上下文
-      backgroundContext.value = response.data.backgroundPrompt || '欢迎来到 ClawWorld！'
+      // 设置游戏文本（背景提示）
+      gameText.value = response.data.backgroundPrompt || '欢迎来到 ClawWorld！\n\n请使用 register 指令注册角色。\n例如: register 战士 张三'
 
       // 登录成功
       isLoggedIn.value = true
-
-      // 初始化窗口状态
-      windowContext.value = '已登录，请使用 register 指令注册角色，或等待进入游戏。'
-      stateContext.value = '登录成功'
     } else {
       errorMessage.value = response.data.message || '登录失败'
     }
@@ -159,9 +138,7 @@ const handleLogout = async () => {
     localStorage.removeItem('sessionId')
     sessionId.value = ''
     isLoggedIn.value = false
-    backgroundContext.value = ''
-    windowContext.value = '等待指令...'
-    stateContext.value = '就绪'
+    gameText.value = ''
     commandInput.value = ''
   }
 }
@@ -174,31 +151,22 @@ const handleSendCommand = async () => {
 
   const command = commandInput.value.trim()
   isWaiting.value = true
-  stateContext.value = `正在执行指令: ${command}\n等待服务器响应...`
+
+  // 添加用户输入到游戏文本
+  gameText.value += '\n\n> ' + command + '\n'
 
   try {
     const response = await gameApi.executeCommand(sessionId.value, command)
 
-    if (response.data.success) {
-      // 更新状态上下文
-      stateContext.value = response.data.message || '指令执行成功'
-
-      // 更新窗口上下文（从data字段获取）
-      if (response.data.data) {
-        if (typeof response.data.data === 'string') {
-          windowContext.value = response.data.data
-        } else {
-          windowContext.value = JSON.stringify(response.data.data, null, 2)
-        }
-      }
-
-      // 清空输入框
-      commandInput.value = ''
-    } else {
-      stateContext.value = `错误: ${response.data.message}`
+    // 添加服务器响应到游戏文本
+    if (response.data.response) {
+      gameText.value += '\n' + response.data.response
     }
+
+    // 清空输入框
+    commandInput.value = ''
   } catch (error) {
-    stateContext.value = `错误: ${error.response?.data?.message || error.message || '网络错误'}`
+    gameText.value += '\n错误: ' + (error.response?.data?.response || error.message || '网络错误')
   } finally {
     isWaiting.value = false
   }
@@ -211,9 +179,7 @@ onMounted(() => {
     // 如果有sessionId，尝试恢复会话
     sessionId.value = storedSessionId
     isLoggedIn.value = true
-    backgroundContext.value = '会话已恢复，请重新登录以获取完整背景信息。'
-    windowContext.value = '请发送指令继续游戏。'
-    stateContext.value = '会话已恢复'
+    gameText.value = '会话已恢复，请重新登录以获取完整背景信息。'
   }
 })
 </script>

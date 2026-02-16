@@ -25,19 +25,14 @@ public class CommandResult {
     private boolean windowChanged;
 
     /**
-     * 新窗口ID（如果窗口改变）
-     */
-    private String newWindowId;
-
-    /**
      * 新窗口类型（如果窗口改变）
      */
     private CommandContext.WindowType newWindowType;
 
     /**
-     * 额外数据（可选）
+     * 窗口内容（纯文本）
      */
-    private Object data;
+    private String windowContent;
 
     public static CommandResult success(String message) {
         return CommandResult.builder()
@@ -55,13 +50,13 @@ public class CommandResult {
                 .build();
     }
 
-    public static CommandResult successWithWindowChange(String message, String newWindowId, CommandContext.WindowType newWindowType) {
+    public static CommandResult successWithWindowChange(String message, CommandContext.WindowType newWindowType, String windowContent) {
         return CommandResult.builder()
                 .success(true)
                 .message(message)
                 .windowChanged(true)
-                .newWindowId(newWindowId)
                 .newWindowType(newWindowType)
+                .windowContent(windowContent)
                 .build();
     }
 }

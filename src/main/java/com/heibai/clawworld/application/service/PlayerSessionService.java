@@ -72,13 +72,15 @@ public interface PlayerSessionService {
         private String message;
         private String playerId;
         private String windowId;
+        private String windowContent;
 
-        public static SessionResult success(String playerId, String windowId, String message) {
+        public static SessionResult success(String playerId, String windowId, String message, String windowContent) {
             SessionResult result = new SessionResult();
             result.success = true;
             result.playerId = playerId;
             result.windowId = windowId;
             result.message = message;
+            result.windowContent = windowContent;
             return result;
         }
 
@@ -103,6 +105,10 @@ public interface PlayerSessionService {
 
         public String getWindowId() {
             return windowId;
+        }
+
+        public String getWindowContent() {
+            return windowContent;
         }
     }
 

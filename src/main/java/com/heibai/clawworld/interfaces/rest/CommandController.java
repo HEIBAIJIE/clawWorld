@@ -68,25 +68,29 @@ public class CommandController {
             if (result.isWindowChanged()) {
                 authService.updateWindowState(
                         request.getSessionId(),
-                        result.getNewWindowId(),
+                        result.getNewWindowType() != null ? result.getNewWindowType().name() : null,
                         result.getNewWindowType() != null ? result.getNewWindowType().name() : null
                 );
             }
 
+            // 构建完整的响应文本
+            StringBuilder responseText = new StringBuilder();
+
+            // 如果有窗口内容，先显示窗口内容
+            if (result.getWindowContent() != null && !result.getWindowContent().isEmpty()) {
+                responseText.append(result.getWindowContent());
+                responseText.append("\n\n");
+            }
+
+            // 添加执行结果消息
+            responseText.append(">>> ").append(result.getMessage());
+
             // 返回结果
             if (result.isSuccess()) {
-                return ResponseEntity.ok(
-                        CommandResponse.success(
-                                result.getMessage(),
-                                result.isWindowChanged(),
-                                result.getNewWindowId(),
-                                result.getNewWindowType() != null ? result.getNewWindowType().name() : null,
-                                result.getData()
-                        )
-                );
+                return ResponseEntity.ok(CommandResponse.success(responseText.toString()));
             } else {
                 return ResponseEntity.badRequest()
-                        .body(CommandResponse.error(result.getMessage()));
+                        .body(CommandResponse.error(responseText.toString()));
             }
 
         } catch (CommandParser.CommandParseException e) {
