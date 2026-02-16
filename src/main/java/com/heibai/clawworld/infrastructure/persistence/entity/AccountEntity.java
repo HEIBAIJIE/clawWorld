@@ -33,4 +33,8 @@ public class AccountEntity {
     private boolean online;
     private Long lastLoginTime;
     private Long lastLogoutTime;
+
+    // 当前窗口状态
+    private String currentWindowId;
+    private String currentWindowType; // REGISTER, MAP, COMBAT, TRADE
 }

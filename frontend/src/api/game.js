@@ -7,16 +7,15 @@ export const gameApi = {
   },
 
   // 登出
-  logout() {
-    return client.post('/auth/logout')
+  logout(sessionId) {
+    return client.post('/auth/logout', { sessionId })
   },
 
   // 执行指令
-  executeCommand(command, windowId, windowType) {
+  executeCommand(sessionId, command) {
     return client.post('/command/execute', {
-      command,
-      windowId,
-      windowType
+      sessionId,
+      command
     })
   }
 }

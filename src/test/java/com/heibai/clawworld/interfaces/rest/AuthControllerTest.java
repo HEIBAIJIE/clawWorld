@@ -2,6 +2,7 @@ package com.heibai.clawworld.interfaces.rest;
 
 import com.heibai.clawworld.interfaces.dto.LoginRequest;
 import com.heibai.clawworld.interfaces.dto.LoginResponse;
+import com.heibai.clawworld.interfaces.dto.LogoutRequest;
 import com.heibai.clawworld.application.impl.AuthService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -185,16 +186,17 @@ class AuthControllerTest {
     @Test
     void testLogout_ShouldReturn200() {
         // Arrange
-        String sessionId = "session123";
-        doNothing().when(authService).logout(sessionId);
+        LogoutRequest request = new LogoutRequest();
+        request.setSessionId("session123");
+        doNothing().when(authService).logout("session123");
 
         // Act
-        ResponseEntity<Void> response = authController.logout(sessionId);
+        ResponseEntity<Void> response = authController.logout(request);
 
         // Assert
         assertEquals(200, response.getStatusCode().value());
 
-        verify(authService).logout(sessionId);
+        verify(authService).logout("session123");
     }
 
     @Test

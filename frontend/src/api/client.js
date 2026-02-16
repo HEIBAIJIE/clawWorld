@@ -8,20 +8,6 @@ const client = axios.create({
   }
 })
 
-// 请求拦截器：添加Session-Id
-client.interceptors.request.use(
-  config => {
-    const sessionId = localStorage.getItem('sessionId')
-    if (sessionId) {
-      config.headers['Session-Id'] = sessionId
-    }
-    return config
-  },
-  error => {
-    return Promise.reject(error)
-  }
-)
-
 // 响应拦截器：处理错误
 client.interceptors.response.use(
   response => response,

@@ -2,6 +2,7 @@ package com.heibai.clawworld.interfaces.rest;
 
 import com.heibai.clawworld.interfaces.dto.LoginRequest;
 import com.heibai.clawworld.interfaces.dto.LoginResponse;
+import com.heibai.clawworld.interfaces.dto.LogoutRequest;
 import com.heibai.clawworld.application.impl.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -58,8 +59,8 @@ public class AuthController {
      * 登出接口
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Session-Id") String sessionId) {
-        authService.logout(sessionId);
+    public ResponseEntity<Void> logout(@RequestBody LogoutRequest request) {
+        authService.logout(request.getSessionId());
         return ResponseEntity.ok().build();
     }
 }

@@ -52,9 +52,6 @@
       <div class="context-section window-context">
         <div class="header">
           <h2>窗口上下文</h2>
-          <div class="window-info">
-            窗口类型: {{ currentWindowType || 'N/A' }} | 窗口ID: {{ currentWindowId || 'N/A' }}
-          </div>
         </div>
         <div class="context-content">{{ windowContext }}</div>
       </div>
@@ -110,10 +107,7 @@ const backgroundContext = ref('')
 const windowContext = ref('等待指令...')
 const stateContext = ref('就绪')
 const commandInput = ref('')
-
-// 窗口信息
-const currentWindowId = ref('')
-const currentWindowType = ref('')
+const sessionId = ref('')
 
 // 登录处理
 const handleLogin = async () => {
@@ -133,6 +127,7 @@ const handleLogin = async () => {
 
     if (response.data.success) {
       // 保存会话ID
+      sessionId.value = response.data.sessionId
       localStorage.setItem('sessionId', response.data.sessionId)
 
       // 设置背景上下文
@@ -157,17 +152,16 @@ const handleLogin = async () => {
 // 登出处理
 const handleLogout = async () => {
   try {
-    await gameApi.logout()
+    await gameApi.logout(sessionId.value)
   } catch (error) {
     console.error('登出失败:', error)
   } finally {
     localStorage.removeItem('sessionId')
+    sessionId.value = ''
     isLoggedIn.value = false
     backgroundContext.value = ''
     windowContext.value = '等待指令...'
     stateContext.value = '就绪'
-    currentWindowId.value = ''
-    currentWindowType.value = ''
     commandInput.value = ''
   }
 }
@@ -183,21 +177,11 @@ const handleSendCommand = async () => {
   stateContext.value = `正在执行指令: ${command}\n等待服务器响应...`
 
   try {
-    const response = await gameApi.executeCommand(
-      command,
-      currentWindowId.value,
-      currentWindowType.value
-    )
+    const response = await gameApi.executeCommand(sessionId.value, command)
 
     if (response.data.success) {
       // 更新状态上下文
       stateContext.value = response.data.message || '指令执行成功'
-
-      // 如果窗口改变，更新窗口信息
-      if (response.data.windowChanged) {
-        currentWindowId.value = response.data.newWindowId
-        currentWindowType.value = response.data.newWindowType
-      }
 
       // 更新窗口上下文（从data字段获取）
       if (response.data.data) {
@@ -222,10 +206,10 @@ const handleSendCommand = async () => {
 
 // 页面加载时检查登录状态
 onMounted(() => {
-  const sessionId = localStorage.getItem('sessionId')
-  if (sessionId) {
+  const storedSessionId = localStorage.getItem('sessionId')
+  if (storedSessionId) {
     // 如果有sessionId，尝试恢复会话
-    // 注意：这里简化处理，实际可能需要验证sessionId是否有效
+    sessionId.value = storedSessionId
     isLoggedIn.value = true
     backgroundContext.value = '会话已恢复，请重新登录以获取完整背景信息。'
     windowContext.value = '请发送指令继续游戏。'

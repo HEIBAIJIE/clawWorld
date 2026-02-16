@@ -26,39 +26,52 @@ public class CommandController {
 
     /**
      * 执行指令
-     * @param sessionId 会话ID（从请求头获取）
-     * @param request 指令请求
+     * @param request 指令请求（包含sessionId和command）
      * @return 指令执行结果
      */
     @PostMapping("/execute")
-    public ResponseEntity<CommandResponse> executeCommand(
-            @RequestHeader("Session-Id") String sessionId,
-            @RequestBody CommandRequest request) {
+    public ResponseEntity<CommandResponse> executeCommand(@RequestBody CommandRequest request) {
 
         // 验证会话
-        Optional<AccountEntity> account = authService.getAccountBySessionId(sessionId);
+        Optional<AccountEntity> account = authService.getAccountBySessionId(request.getSessionId());
         if (!account.isPresent() || !account.get().isOnline()) {
             return ResponseEntity.status(401)
                     .body(CommandResponse.error("会话无效或已过期"));
         }
 
+        AccountEntity accountEntity = account.get();
+
+        // 获取当前窗口状态
+        String windowId = accountEntity.getCurrentWindowId();
+        CommandContext.WindowType windowType = accountEntity.getCurrentWindowType() != null ?
+                CommandContext.WindowType.valueOf(accountEntity.getCurrentWindowType()) : null;
+
         try {
             // 解析指令
             Command command = commandParser.parse(
                     request.getCommand(),
-                    request.getWindowType()
+                    windowType
             );
 
             // 构建执行上下文
             CommandContext context = CommandContext.builder()
-                    .sessionId(sessionId)
-                    .windowId(request.getWindowId())
-                    .playerId(account.get().getPlayerId())
-                    .windowType(request.getWindowType())
+                    .sessionId(request.getSessionId())
+                    .windowId(windowId)
+                    .playerId(accountEntity.getPlayerId())
+                    .windowType(windowType)
                     .build();
 
             // 执行指令
             CommandResult result = commandExecutor.execute(command, context);
+
+            // 如果窗口改变，更新账号的窗口状态
+            if (result.isWindowChanged()) {
+                authService.updateWindowState(
+                        request.getSessionId(),
+                        result.getNewWindowId(),
+                        result.getNewWindowType() != null ? result.getNewWindowType().name() : null
+                );
+            }
 
             // 返回结果
             if (result.isSuccess()) {

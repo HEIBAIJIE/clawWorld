@@ -3,17 +3,12 @@ package com.heibai.clawworld.interfaces.dto;
 import lombok.Data;
 
 /**
- * 指令请求DTO
+ * 登出请求DTO
  */
 @Data
-public class CommandRequest {
+public class LogoutRequest {
     /**
      * 会话ID
      */
     private String sessionId;
-
-    /**
-     * 指令字符串
-     */
-    private String command;
 }

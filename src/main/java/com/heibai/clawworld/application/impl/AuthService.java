@@ -49,6 +49,18 @@ public class AuthService {
             account.setSessionId(sessionId);
             account.setOnline(true);
             account.setLastLoginTime(System.currentTimeMillis());
+
+            // 设置初始窗口状态
+            if (account.getPlayerId() == null) {
+                // 新用户，进入注册窗口
+                account.setCurrentWindowType("REGISTER");
+                account.setCurrentWindowId(null);
+            } else {
+                // 老用户，进入地图窗口
+                account.setCurrentWindowType("MAP");
+                account.setCurrentWindowId(null);
+            }
+
             accountRepository.save(account);
 
             // 获取玩家信息
@@ -74,6 +86,10 @@ public class AuthService {
 
             String sessionId = generateSessionId();
             newAccount.setSessionId(sessionId);
+
+            // 新用户进入注册窗口
+            newAccount.setCurrentWindowType("REGISTER");
+            newAccount.setCurrentWindowId(null);
 
             accountRepository.save(newAccount);
 
@@ -101,6 +117,21 @@ public class AuthService {
             entity.setOnline(false);
             entity.setLastLogoutTime(System.currentTimeMillis());
             entity.setSessionId(null);
+            entity.setCurrentWindowId(null);
+            entity.setCurrentWindowType(null);
+            accountRepository.save(entity);
+        }
+    }
+
+    /**
+     * 更新窗口状态
+     */
+    public void updateWindowState(String sessionId, String windowId, String windowType) {
+        Optional<AccountEntity> account = accountRepository.findBySessionId(sessionId);
+        if (account.isPresent()) {
+            AccountEntity entity = account.get();
+            entity.setCurrentWindowId(windowId);
+            entity.setCurrentWindowType(windowType);
             accountRepository.save(entity);
         }
     }
