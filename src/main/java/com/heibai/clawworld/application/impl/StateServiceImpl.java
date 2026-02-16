@@ -26,6 +26,8 @@ public class StateServiceImpl implements StateService {
     private final ChatService chatService;
     private final MapEntityService mapEntityService;
     private final PlayerSessionService playerSessionService;
+    private final com.heibai.clawworld.application.service.TradeService tradeService;
+    private final com.heibai.clawworld.infrastructure.config.ConfigDataManager configDataManager;
 
     @Override
     public String generateMapState(String playerId, String commandResult) {
@@ -129,20 +131,104 @@ public class StateServiceImpl implements StateService {
         // 交易窗口的状态
         state.append(">>> ").append(commandResult).append("\n\n");
 
+        // 获取交易状态
+        com.heibai.clawworld.domain.trade.Trade trade = tradeService.getTradeState(tradeId);
+        if (trade == null) {
+            state.append("交易不存在或已结束\n");
+            updateLastStateTimestamp(playerId);
+            return state.toString();
+        }
+
+        // 确定当前玩家是发起者还是接收者
+        boolean isInitiator = trade.getInitiatorId().equals(playerId);
+        com.heibai.clawworld.domain.trade.Trade.TradeOffer myOffer = isInitiator ? trade.getInitiatorOffer() : trade.getReceiverOffer();
+        com.heibai.clawworld.domain.trade.Trade.TradeOffer otherOffer = isInitiator ? trade.getReceiverOffer() : trade.getInitiatorOffer();
+        boolean myLocked = isInitiator ? trade.isInitiatorLocked() : trade.isReceiverLocked();
+        boolean otherLocked = isInitiator ? trade.isReceiverLocked() : trade.isInitiatorLocked();
+
         // 交易状态的详细信息
         state.append("=== 交易状态 ===\n");
         state.append("（双方提供的物品和金钱）\n");
-        state.append("你的提供：（待实现）\n");
-        state.append("对方的提供：（待实现）\n");
+
+        // 你的提供
+        state.append("你的提供：\n");
+        if (myOffer != null) {
+            if (myOffer.getGold() > 0) {
+                state.append("  金币: ").append(myOffer.getGold()).append("\n");
+            }
+            if (myOffer.getItems() != null && !myOffer.getItems().isEmpty()) {
+                state.append("  物品:\n");
+                for (com.heibai.clawworld.domain.trade.Trade.TradeItem item : myOffer.getItems()) {
+                    String itemName = getItemDisplayName(item);
+                    state.append("    - ").append(itemName);
+                    if (!item.isEquipment() && item.getQuantity() > 1) {
+                        state.append(" x").append(item.getQuantity());
+                    }
+                    state.append("\n");
+                }
+            }
+            if ((myOffer.getGold() == 0) && (myOffer.getItems() == null || myOffer.getItems().isEmpty())) {
+                state.append("  （无）\n");
+            }
+        } else {
+            state.append("  （无）\n");
+        }
+
+        // 对方的提供
+        state.append("对方的提供：\n");
+        if (otherOffer != null) {
+            if (otherOffer.getGold() > 0) {
+                state.append("  金币: ").append(otherOffer.getGold()).append("\n");
+            }
+            if (otherOffer.getItems() != null && !otherOffer.getItems().isEmpty()) {
+                state.append("  物品:\n");
+                for (com.heibai.clawworld.domain.trade.Trade.TradeItem item : otherOffer.getItems()) {
+                    String itemName = getItemDisplayName(item);
+                    state.append("    - ").append(itemName);
+                    if (!item.isEquipment() && item.getQuantity() > 1) {
+                        state.append(" x").append(item.getQuantity());
+                    }
+                    state.append("\n");
+                }
+            }
+            if ((otherOffer.getGold() == 0) && (otherOffer.getItems() == null || otherOffer.getItems().isEmpty())) {
+                state.append("  （无）\n");
+            }
+        } else {
+            state.append("  （无）\n");
+        }
         state.append("\n");
 
         state.append("（锁定状态）\n");
-        state.append("你的锁定状态：未锁定\n");
-        state.append("对方的锁定状态：未锁定\n");
+        state.append("你的锁定状态：").append(myLocked ? "已锁定" : "未锁定").append("\n");
+        state.append("对方的锁定状态：").append(otherLocked ? "已锁定" : "未锁定").append("\n");
 
         updateLastStateTimestamp(playerId);
 
         return state.toString();
+    }
+
+    /**
+     * 获取物品显示名称
+     */
+    private String getItemDisplayName(com.heibai.clawworld.domain.trade.Trade.TradeItem item) {
+        if (item.isEquipment()) {
+            // 装备显示为：物品名#实例编号
+            com.heibai.clawworld.infrastructure.config.data.item.EquipmentConfig equipConfig =
+                configDataManager.getEquipment(item.getItemId());
+            if (equipConfig != null) {
+                return equipConfig.getName() + "#" + item.getEquipmentInstanceNumber();
+            }
+            return item.getItemId() + "#" + item.getEquipmentInstanceNumber();
+        } else {
+            // 普通物品显示名称
+            com.heibai.clawworld.infrastructure.config.data.item.ItemConfig itemConfig =
+                configDataManager.getItem(item.getItemId());
+            if (itemConfig != null) {
+                return itemConfig.getName();
+            }
+            return item.getItemId();
+        }
     }
 
     @Override

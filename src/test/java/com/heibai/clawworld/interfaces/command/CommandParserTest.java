@@ -500,4 +500,167 @@ class CommandParserTest {
         assertEquals(5, moveCommand.getTargetX());
         assertEquals(10, moveCommand.getTargetY());
     }
+
+    // ==================== 组队命令测试 ====================
+
+    @Test
+    @DisplayName("解析邀请组队指令")
+    void testParsePartyInviteCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("party invite 张三", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.PARTY_INVITE, command.getType());
+        assertTrue(command instanceof PartyInviteCommand);
+        assertEquals("张三", ((PartyInviteCommand) command).getPlayerName());
+    }
+
+    @Test
+    @DisplayName("解析接受组队邀请指令")
+    void testParsePartyAcceptInviteCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("party accept 李四", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.PARTY_ACCEPT_INVITE, command.getType());
+        assertTrue(command instanceof PartyAcceptInviteCommand);
+        assertEquals("李四", ((PartyAcceptInviteCommand) command).getInviterName());
+    }
+
+    @Test
+    @DisplayName("解析拒绝组队邀请指令")
+    void testParsePartyRejectInviteCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("party reject 王五", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.PARTY_REJECT_INVITE, command.getType());
+        assertTrue(command instanceof PartyRejectInviteCommand);
+        assertEquals("王五", ((PartyRejectInviteCommand) command).getInviterName());
+    }
+
+    @Test
+    @DisplayName("解析请求加入队伍指令")
+    void testParsePartyRequestJoinCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("party request 赵六", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.PARTY_REQUEST_JOIN, command.getType());
+        assertTrue(command instanceof PartyRequestJoinCommand);
+        assertEquals("赵六", ((PartyRequestJoinCommand) command).getPlayerName());
+    }
+
+    @Test
+    @DisplayName("解析接受组队请求指令")
+    void testParsePartyAcceptRequestCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("party acceptrequest 孙七", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.PARTY_ACCEPT_REQUEST, command.getType());
+        assertTrue(command instanceof PartyAcceptRequestCommand);
+        assertEquals("孙七", ((PartyAcceptRequestCommand) command).getRequesterName());
+    }
+
+    @Test
+    @DisplayName("解析拒绝组队请求指令")
+    void testParsePartyRejectRequestCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("party rejectrequest 周八", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.PARTY_REJECT_REQUEST, command.getType());
+        assertTrue(command instanceof PartyRejectRequestCommand);
+        assertEquals("周八", ((PartyRejectRequestCommand) command).getRequesterName());
+    }
+
+    @Test
+    @DisplayName("解析邀请组队指令 - 缺少玩家名")
+    void testParsePartyInviteWithoutPlayerName() {
+        assertThrows(CommandParser.CommandParseException.class, () -> {
+            parser.parse("party invite", CommandContext.WindowType.MAP);
+        });
+    }
+
+    // ==================== 交易请求命令测试 ====================
+
+    @Test
+    @DisplayName("解析发起交易请求指令")
+    void testParseTradeRequestCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("trade request 吴九", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.TRADE_REQUEST, command.getType());
+        assertTrue(command instanceof TradeRequestCommand);
+        assertEquals("吴九", ((TradeRequestCommand) command).getPlayerName());
+    }
+
+    @Test
+    @DisplayName("解析接受交易请求指令")
+    void testParseTradeAcceptRequestCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("trade accept 郑十", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.TRADE_ACCEPT_REQUEST, command.getType());
+        assertTrue(command instanceof TradeAcceptRequestCommand);
+        assertEquals("郑十", ((TradeAcceptRequestCommand) command).getRequesterName());
+    }
+
+    @Test
+    @DisplayName("解析拒绝交易请求指令")
+    void testParseTradeRejectRequestCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("trade reject 冯十一", CommandContext.WindowType.MAP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.TRADE_REJECT_REQUEST, command.getType());
+        assertTrue(command instanceof TradeRejectRequestCommand);
+        assertEquals("冯十一", ((TradeRejectRequestCommand) command).getRequesterName());
+    }
+
+    // ==================== 商店命令测试 ====================
+
+    @Test
+    @DisplayName("解析商店购买指令")
+    void testParseShopBuyCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("shop buy 生命药剂 5", CommandContext.WindowType.SHOP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.SHOP_BUY, command.getType());
+        assertTrue(command instanceof ShopBuyCommand);
+        assertEquals("生命药剂", ((ShopBuyCommand) command).getItemName());
+        assertEquals(5, ((ShopBuyCommand) command).getQuantity());
+    }
+
+    @Test
+    @DisplayName("解析商店出售指令")
+    void testParseShopSellCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("shop sell 铁剑 1", CommandContext.WindowType.SHOP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.SHOP_SELL, command.getType());
+        assertTrue(command instanceof ShopSellCommand);
+        assertEquals("铁剑", ((ShopSellCommand) command).getItemName());
+        assertEquals(1, ((ShopSellCommand) command).getQuantity());
+    }
+
+    @Test
+    @DisplayName("解析离开商店指令")
+    void testParseShopLeaveCommand() throws CommandParser.CommandParseException {
+        Command command = parser.parse("shop leave", CommandContext.WindowType.SHOP);
+
+        assertNotNull(command);
+        assertEquals(Command.CommandType.SHOP_LEAVE, command.getType());
+        assertTrue(command instanceof ShopLeaveCommand);
+    }
+
+    @Test
+    @DisplayName("解析商店购买指令 - 缺少数量")
+    void testParseShopBuyWithoutQuantity() {
+        assertThrows(CommandParser.CommandParseException.class, () -> {
+            parser.parse("shop buy 生命药剂", CommandContext.WindowType.SHOP);
+        });
+    }
+
+    @Test
+    @DisplayName("解析商店购买指令 - 数量格式错误")
+    void testParseShopBuyWithInvalidQuantity() {
+        assertThrows(CommandParser.CommandParseException.class, () -> {
+            parser.parse("shop buy 生命药剂 abc", CommandContext.WindowType.SHOP);
+        });
+    }
 }

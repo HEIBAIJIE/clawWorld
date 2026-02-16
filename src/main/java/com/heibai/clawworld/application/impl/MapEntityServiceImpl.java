@@ -27,6 +27,8 @@ public class MapEntityServiceImpl implements MapEntityService {
     private final PlayerMapper playerMapper;
     private final ConfigDataManager configDataManager;
     private final PlayerSessionService playerSessionService;
+    private final com.heibai.clawworld.infrastructure.persistence.repository.EnemyInstanceRepository enemyInstanceRepository;
+    private final com.heibai.clawworld.infrastructure.persistence.repository.NpcShopInstanceRepository npcShopInstanceRepository;
 
     @Override
     public EntityInfo inspectCharacter(String playerId, String characterName) {
@@ -71,13 +73,95 @@ public class MapEntityServiceImpl implements MapEntityService {
             }
         }
 
-        // 查找敌人和NPC
-        // 注意：这里需要从EnemyInstanceRepository和NpcInstanceRepository中查找
-        // 当前简化实现，返回未找到
-        // 未来需要实现：
-        // 1. 从EnemyInstanceRepository查找敌人
-        // 2. 从NpcInstanceRepository查找NPC
-        // 3. 返回对应的详细信息
+        // 查找敌人
+        List<com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity> enemiesOnMap =
+            enemyInstanceRepository.findByMapId(player.getCurrentMapId());
+
+        for (com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity enemy : enemiesOnMap) {
+            if (enemy.getDisplayName() != null && enemy.getDisplayName().equals(characterName)) {
+                // 获取敌人模板配置
+                com.heibai.clawworld.infrastructure.config.data.character.EnemyConfig enemyConfig =
+                    configDataManager.getEnemy(enemy.getTemplateId());
+
+                if (enemyConfig == null) {
+                    return EntityInfo.error("敌人配置不存在: " + enemy.getTemplateId());
+                }
+
+                // 构建敌人详细信息
+                StringBuilder info = new StringBuilder();
+
+                info.append("=== 敌人信息 ===\n");
+                info.append("名称: ").append(enemy.getDisplayName()).append("\n");
+                info.append("等级: ").append(enemyConfig.getLevel()).append("\n");
+                info.append("品阶: ").append(enemyConfig.getTier()).append("\n");
+                info.append("位置: (").append(enemy.getX()).append(", ").append(enemy.getY()).append(")\n");
+                info.append("状态: ").append(enemy.isDead() ? "已死亡" : "存活").append("\n\n");
+
+                if (!enemy.isDead()) {
+                    info.append("=== 生命与法力 ===\n");
+                    info.append("生命值: ").append(enemy.getCurrentHealth()).append("/").append(enemyConfig.getHealth()).append("\n");
+                    info.append("法力值: ").append(enemy.getCurrentMana()).append("/").append(enemyConfig.getMana()).append("\n\n");
+
+                    info.append("=== 战斗属性 ===\n");
+                    info.append("物理攻击: ").append(enemyConfig.getPhysicalAttack()).append("\n");
+                    info.append("物理防御: ").append(enemyConfig.getPhysicalDefense()).append("\n");
+                    info.append("法术攻击: ").append(enemyConfig.getMagicAttack()).append("\n");
+                    info.append("法术防御: ").append(enemyConfig.getMagicDefense()).append("\n");
+                    info.append("速度: ").append(enemyConfig.getSpeed()).append("\n");
+                    info.append("暴击率: ").append(String.format("%.1f%%", enemyConfig.getCritRate() * 100)).append("\n");
+                    info.append("暴击伤害: ").append(String.format("%.1f%%", enemyConfig.getCritDamage() * 100)).append("\n");
+                    info.append("命中率: ").append(String.format("%.1f%%", enemyConfig.getHitRate() * 100)).append("\n");
+                    info.append("闪避率: ").append(String.format("%.1f%%", enemyConfig.getDodgeRate() * 100)).append("\n\n");
+
+                    info.append("=== 掉落信息 ===\n");
+                    info.append("经验: ").append(enemyConfig.getExpMin()).append(" - ").append(enemyConfig.getExpMax()).append("\n");
+                    info.append("金钱: ").append(enemyConfig.getGoldMin()).append(" - ").append(enemyConfig.getGoldMax()).append("\n");
+                    info.append("刷新时间: ").append(enemyConfig.getRespawnSeconds()).append("秒\n");
+                } else {
+                    long remainingTime = (enemy.getLastDeathTime() + enemyConfig.getRespawnSeconds() * 1000L - System.currentTimeMillis()) / 1000;
+                    if (remainingTime > 0) {
+                        info.append("刷新倒计时: ").append(remainingTime).append("秒\n");
+                    } else {
+                        info.append("即将刷新\n");
+                    }
+                }
+
+                return EntityInfo.success(characterName, "ENEMY", info.toString());
+            }
+        }
+
+        // 查找NPC
+        List<com.heibai.clawworld.infrastructure.persistence.entity.NpcShopInstanceEntity> npcsOnMap =
+            npcShopInstanceRepository.findByMapId(player.getCurrentMapId());
+
+        for (com.heibai.clawworld.infrastructure.persistence.entity.NpcShopInstanceEntity npcShop : npcsOnMap) {
+            // 获取NPC配置
+            com.heibai.clawworld.infrastructure.config.data.character.NpcConfig npcConfig =
+                configDataManager.getNpc(npcShop.getNpcId());
+
+            if (npcConfig != null && npcConfig.getName().equals(characterName)) {
+                // 构建NPC详细信息
+                StringBuilder info = new StringBuilder();
+
+                info.append("=== NPC信息 ===\n");
+                info.append("名称: ").append(npcConfig.getName()).append("\n");
+                info.append("描述: ").append(npcConfig.getDescription()).append("\n\n");
+
+                if (npcConfig.isHasShop()) {
+                    info.append("=== 商店信息 ===\n");
+                    info.append("可以与此NPC进行交易\n");
+                    info.append("当前金钱: ").append(npcShop.getCurrentGold()).append("\n");
+                    info.append("刷新间隔: ").append(npcConfig.getShopRefreshSeconds()).append("秒\n\n");
+                }
+
+                if (npcConfig.isHasDialogue()) {
+                    info.append("=== 对话 ===\n");
+                    info.append("可以与此NPC对话\n");
+                }
+
+                return EntityInfo.success(characterName, "NPC", info.toString());
+            }
+        }
 
         return EntityInfo.error("未找到目标角色: " + characterName);
     }

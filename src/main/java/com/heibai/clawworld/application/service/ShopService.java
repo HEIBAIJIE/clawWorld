@@ -65,6 +65,19 @@ public interface ShopService {
         private String shopId;
         private String npcName;
         private int gold;
-        // TODO: 添加商品列表等信息
+        private double priceMultiplier;
+        private java.util.List<ShopItemInfo> items;
+
+        /**
+         * 商店物品信息
+         */
+        @Data
+        public static class ShopItemInfo {
+            private String itemId;
+            private String itemName;
+            private int price;
+            private int maxQuantity;
+            private int currentQuantity;
+        }
     }
 }
