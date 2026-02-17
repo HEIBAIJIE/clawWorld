@@ -72,9 +72,12 @@ public class PartyServiceImpl implements PartyService {
             return PartyResult.error("队伍已满");
         }
 
-        // 检查是否已有邀请
+        // 清理所有过期的邀请
+        party.getPendingInvitations().removeIf(inv -> isExpired(inv.getInviteTime()));
+
+        // 检查是否已有未过期的邀请
         boolean alreadyInvited = party.getPendingInvitations().stream()
-                .anyMatch(inv -> inv.getInviteeId().equals(targetPlayerId) && !isExpired(inv.getInviteTime()));
+                .anyMatch(inv -> inv.getInviteeId().equals(targetPlayerId));
         if (alreadyInvited) {
             return PartyResult.error("已经邀请过该玩家");
         }
@@ -124,21 +127,25 @@ public class PartyServiceImpl implements PartyService {
 
         PartyEntity party = partyOpt.get();
 
-        // 查找邀请记录
+        // 查找邀请记录（找最新的未过期邀请）
         Optional<PartyEntity.PartyInvitationData> invitationOpt = party.getPendingInvitations().stream()
                 .filter(inv -> inv.getInviterId().equals(inviterId) && inv.getInviteeId().equals(playerId))
-                .findFirst();
+                .filter(inv -> !isExpired(inv.getInviteTime()))
+                .max((a, b) -> {
+                    Long timeA = a.getInviteTime() != null ? a.getInviteTime() : 0L;
+                    Long timeB = b.getInviteTime() != null ? b.getInviteTime() : 0L;
+                    return timeA.compareTo(timeB);
+                });
 
         if (!invitationOpt.isPresent()) {
-            return PartyResult.error("未找到邀请记录");
+            // 清理所有过期的邀请
+            party.getPendingInvitations().removeIf(inv ->
+                inv.getInviterId().equals(inviterId) && inv.getInviteeId().equals(playerId) && isExpired(inv.getInviteTime()));
+            partyRepository.save(party);
+            return PartyResult.error("未找到有效的邀请记录");
         }
 
         PartyEntity.PartyInvitationData invitation = invitationOpt.get();
-        if (isExpired(invitation.getInviteTime())) {
-            party.getPendingInvitations().remove(invitation);
-            partyRepository.save(party);
-            return PartyResult.error("邀请已过期");
-        }
 
         // 检查队伍是否已满
         if (party.isFull()) {
@@ -228,9 +235,12 @@ public class PartyServiceImpl implements PartyService {
             return PartyResult.error("目标队伍已满");
         }
 
-        // 检查是否已有请求
+        // 清理所有过期的请求
+        targetParty.getPendingRequests().removeIf(req -> isExpired(req.getRequestTime()));
+
+        // 检查是否已有未过期的请求
         boolean alreadyRequested = targetParty.getPendingRequests().stream()
-                .anyMatch(req -> req.getRequesterId().equals(playerId) && !isExpired(req.getRequestTime()));
+                .anyMatch(req -> req.getRequesterId().equals(playerId));
         if (alreadyRequested) {
             return PartyResult.error("已经请求过加入该队伍");
         }
@@ -264,21 +274,23 @@ public class PartyServiceImpl implements PartyService {
             return PartyResult.error("请求者不存在");
         }
 
-        // 查找请求记录
+        // 清理所有过期的请求
+        party.getPendingRequests().removeIf(req -> isExpired(req.getRequestTime()));
+
+        // 查找请求记录（找最新的未过期请求）
         Optional<PartyEntity.PartyRequestData> requestOpt = party.getPendingRequests().stream()
                 .filter(req -> req.getRequesterId().equals(requesterId))
-                .findFirst();
+                .max((a, b) -> {
+                    Long timeA = a.getRequestTime() != null ? a.getRequestTime() : 0L;
+                    Long timeB = b.getRequestTime() != null ? b.getRequestTime() : 0L;
+                    return timeA.compareTo(timeB);
+                });
 
         if (!requestOpt.isPresent()) {
-            return PartyResult.error("未找到加入请求");
+            return PartyResult.error("未找到有效的加入请求");
         }
 
         PartyEntity.PartyRequestData request = requestOpt.get();
-        if (isExpired(request.getRequestTime())) {
-            party.getPendingRequests().remove(request);
-            partyRepository.save(party);
-            return PartyResult.error("请求已过期");
-        }
 
         // 检查队伍是否已满
         if (party.isFull()) {
@@ -515,6 +527,9 @@ public class PartyServiceImpl implements PartyService {
      * 检查时间是否过期（5分钟）
      */
     private boolean isExpired(Long timestamp) {
+        if (timestamp == null) {
+            return true; // 没有时间戳视为已过期
+        }
         return System.currentTimeMillis() - timestamp > 5 * 60 * 1000;
     }
 

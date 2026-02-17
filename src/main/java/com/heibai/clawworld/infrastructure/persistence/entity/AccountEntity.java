@@ -58,10 +58,22 @@ public class AccountEntity {
     // 上次获取的战斗日志序列号（用于增量获取战斗日志）
     private Integer lastCombatLogSequence;
 
+    // 上次的队伍状态快照（用于追踪队伍变化）
+    private PartySnapshot lastPartySnapshot;
+
     @Data
     public static class EntitySnapshot {
         private int x;
         private int y;
         private java.util.List<String> interactionOptions;
+    }
+
+    @Data
+    public static class PartySnapshot {
+        private String partyId;
+        private boolean isLeader;
+        private java.util.List<String> memberNames;
+        // 收到的待处理邀请（inviterName -> inviteTime）
+        private java.util.Map<String, Long> pendingInvitationsReceived;
     }
 }

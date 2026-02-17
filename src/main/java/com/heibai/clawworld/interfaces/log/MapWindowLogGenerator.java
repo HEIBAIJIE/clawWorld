@@ -233,9 +233,9 @@ public class MapWindowLogGenerator {
                 options.add("邀请组队");
             }
 
-            // 检查是否有来自目标的组队邀请
-            if (viewerParty != null && viewerParty.getPendingInvitations() != null) {
-                boolean hasInvitation = viewerParty.getPendingInvitations().stream()
+            // 检查是否有来自目标的组队邀请（邀请存储在目标的队伍中）
+            if (targetParty != null && targetParty.getPendingInvitations() != null) {
+                boolean hasInvitation = targetParty.getPendingInvitations().stream()
                         .anyMatch(inv -> inv.getInviterId().equals(target.getId())
                                 && inv.getInviteeId().equals(viewer.getId())
                                 && !inv.isExpired());

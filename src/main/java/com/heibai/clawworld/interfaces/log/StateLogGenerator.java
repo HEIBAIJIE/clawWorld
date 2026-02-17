@@ -93,13 +93,16 @@ public class StateLogGenerator {
             account.setLastEntitySnapshot(currentSnapshot);
         }
 
-        // 3. 聊天消息变化
+        // 3. 队伍状态变化
+        generatePartyChangeLogs(builder, account, currentPlayer);
+
+        // 4. 聊天消息变化
         generateChatChangeLogs(builder, playerId, lastTimestamp);
 
-        // 4. 指令响应（放在最后）
+        // 5. 指令响应（放在最后）
         builder.addState("指令响应", commandResult);
 
-        // 5. 更新状态时间戳
+        // 6. 更新状态时间戳
         account.setLastStateTimestamp(System.currentTimeMillis());
         accountRepository.save(account);
     }
@@ -210,6 +213,123 @@ public class StateLogGenerator {
     }
 
     /**
+     * 生成队伍变化日志
+     */
+    private void generatePartyChangeLogs(GameLogBuilder builder, AccountEntity account, Player currentPlayer) {
+        if (currentPlayer == null) {
+            return;
+        }
+
+        AccountEntity.PartySnapshot lastSnapshot = account.getLastPartySnapshot();
+        AccountEntity.PartySnapshot currentSnapshot = buildCurrentPartySnapshot(currentPlayer);
+
+        // 检测队伍状态变化
+        if (lastSnapshot == null) {
+            // 首次检测，只保存快照，不生成日志
+        } else {
+            String lastPartyId = lastSnapshot.getPartyId();
+            String currentPartyId = currentSnapshot.getPartyId();
+
+            // 检测队伍解散或被踢
+            if (lastPartyId != null && currentPartyId == null) {
+                // 之前在队伍中，现在不在了
+                if (lastSnapshot.isLeader()) {
+                    // 自己是队长，队伍解散了（这个是主动操作，不需要通知）
+                } else {
+                    // 自己不是队长，可能是被踢或队伍解散
+                    builder.addState("队伍变化", "你已离开队伍（队伍解散或被踢出）");
+                }
+            } else if (lastPartyId != null && currentPartyId != null && lastPartyId.equals(currentPartyId)) {
+                // 在同一个队伍中，检测成员变化
+                List<String> lastMembers = lastSnapshot.getMemberNames() != null ? lastSnapshot.getMemberNames() : new ArrayList<>();
+                List<String> currentMembers = currentSnapshot.getMemberNames() != null ? currentSnapshot.getMemberNames() : new ArrayList<>();
+
+                // 检测新加入的成员
+                for (String member : currentMembers) {
+                    if (!lastMembers.contains(member) && !member.equals(currentPlayer.getName())) {
+                        builder.addState("队伍变化", String.format("%s 加入了队伍", member));
+                    }
+                }
+
+                // 检测离开的成员
+                for (String member : lastMembers) {
+                    if (!currentMembers.contains(member) && !member.equals(currentPlayer.getName())) {
+                        builder.addState("队伍变化", String.format("%s 离开了队伍", member));
+                    }
+                }
+            } else if (lastPartyId == null && currentPartyId != null) {
+                // 之前不在队伍，现在在队伍中（这个是主动操作，不需要通知）
+            }
+
+            // 检测收到的新邀请
+            Map<String, Long> lastInvitations = lastSnapshot.getPendingInvitationsReceived() != null
+                ? lastSnapshot.getPendingInvitationsReceived() : new HashMap<>();
+            Map<String, Long> currentInvitations = currentSnapshot.getPendingInvitationsReceived() != null
+                ? currentSnapshot.getPendingInvitationsReceived() : new HashMap<>();
+
+            for (String inviterName : currentInvitations.keySet()) {
+                if (!lastInvitations.containsKey(inviterName)) {
+                    builder.addState("队伍变化", String.format("%s 邀请你加入队伍", inviterName));
+                }
+            }
+        }
+
+        // 保存当前快照
+        account.setLastPartySnapshot(currentSnapshot);
+    }
+
+    /**
+     * 构建当前队伍状态快照
+     */
+    private AccountEntity.PartySnapshot buildCurrentPartySnapshot(Player player) {
+        AccountEntity.PartySnapshot snapshot = new AccountEntity.PartySnapshot();
+
+        Party party = partyService.getPlayerParty(player.getId());
+        if (party != null && !party.isSolo()) {
+            snapshot.setPartyId(party.getId());
+            snapshot.setLeader(party.isLeader(player.getId()));
+
+            // 获取成员名称列表
+            List<String> memberNames = new ArrayList<>();
+            for (String memberId : party.getMemberIds()) {
+                Player member = playerSessionService.getPlayerState(memberId);
+                if (member != null) {
+                    memberNames.add(member.getName());
+                }
+            }
+            snapshot.setMemberNames(memberNames);
+        }
+
+        // 收集所有发给当前玩家的待处理邀请
+        Map<String, Long> pendingInvitations = new HashMap<>();
+        // 遍历所有可能的邀请者（地图上的其他玩家）
+        List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(player.getMapId());
+        for (MapEntity entity : entitiesOnMap) {
+            if ("PLAYER".equals(entity.getEntityType()) && !entity.getName().equals(player.getName())) {
+                // 获取这个玩家的完整信息
+                Player otherPlayer = null;
+                if (entity instanceof Player) {
+                    otherPlayer = (Player) entity;
+                }
+
+                if (otherPlayer != null && otherPlayer.getId() != null) {
+                    Party otherParty = partyService.getPlayerParty(otherPlayer.getId());
+                    if (otherParty != null && otherParty.getPendingInvitations() != null) {
+                        for (Party.PartyInvitation inv : otherParty.getPendingInvitations()) {
+                            if (inv.getInviteeId().equals(player.getId()) && !inv.isExpired()) {
+                                pendingInvitations.put(otherPlayer.getName(), inv.getInviteTime());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        snapshot.setPendingInvitationsReceived(pendingInvitations);
+
+        return snapshot;
+    }
+
+    /**
      * 生成聊天变化日志
      */
     private void generateChatChangeLogs(GameLogBuilder builder, String playerId, Long lastTimestamp) {
@@ -269,9 +389,9 @@ public class StateLogGenerator {
                 options.add("邀请组队");
             }
 
-            // 检查是否有来自目标的组队邀请
-            if (viewerParty != null && viewerParty.getPendingInvitations() != null) {
-                boolean hasInvitation = viewerParty.getPendingInvitations().stream()
+            // 检查是否有来自目标的组队邀请（邀请存储在目标的队伍中）
+            if (targetParty != null && targetParty.getPendingInvitations() != null) {
+                boolean hasInvitation = targetParty.getPendingInvitations().stream()
                         .anyMatch(inv -> inv.getInviterId().equals(target.getId())
                                 && inv.getInviteeId().equals(viewer.getId())
                                 && !inv.isExpired());

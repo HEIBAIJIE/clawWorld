@@ -150,7 +150,7 @@ class PartyServiceImplTest {
 
         // Assert
         assertFalse(result.isSuccess());
-        assertEquals("邀请已过期", result.getMessage());
+        assertEquals("未找到有效的邀请记录", result.getMessage());
     }
 
     @Test
