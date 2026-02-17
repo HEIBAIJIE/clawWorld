@@ -41,16 +41,31 @@ class TradeServiceImplTest {
     @Mock
     private PlayerSessionService playerSessionService;
 
+    @Mock
+    private com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository playerRepository;
+
     @InjectMocks
     private TradeServiceImpl tradeService;
 
     private Player player1;
     private Player player2;
+    private com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity playerEntity1;
+    private com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity playerEntity2;
     private Item testItem;
     private Equipment testEquipment;
 
     @BeforeEach
     void setUp() {
+        // 创建测试玩家实体1
+        playerEntity1 = new com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity();
+        playerEntity1.setId("player1");
+        playerEntity1.setName("玩家1");
+
+        // 创建测试玩家实体2
+        playerEntity2 = new com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity();
+        playerEntity2.setId("player2");
+        playerEntity2.setName("玩家2");
+
         // 创建测试玩家1
         player1 = new Player();
         player1.setId("player1");
@@ -84,12 +99,13 @@ class TradeServiceImplTest {
     void testRequestTrade_Success() {
         // 准备
         when(tradeRepository.findActiveTradesByPlayerId(any(), anyString())).thenReturn(new ArrayList<>());
+        when(playerRepository.findAll()).thenReturn(List.of(playerEntity1, playerEntity2));
         when(playerSessionService.getPlayerState("player2")).thenReturn(player2);
         when(tradeMapper.toEntity(any(Trade.class))).thenReturn(new TradeEntity());
         when(tradeRepository.save(any(TradeEntity.class))).thenReturn(new TradeEntity());
 
         // 执行
-        TradeService.TradeResult result = tradeService.requestTrade("player1", "player2");
+        TradeService.TradeResult result = tradeService.requestTrade("player1", "玩家2");
 
         // 验证
         assertTrue(result.isSuccess());
@@ -118,10 +134,10 @@ class TradeServiceImplTest {
     void testRequestTrade_TargetPlayerNotExists() {
         // 准备
         when(tradeRepository.findActiveTradesByPlayerId(any(), anyString())).thenReturn(new ArrayList<>());
-        when(playerSessionService.getPlayerState("player2")).thenReturn(null);
+        when(playerRepository.findAll()).thenReturn(List.of(playerEntity1)); // 只返回player1，没有player2
 
         // 执行
-        TradeService.TradeResult result = tradeService.requestTrade("player1", "player2");
+        TradeService.TradeResult result = tradeService.requestTrade("player1", "不存在的玩家");
 
         // 验证
         assertFalse(result.isSuccess());
@@ -140,12 +156,13 @@ class TradeServiceImplTest {
         List<TradeEntity> pendingTrades = new ArrayList<>();
         pendingTrades.add(tradeEntity);
 
+        when(playerRepository.findAll()).thenReturn(List.of(playerEntity1, playerEntity2));
         when(tradeRepository.findByStatusAndReceiverId(TradeEntity.TradeStatus.PENDING, "player2"))
             .thenReturn(pendingTrades);
         when(tradeRepository.save(any(TradeEntity.class))).thenReturn(tradeEntity);
 
         // 执行
-        TradeService.TradeResult result = tradeService.acceptTradeRequest("player2", "player1");
+        TradeService.TradeResult result = tradeService.acceptTradeRequest("player2", "玩家1");
 
         // 验证
         assertTrue(result.isSuccess());
@@ -165,12 +182,13 @@ class TradeServiceImplTest {
         List<TradeEntity> pendingTrades = new ArrayList<>();
         pendingTrades.add(tradeEntity);
 
+        when(playerRepository.findAll()).thenReturn(List.of(playerEntity1, playerEntity2));
         when(tradeRepository.findByStatusAndReceiverId(TradeEntity.TradeStatus.PENDING, "player2"))
             .thenReturn(pendingTrades);
         when(tradeRepository.save(any(TradeEntity.class))).thenReturn(tradeEntity);
 
         // 执行
-        TradeService.OperationResult result = tradeService.rejectTradeRequest("player2", "player1");
+        TradeService.OperationResult result = tradeService.rejectTradeRequest("player2", "玩家1");
 
         // 验证
         assertTrue(result.isSuccess());
@@ -436,11 +454,12 @@ class TradeServiceImplTest {
         // 这是一个完整的交易流程测试
         // 1. 发起交易
         when(tradeRepository.findActiveTradesByPlayerId(any(), anyString())).thenReturn(new ArrayList<>());
+        when(playerRepository.findAll()).thenReturn(List.of(playerEntity1, playerEntity2));
         when(playerSessionService.getPlayerState("player2")).thenReturn(player2);
         when(tradeMapper.toEntity(any(Trade.class))).thenReturn(new TradeEntity());
         when(tradeRepository.save(any(TradeEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TradeService.TradeResult requestResult = tradeService.requestTrade("player1", "player2");
+        TradeService.TradeResult requestResult = tradeService.requestTrade("player1", "玩家2");
         assertTrue(requestResult.isSuccess());
 
         // 2. 接受交易
@@ -459,7 +478,7 @@ class TradeServiceImplTest {
         when(tradeRepository.findByStatusAndReceiverId(TradeEntity.TradeStatus.PENDING, "player2"))
             .thenReturn(pendingTrades);
 
-        TradeService.TradeResult acceptResult = tradeService.acceptTradeRequest("player2", "player1");
+        TradeService.TradeResult acceptResult = tradeService.acceptTradeRequest("player2", "玩家1");
         assertTrue(acceptResult.isSuccess());
         assertEquals(TradeEntity.TradeStatus.ACTIVE, tradeEntity.getStatus());
 

@@ -28,10 +28,11 @@ public class TradeServiceImpl implements TradeService {
     private final TradeRepository tradeRepository;
     private final TradeMapper tradeMapper;
     private final PlayerSessionService playerSessionService;
+    private final com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository playerRepository;
 
     @Override
     @Transactional
-    public TradeResult requestTrade(String requesterId, String targetPlayerId) {
+    public TradeResult requestTrade(String requesterId, String targetPlayerName) {
         // 检查发起者是否已有进行中的交易
         List<TradeEntity> activeTradesInitiator = tradeRepository.findActiveTradesByPlayerId(
             TradeEntity.TradeStatus.ACTIVE, requesterId);
@@ -40,6 +41,12 @@ public class TradeServiceImpl implements TradeService {
 
         if (!activeTradesInitiator.isEmpty() || !pendingTradesInitiator.isEmpty()) {
             return TradeResult.error("你已有进行中的交易");
+        }
+
+        // 通过玩家昵称查找玩家ID
+        String targetPlayerId = findPlayerIdByName(targetPlayerName);
+        if (targetPlayerId == null) {
+            return TradeResult.error("目标玩家不存在");
         }
 
         // 检查目标玩家是否存在
@@ -83,7 +90,13 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     @Transactional
-    public TradeResult acceptTradeRequest(String playerId, String requesterId) {
+    public TradeResult acceptTradeRequest(String playerId, String requesterName) {
+        // 通过玩家昵称查找玩家ID
+        String requesterId = findPlayerIdByName(requesterName);
+        if (requesterId == null) {
+            return TradeResult.error("发起者不存在");
+        }
+
         // 查找待接受的交易
         List<TradeEntity> pendingTrades = tradeRepository.findByStatusAndReceiverId(
             TradeEntity.TradeStatus.PENDING, playerId);
@@ -110,7 +123,13 @@ public class TradeServiceImpl implements TradeService {
 
     @Override
     @Transactional
-    public OperationResult rejectTradeRequest(String playerId, String requesterId) {
+    public OperationResult rejectTradeRequest(String playerId, String requesterName) {
+        // 通过玩家昵称查找玩家ID
+        String requesterId = findPlayerIdByName(requesterName);
+        if (requesterId == null) {
+            return OperationResult.error("发起者不存在");
+        }
+
         // 查找待接受的交易
         List<TradeEntity> pendingTrades = tradeRepository.findByStatusAndReceiverId(
             TradeEntity.TradeStatus.PENDING, playerId);
@@ -570,5 +589,16 @@ public class TradeServiceImpl implements TradeService {
                 }
             }
         }
+    }
+
+    /**
+     * 通过玩家昵称查找玩家ID
+     */
+    private String findPlayerIdByName(String playerName) {
+        return playerRepository.findAll().stream()
+            .filter(p -> p.getName() != null && p.getName().equals(playerName))
+            .map(com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity::getId)
+            .findFirst()
+            .orElse(null);
     }
 }
