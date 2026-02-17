@@ -1,9 +1,12 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.service.WindowStateService;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.trade.Trade;
 import com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity;
 import com.heibai.clawworld.infrastructure.persistence.mapper.TradeMapper;
+import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
+import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.TradeRepository;
 import com.heibai.clawworld.application.service.PlayerSessionService;
 import com.heibai.clawworld.application.service.TradeService;
@@ -28,8 +31,9 @@ public class TradeServiceImpl implements TradeService {
     private final TradeRepository tradeRepository;
     private final TradeMapper tradeMapper;
     private final PlayerSessionService playerSessionService;
-    private final com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository playerRepository;
-    private final com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository accountRepository;
+    private final PlayerRepository playerRepository;
+    private final AccountRepository accountRepository;
+    private final WindowStateService windowStateService;
 
     @Override
     @Transactional
@@ -147,14 +151,20 @@ public class TradeServiceImpl implements TradeService {
             playerRepository.save(receiverEntity);
         }
 
-        // 更新发起者的窗口状态
-        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> initiatorAccountOpt =
-            accountRepository.findByPlayerId(initiatorId);
-        if (initiatorAccountOpt.isPresent()) {
-            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = initiatorAccountOpt.get();
-            account.setCurrentWindowType("TRADE");
-            account.setCurrentWindowId(tradeEntity.getId());
-            accountRepository.save(account);
+        // 使用WindowStateService原子地转换双方玩家的窗口状态
+        String initiatorCurrentWindow = windowStateService.getCurrentWindowType(initiatorId);
+        String receiverCurrentWindow = windowStateService.getCurrentWindowType(receiverId);
+
+        List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new java.util.ArrayList<>();
+        transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+            initiatorId, initiatorCurrentWindow, "TRADE", tradeEntity.getId()));
+        transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+            receiverId, receiverCurrentWindow, "TRADE", tradeEntity.getId()));
+
+        boolean transitionSuccess = windowStateService.transitionWindows(transitions);
+        if (!transitionSuccess) {
+            log.warn("窗口状态转换失败: tradeId={}", tradeEntity.getId());
+            return TradeResult.error("窗口状态转换失败");
         }
 
         String windowId = tradeEntity.getId();
@@ -198,14 +208,12 @@ public class TradeServiceImpl implements TradeService {
             playerRepository.save(initiatorEntity);
         }
 
-        // 清理发起者的窗口状态
-        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> initiatorAccountOpt =
-            accountRepository.findByPlayerId(tradeEntity.getInitiatorId());
-        if (initiatorAccountOpt.isPresent()) {
-            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = initiatorAccountOpt.get();
-            account.setCurrentWindowType("MAP");
-            account.setCurrentWindowId(null);
-            accountRepository.save(account);
+        // 使用WindowStateService转换发起者的窗口状态回MAP
+        String initiatorCurrentWindow = windowStateService.getCurrentWindowType(tradeEntity.getInitiatorId());
+        boolean transitionSuccess = windowStateService.transitionWindow(
+            tradeEntity.getInitiatorId(), "MAP", null);
+        if (!transitionSuccess) {
+            log.warn("窗口状态转换失败: initiatorId={}", tradeEntity.getInitiatorId());
         }
 
         log.info("拒绝交易: tradeId={}, playerId={}", tradeEntity.getId(), playerId);
@@ -571,7 +579,7 @@ public class TradeServiceImpl implements TradeService {
 
             log.info("交易完成: tradeId={}", tradeEntity.getId());
 
-            return OperationResult.success("交易完成");
+            return OperationResult.tradeCompleted("交易完成");
         } catch (Exception e) {
             log.error("执行交易失败: tradeId={}", tradeEntity.getId(), e);
             return OperationResult.error("交易执行失败: " + e.getMessage());
@@ -692,24 +700,19 @@ public class TradeServiceImpl implements TradeService {
             playerRepository.save(receiverEntity);
         }
 
-        // 清理发起者的窗口状态，切换回地图窗口
-        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> initiatorAccountOpt =
-            accountRepository.findByPlayerId(initiatorId);
-        if (initiatorAccountOpt.isPresent()) {
-            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = initiatorAccountOpt.get();
-            account.setCurrentWindowType("MAP");
-            account.setCurrentWindowId(null);
-            accountRepository.save(account);
-        }
+        // 使用WindowStateService原子地转换双方玩家的窗口状态回MAP
+        String initiatorCurrentWindow = windowStateService.getCurrentWindowType(initiatorId);
+        String receiverCurrentWindow = windowStateService.getCurrentWindowType(receiverId);
 
-        // 清理接收者的窗口状态，切换回地图窗口
-        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> receiverAccountOpt =
-            accountRepository.findByPlayerId(receiverId);
-        if (receiverAccountOpt.isPresent()) {
-            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = receiverAccountOpt.get();
-            account.setCurrentWindowType("MAP");
-            account.setCurrentWindowId(null);
-            accountRepository.save(account);
+        List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new java.util.ArrayList<>();
+        transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+            initiatorId, initiatorCurrentWindow, "MAP", null));
+        transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+            receiverId, receiverCurrentWindow, "MAP", null));
+
+        boolean transitionSuccess = windowStateService.transitionWindows(transitions);
+        if (!transitionSuccess) {
+            log.warn("窗口状态转换失败: initiatorId={}, receiverId={}", initiatorId, receiverId);
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.service.WindowStateService;
 import com.heibai.clawworld.domain.combat.CombatCharacter;
 import com.heibai.clawworld.domain.service.CombatEngine;
 import com.heibai.clawworld.domain.combat.CombatInstance;
@@ -8,6 +9,7 @@ import com.heibai.clawworld.domain.character.Character;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.combat.Combat;
 import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
+import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.application.service.CombatService;
@@ -32,6 +34,8 @@ public class CombatServiceImpl implements CombatService {
     private final ConfigDataManager configDataManager;
     private final PlayerSessionService playerSessionService;
     private final PlayerRepository playerRepository;
+    private final WindowStateService windowStateService;
+    private final AccountRepository accountRepository;
 
     @Override
     public CombatResult initiateCombat(String attackerId, String targetId) {
@@ -140,6 +144,7 @@ public class CombatServiceImpl implements CombatService {
             String battleLog = String.join("\n", result.getBattleLog());
 
             if (result.isCombatEnded()) {
+                handleCombatEndWindowTransition(combatId);
                 return ActionResult.combatEnded("战斗结束", battleLog);
             }
 
@@ -176,6 +181,7 @@ public class CombatServiceImpl implements CombatService {
             String battleLog = String.join("\n", result.getBattleLog());
 
             if (result.isCombatEnded()) {
+                handleCombatEndWindowTransition(combatId);
                 return ActionResult.combatEnded("战斗结束", battleLog);
             }
 
@@ -212,6 +218,7 @@ public class CombatServiceImpl implements CombatService {
             String battleLog = String.join("\n", result.getBattleLog());
 
             if (result.isCombatEnded()) {
+                handleCombatEndWindowTransition(combatId);
                 return ActionResult.combatEnded("战斗结束", battleLog);
             }
 
@@ -232,6 +239,7 @@ public class CombatServiceImpl implements CombatService {
             }
 
             if (result.isCombatEnded()) {
+                handleCombatEndWindowTransition(combatId);
                 return ActionResult.combatEnded("战斗结束", "");
             }
 
@@ -324,5 +332,46 @@ public class CombatServiceImpl implements CombatService {
             .map(skill -> skill.getId())
             .findFirst()
             .orElse("basic_attack"); // 找不到时默认使用普通攻击
+    }
+
+    /**
+     * 处理战斗结束时的窗口状态转换
+     * 将所有参战玩家的窗口状态从COMBAT转换回MAP
+     */
+    private void handleCombatEndWindowTransition(String combatId) {
+        try {
+            Optional<CombatInstance> combatOpt = combatEngine.getCombat(combatId);
+            if (combatOpt.isEmpty()) {
+                log.warn("战斗不存在，无法处理窗口转换: combatId={}", combatId);
+                return;
+            }
+
+            CombatInstance combat = combatOpt.get();
+            List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new java.util.ArrayList<>();
+
+            // 遍历所有参战方，收集所有玩家
+            for (com.heibai.clawworld.domain.combat.CombatParty party : combat.getParties().values()) {
+                for (CombatCharacter character : party.getCharacters()) {
+                    if (character.isPlayer()) {
+                        String playerId = character.getCharacterId();
+                        String currentWindow = windowStateService.getCurrentWindowType(playerId);
+                        transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+                            playerId, currentWindow, "MAP", null));
+                    }
+                }
+            }
+
+            if (!transitions.isEmpty()) {
+                boolean success = windowStateService.transitionWindows(transitions);
+                if (success) {
+                    log.info("战斗结束，所有玩家窗口状态已转换回MAP: combatId={}, playerCount={}",
+                        combatId, transitions.size());
+                } else {
+                    log.warn("战斗结束窗口状态转换失败: combatId={}", combatId);
+                }
+            }
+        } catch (Exception e) {
+            log.error("处理战斗结束窗口转换失败: combatId={}", combatId, e);
+        }
     }
 }

@@ -26,9 +26,19 @@ public class EndCombatCommand extends Command {
         CombatService.ActionResult result = CommandServiceLocator.getInstance().getCombatService()
                 .forfeit(combatId, context.getPlayerId());
 
-        return result.isSuccess() ?
-                CommandResult.success(result.getMessage()) :
-                CommandResult.error(result.getMessage());
+        if (result.isSuccess()) {
+            if (result.isCombatEnded()) {
+                return CommandResult.successWithWindowChange(
+                        result.getMessage(),
+                        CommandContext.WindowType.MAP,
+                        "已退出战斗，返回地图"
+                );
+            } else {
+                return CommandResult.success(result.getMessage());
+            }
+        } else {
+            return CommandResult.error(result.getMessage());
+        }
     }
 
     @Override

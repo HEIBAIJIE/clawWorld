@@ -119,17 +119,28 @@ public class StateLogGenerator {
             AccountEntity.EntitySnapshot lastSnap = lastSnapshot.get(entityName);
 
             if (lastSnap == null) {
-                // 新实体
+                // 新实体 - 显示完整信息，包括位置和交互选项
                 MapEntity entity = currentEntitiesMap.get(entityName);
                 String entityType = entity.getEntityType();
+                List<String> options = currentSnap.getInteractionOptions();
+                String optionsStr = (options != null && !options.isEmpty())
+                    ? String.join(", ", options)
+                    : "无";
+
                 if ("PLAYER".equals(entityType)) {
                     builder.addState("环境变化",
                         String.format("玩家 %s 加入了地图，位置 (%d,%d)",
                             entityName, currentSnap.getX(), currentSnap.getY()));
+                    builder.addState("环境变化",
+                        String.format("%s 的交互选项：[%s]", entityName, optionsStr));
                 } else {
                     builder.addState("环境变化",
                         String.format("%s %s 出现在 (%d,%d)",
                             entityType, entityName, currentSnap.getX(), currentSnap.getY()));
+                    if (entity.isInteractable()) {
+                        builder.addState("环境变化",
+                            String.format("%s 的交互选项：[%s]", entityName, optionsStr));
+                    }
                 }
             }
         }

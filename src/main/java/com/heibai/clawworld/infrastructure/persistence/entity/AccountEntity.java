@@ -38,6 +38,11 @@ public class AccountEntity {
     private String currentWindowId;
     private String currentWindowType; // REGISTER, MAP, COMBAT, TRADE
 
+    // 玩家上次收到响应时的窗口类型（用于检测被动窗口变化）
+    // 当其他玩家的操作导致当前玩家窗口变化时，currentWindowType会被更新，
+    // 但lastKnownWindowType不会更新，直到玩家收到包含新窗口内容的响应
+    private String lastKnownWindowType;
+
     // 最后一次获取状态的时间戳（用于追踪环境变化）
     private Long lastStateTimestamp;
 

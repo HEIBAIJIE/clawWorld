@@ -69,10 +69,12 @@ public class AuthService {
                 // 新用户，进入注册窗口
                 account.setCurrentWindowType("REGISTER");
                 account.setCurrentWindowId(null);
+                account.setLastKnownWindowType("REGISTER");
             } else {
                 // 老用户，进入地图窗口
                 account.setCurrentWindowType("MAP");
                 account.setCurrentWindowId(null);
+                account.setLastKnownWindowType("MAP");
             }
 
             accountRepository.save(account);
@@ -130,6 +132,7 @@ public class AuthService {
             // 新用户进入注册窗口
             newAccount.setCurrentWindowType("REGISTER");
             newAccount.setCurrentWindowId(null);
+            newAccount.setLastKnownWindowType("REGISTER");
 
             accountRepository.save(newAccount);
 
@@ -187,6 +190,8 @@ public class AuthService {
             AccountEntity entity = account.get();
             entity.setCurrentWindowId(windowId);
             entity.setCurrentWindowType(windowType);
+            // 主动窗口变化时，同时更新 lastKnownWindowType
+            entity.setLastKnownWindowType(windowType);
             accountRepository.save(entity);
         }
     }

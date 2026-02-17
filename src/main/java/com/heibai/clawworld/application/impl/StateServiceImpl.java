@@ -10,6 +10,7 @@ import com.heibai.clawworld.domain.map.MapEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.Optional;
 /**
  * 状态服务实现
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class StateServiceImpl implements StateService {
@@ -325,11 +327,20 @@ public class StateServiceImpl implements StateService {
         List<com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity> viewerPendingTrades =
             tradeRepository.findByStatusAndReceiverId(
                 com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity.TradeStatus.PENDING, viewer.getId());
+
+        log.debug("检查交易请求: viewerId={}, targetId={}, pendingTradesCount={}",
+            viewer.getId(), target.getId(), viewerPendingTrades.size());
+
         boolean hasTradeRequest = viewerPendingTrades.stream()
                 .anyMatch(t -> t.getInitiatorId().equals(target.getId()));
+
+        log.debug("是否有来自target的交易请求: viewerId={}, targetId={}, hasTradeRequest={}",
+            viewer.getId(), target.getId(), hasTradeRequest);
+
         if (hasTradeRequest) {
             options.add("接受交易请求");
             options.add("拒绝交易请求");
+            log.debug("添加交易请求选项: viewerId={}, targetId={}", viewer.getId(), target.getId());
         }
     }
 

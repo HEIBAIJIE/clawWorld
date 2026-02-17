@@ -47,6 +47,9 @@ class TradeServiceImplTest {
     @Mock
     private com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository accountRepository;
 
+    @Mock
+    private com.heibai.clawworld.application.service.WindowStateService windowStateService;
+
     @InjectMocks
     private TradeServiceImpl tradeService;
 
@@ -96,6 +99,11 @@ class TradeServiceImplTest {
         player2.setId("player2");
         player2.setGold(500);
         player2.setInventory(new ArrayList<>());
+
+        // Mock WindowStateService 行为 (使用 lenient 模式，因为不是所有测试都需要这些 mock)
+        lenient().when(windowStateService.getCurrentWindowType(anyString())).thenReturn("MAP");
+        lenient().when(windowStateService.transitionWindow(anyString(), anyString(), anyString())).thenReturn(true);
+        lenient().when(windowStateService.transitionWindows(any())).thenReturn(true);
     }
 
     @Test
@@ -165,7 +173,6 @@ class TradeServiceImplTest {
         when(tradeRepository.save(any(TradeEntity.class))).thenReturn(tradeEntity);
         when(playerRepository.findById("player1")).thenReturn(Optional.of(playerEntity1));
         when(playerRepository.findById("player2")).thenReturn(Optional.of(playerEntity2));
-        when(accountRepository.findByPlayerId("player1")).thenReturn(Optional.empty());
 
         // 执行
         TradeService.TradeResult result = tradeService.acceptTradeRequest("player2", "玩家1");
@@ -193,7 +200,6 @@ class TradeServiceImplTest {
             .thenReturn(pendingTrades);
         when(tradeRepository.save(any(TradeEntity.class))).thenReturn(tradeEntity);
         when(playerRepository.findById("player1")).thenReturn(Optional.of(playerEntity1));
-        when(accountRepository.findByPlayerId("player1")).thenReturn(Optional.empty());
 
         // 执行
         TradeService.OperationResult result = tradeService.rejectTradeRequest("player2", "玩家1");
@@ -399,8 +405,6 @@ class TradeServiceImplTest {
         when(tradeRepository.save(any(TradeEntity.class))).thenReturn(tradeEntity);
         when(playerRepository.findById("player1")).thenReturn(Optional.of(playerEntity1));
         when(playerRepository.findById("player2")).thenReturn(Optional.of(playerEntity2));
-        when(accountRepository.findByPlayerId("player1")).thenReturn(Optional.empty());
-        when(accountRepository.findByPlayerId("player2")).thenReturn(Optional.empty());
 
         // 执行
         TradeService.OperationResult result = tradeService.cancelTrade("trade1", "player1");
@@ -491,7 +495,6 @@ class TradeServiceImplTest {
         when(tradeRepository.findByStatusAndReceiverId(TradeEntity.TradeStatus.PENDING, "player2"))
             .thenReturn(pendingTrades);
         when(playerRepository.findById("player2")).thenReturn(Optional.of(playerEntity2));
-        when(accountRepository.findByPlayerId("player1")).thenReturn(Optional.empty());
 
         TradeService.TradeResult acceptResult = tradeService.acceptTradeRequest("player2", "玩家1");
         assertTrue(acceptResult.isSuccess());

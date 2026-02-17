@@ -26,9 +26,19 @@ public class WaitCombatCommand extends Command {
         CombatService.ActionResult result = CommandServiceLocator.getInstance().getCombatService()
                 .waitTurn(combatId, context.getPlayerId());
 
-        return result.isSuccess() ?
-                CommandResult.success(result.getMessage()) :
-                CommandResult.error(result.getMessage());
+        if (result.isSuccess()) {
+            if (result.isCombatEnded()) {
+                return CommandResult.successWithWindowChange(
+                        result.getMessage(),
+                        CommandContext.WindowType.MAP,
+                        "战斗已结束，返回地图"
+                );
+            } else {
+                return CommandResult.success(result.getMessage());
+            }
+        } else {
+            return CommandResult.error(result.getMessage());
+        }
     }
 
     @Override

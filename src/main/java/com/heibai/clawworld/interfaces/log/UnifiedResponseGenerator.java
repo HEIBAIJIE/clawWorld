@@ -50,10 +50,12 @@ public class UnifiedResponseGenerator {
 
         // 只有当 playerId 不为 null 时才查询账号信息
         // 避免查询 playerId=null 时返回多个未注册账号的问题
+        CommandContext.WindowType actualCurrentWindowType = currentWindowType;
+        AccountEntity account = null;
         if (playerId != null) {
             Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
             if (accountOpt.isPresent()) {
-                AccountEntity account = accountOpt.get();
+                account = accountOpt.get();
                 // 1. 添加客户端指令日志
                 if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
                     GameLog clientLog = GameLog.builder()
@@ -65,11 +67,32 @@ public class UnifiedResponseGenerator {
                         .build();
                     builder.addLog(clientLog);
                 }
+
+                // 检查玩家的实际窗口状态是否与玩家上次知道的窗口状态不一致
+                // 这种情况发生在：其他玩家的操作导致当前玩家的窗口状态被改变
+                // 例如：交易被接受、交易完成、战斗开始等
+                String dbWindowType = account.getCurrentWindowType();
+                String lastKnownWindowType = account.getLastKnownWindowType();
+                if (dbWindowType != null && lastKnownWindowType != null && newWindowType == null) {
+                    try {
+                        CommandContext.WindowType dbWindowTypeEnum = CommandContext.WindowType.valueOf(dbWindowType);
+                        CommandContext.WindowType lastKnownWindowTypeEnum = CommandContext.WindowType.valueOf(lastKnownWindowType);
+                        if (dbWindowTypeEnum != lastKnownWindowTypeEnum) {
+                            // 窗口被其他玩家的操作改变了，需要通知当前玩家
+                            newWindowType = dbWindowTypeEnum;
+                            actualCurrentWindowType = dbWindowTypeEnum;
+                            // 更新 currentWindowType 参数，用于后面的窗口变化消息
+                            currentWindowType = lastKnownWindowTypeEnum;
+                        }
+                    } catch (IllegalArgumentException e) {
+                        // 忽略无效的窗口类型
+                    }
+                }
             }
         }
 
         // 2. 根据窗口类型生成状态日志
-        if (currentWindowType == CommandContext.WindowType.MAP) {
+        if (actualCurrentWindowType == CommandContext.WindowType.MAP) {
             // 地图窗口：生成环境变化和指令响应
             // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
             if (playerId != null) {
@@ -77,7 +100,7 @@ public class UnifiedResponseGenerator {
             } else {
                 builder.addState("指令响应", commandResult);
             }
-        } else if (currentWindowType == CommandContext.WindowType.COMBAT) {
+        } else if (actualCurrentWindowType == CommandContext.WindowType.COMBAT) {
             // 战斗窗口：生成战斗状态
             // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
             if (playerId != null) {
@@ -95,7 +118,7 @@ public class UnifiedResponseGenerator {
             } else {
                 builder.addState("指令响应", commandResult);
             }
-        } else if (currentWindowType == CommandContext.WindowType.TRADE) {
+        } else if (actualCurrentWindowType == CommandContext.WindowType.TRADE) {
             // 交易窗口：生成交易状态
             // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
             if (playerId != null) {
@@ -113,7 +136,7 @@ public class UnifiedResponseGenerator {
             } else {
                 builder.addState("指令响应", commandResult);
             }
-        } else if (currentWindowType == CommandContext.WindowType.SHOP) {
+        } else if (actualCurrentWindowType == CommandContext.WindowType.SHOP) {
             // 商店窗口：生成商店状态
             // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
             if (playerId != null) {
@@ -151,21 +174,39 @@ public class UnifiedResponseGenerator {
             }
         }
 
+        // 4. 更新玩家的 lastKnownWindowType
+        // 这样下次请求时可以检测到被动窗口变化
+        if (account != null) {
+            String finalWindowType = newWindowType != null ? newWindowType.name() :
+                (actualCurrentWindowType != null ? actualCurrentWindowType.name() : account.getCurrentWindowType());
+            if (finalWindowType != null && !finalWindowType.equals(account.getLastKnownWindowType())) {
+                account.setLastKnownWindowType(finalWindowType);
+                accountRepository.save(account);
+            }
+        }
+
         return builder.build();
     }
 
     /**
      * 生成错误响应
+     * @param playerId 玩家ID
+     * @param errorMessage 错误消息
+     * @param currentWindowType 命令执行时的窗口类型（可能与实际窗口类型不一致）
      */
-    public String generateErrorResponse(String playerId, String errorMessage) {
+    public String generateErrorResponse(String playerId, String errorMessage, CommandContext.WindowType currentWindowType) {
         GameLogBuilder builder = new GameLogBuilder();
+
+        CommandContext.WindowType newWindowType = null;
+        AccountEntity account = null;
+        CommandContext.WindowType lastKnownWindowTypeEnum = null;
 
         // 只有当 playerId 不为 null 时才查询账号信息
         // 避免查询 playerId=null 时返回多个未注册账号的问题
         if (playerId != null) {
             Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
             if (accountOpt.isPresent()) {
-                AccountEntity account = accountOpt.get();
+                account = accountOpt.get();
                 // 添加客户端指令日志
                 if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
                     GameLog clientLog = GameLog.builder()
@@ -177,11 +218,54 @@ public class UnifiedResponseGenerator {
                         .build();
                     builder.addLog(clientLog);
                 }
+
+                // 检查玩家的实际窗口状态是否与玩家上次知道的窗口状态不一致
+                String dbWindowType = account.getCurrentWindowType();
+                String lastKnownWindowType = account.getLastKnownWindowType();
+                if (dbWindowType != null && lastKnownWindowType != null) {
+                    try {
+                        CommandContext.WindowType dbWindowTypeEnum = CommandContext.WindowType.valueOf(dbWindowType);
+                        lastKnownWindowTypeEnum = CommandContext.WindowType.valueOf(lastKnownWindowType);
+                        if (dbWindowTypeEnum != lastKnownWindowTypeEnum) {
+                            // 窗口被其他玩家的操作改变了，需要通知当前玩家
+                            newWindowType = dbWindowTypeEnum;
+                        }
+                    } catch (IllegalArgumentException e) {
+                        // 忽略无效的窗口类型
+                    }
+                }
             }
         }
 
         builder.addState("指令响应", errorMessage);
+
+        // 如果窗口发生变化，添加窗口变化日志和新窗口内容
+        if (newWindowType != null) {
+            String windowChangeMsg = String.format("你已经从%s切换到%s",
+                getWindowTypeName(lastKnownWindowTypeEnum),
+                getWindowTypeName(newWindowType));
+            builder.addState("窗口变化", windowChangeMsg);
+
+            // 生成新窗口的内容
+            if (playerId != null) {
+                generateNewWindowContent(builder, playerId, newWindowType);
+            }
+        }
+
+        // 更新玩家的 lastKnownWindowType
+        if (account != null && newWindowType != null) {
+            account.setLastKnownWindowType(newWindowType.name());
+            accountRepository.save(account);
+        }
+
         return builder.build();
+    }
+
+    /**
+     * 生成错误响应（不检查窗口变化，用于向后兼容）
+     */
+    public String generateErrorResponse(String playerId, String errorMessage) {
+        return generateErrorResponse(playerId, errorMessage, null);
     }
 
     /**

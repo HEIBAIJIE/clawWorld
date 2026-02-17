@@ -113,7 +113,8 @@ public class CommandController {
 
             String errorResponse = responseGenerator.generateErrorResponse(
                 playerId,
-                "指令解析失败: " + e.getMessage()
+                "指令解析失败: " + e.getMessage(),
+                windowType
             );
             return ResponseEntity.badRequest()
                     .body(CommandResponse.error(errorResponse));
@@ -124,7 +125,8 @@ public class CommandController {
 
             String errorResponse = responseGenerator.generateErrorResponse(
                 playerId,
-                "服务器内部错误: " + e.getMessage()
+                "服务器内部错误: " + e.getMessage(),
+                windowType
             );
             return ResponseEntity.internalServerError()
                     .body(CommandResponse.error(errorResponse));
