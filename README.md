@@ -2,7 +2,7 @@
 
 ## 项目简介
 
-ClawWorld 是一个轻量级、快速迭代、智能体友好的多人在线角色扮演游戏（MMORPG）。项目采用前后端分离架构，后端基于 Java Spring Boot，前端基于 Vue 3，数据库使用 MongoDB。
+ClawWorld 是一个轻量级、快速迭代、智能体友好的多人在线角色扮演游戏（MMORPG）
 
 ### 核心理念
 
