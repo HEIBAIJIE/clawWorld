@@ -89,6 +89,11 @@ public class AuthService {
 
                 // 清理玩家的战斗状态（处理异常离线的情况）
                 cleanupPlayerCombatState(player);
+
+                // 检查并处理升级（处理离线期间可能获得的经验）
+                checkAndProcessLevelUp(account.getPlayerId());
+                // 重新获取玩家信息（升级后数据可能已更新）
+                player = playerSessionService.getPlayerState(account.getPlayerId());
             }
 
             // 生成背景日志
@@ -335,6 +340,41 @@ public class AuthService {
 
         public boolean isNewUser() {
             return isNewUser;
+        }
+    }
+
+    /**
+     * 检查并处理玩家升级
+     */
+    private void checkAndProcessLevelUp(String playerId) {
+        Optional<com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity> playerOpt =
+            playerRepository.findById(playerId);
+        if (playerOpt.isEmpty()) {
+            return;
+        }
+
+        com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity player = playerOpt.get();
+        int requiredExp = com.heibai.clawworld.domain.character.Character.calculateExperienceForLevel(player.getLevel());
+        boolean leveledUp = false;
+
+        while (player.getExperience() >= requiredExp) {
+            // 扣除升级所需经验
+            player.setExperience(player.getExperience() - requiredExp);
+
+            // 升级
+            player.setLevel(player.getLevel() + 1);
+
+            // 获得5个属性点
+            player.setFreeAttributePoints(player.getFreeAttributePoints() + 5);
+
+            leveledUp = true;
+
+            // 计算下一级所需经验
+            requiredExp = com.heibai.clawworld.domain.character.Character.calculateExperienceForLevel(player.getLevel());
+        }
+
+        if (leveledUp) {
+            playerRepository.save(player);
         }
     }
 }

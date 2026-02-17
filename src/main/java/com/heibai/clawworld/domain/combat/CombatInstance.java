@@ -156,35 +156,46 @@ public class CombatInstance {
     }
 
     /**
-     * 获取当前应该行动的角色（可能有多个同时准备好）
-     */
-    public List<String> getReadyCharacterIds() {
-        return actionBar.values().stream()
-            .filter(ActionBarEntry::isReady)
-            .map(ActionBarEntry::getCharacterId)
-            .collect(Collectors.toList());
-    }
-
-    /**
-     * 获取当前应该行动的角色（单个，用于兼容）
+     * 获取当前应该行动的角色（通过计算确定）
+     * CTB战斗系统：根据速度计算谁最先到达行动条满值
      */
     public Optional<String> getCurrentTurnCharacterId() {
-        return actionBar.values().stream()
-            .filter(ActionBarEntry::isReady)
-            .max(Comparator.comparingInt(ActionBarEntry::getProgress))
-            .map(ActionBarEntry::getCharacterId);
-    }
-
-    /**
-     * 推进所有角色的行动条
-     */
-    public void advanceActionBars() {
+        // 收集所有存活角色的行动条
+        List<ActionBarEntry> aliveEntries = new ArrayList<>();
         for (ActionBarEntry entry : actionBar.values()) {
             CombatCharacter character = findCharacter(entry.getCharacterId());
             if (character != null && character.isAlive()) {
-                entry.increaseProgress();
+                aliveEntries.add(entry);
             }
         }
+
+        if (aliveEntries.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // 找出最快到达行动的角色（时间最短）
+        ActionBarEntry nextActor = null;
+        double minTime = Double.MAX_VALUE;
+
+        for (ActionBarEntry entry : aliveEntries) {
+            double timeToReady = entry.getTimeToReady();
+            if (timeToReady < minTime ||
+                (timeToReady == minTime && nextActor != null && entry.getSpeed() > nextActor.getSpeed())) {
+                minTime = timeToReady;
+                nextActor = entry;
+            }
+        }
+
+        if (nextActor == null) {
+            return Optional.empty();
+        }
+
+        // 所有存活角色的进度条按该时间推进
+        for (ActionBarEntry entry : aliveEntries) {
+            entry.advanceByTime(minTime);
+        }
+
+        return Optional.of(nextActor.getCharacterId());
     }
 
     /**
@@ -324,6 +335,7 @@ public class CombatInstance {
 
     /**
      * 行动条条目
+     * CTB战斗系统：通过数学计算确定行动顺序，无需定时模拟
      */
     @Data
     public static class ActionBarEntry {
@@ -331,22 +343,41 @@ public class CombatInstance {
         private int progress;
         private int speed;
 
-        private static final int ACTION_BAR_MAX = 10000;
+        public static final int ACTION_BAR_MAX = 10000;
 
         public ActionBarEntry(String characterId, int speed) {
             this.characterId = characterId;
-            this.speed = speed;
+            this.speed = Math.max(1, speed); // 确保速度至少为1，避免除零
             this.progress = 0;
         }
 
-        public void increaseProgress() {
-            progress += speed;
+        /**
+         * 计算到达行动所需的"时间单位"
+         */
+        public double getTimeToReady() {
+            if (progress >= ACTION_BAR_MAX) {
+                return 0;
+            }
+            return (double) (ACTION_BAR_MAX - progress) / speed;
         }
 
+        /**
+         * 检查是否已准备好行动
+         */
         public boolean isReady() {
             return progress >= ACTION_BAR_MAX;
         }
 
+        /**
+         * 增加进度（根据经过的时间单位）
+         */
+        public void advanceByTime(double timeUnits) {
+            progress += (int) (timeUnits * speed);
+        }
+
+        /**
+         * 行动后重置进度条
+         */
         public void reset() {
             progress -= ACTION_BAR_MAX;
             if (progress < 0) {

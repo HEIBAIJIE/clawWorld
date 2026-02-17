@@ -59,6 +59,49 @@ public abstract class Character extends MapEntity {
     private String combatId;
     private Long combatStartTime;
 
+    // ==================== 升级经验计算 ====================
+    // 升级所需经验公式: exp = A * level^2 + B * level + C
+    // 1级升2级需要100经验，之后逐级递增
+    private static final int EXP_COEFFICIENT_A = 50;   // 二次项系数
+    private static final int EXP_COEFFICIENT_B = 50;   // 一次项系数
+    private static final int EXP_COEFFICIENT_C = 0;    // 常数项
+
+    /**
+     * 计算升到下一级所需的总经验值
+     * 公式: exp = A * level^2 + B * level + C
+     * 例如: 1级升2级需要 50*1 + 50*1 + 0 = 100 经验
+     *       2级升3级需要 50*4 + 50*2 + 0 = 300 经验
+     *       3级升4级需要 50*9 + 50*3 + 0 = 600 经验
+     */
+    public int getExperienceForNextLevel() {
+        return EXP_COEFFICIENT_A * level * level + EXP_COEFFICIENT_B * level + EXP_COEFFICIENT_C;
+    }
+
+    /**
+     * 获取当前等级的经验进度百分比
+     * @return 0-100之间的整数
+     */
+    public int getExperienceProgressPercent() {
+        int required = getExperienceForNextLevel();
+        if (required <= 0) return 100;
+        return Math.min(100, (int) ((long) experience * 100 / required));
+    }
+
+    /**
+     * 检查是否可以升级
+     */
+    public boolean canLevelUp() {
+        return experience >= getExperienceForNextLevel();
+    }
+
+    /**
+     * 静态方法：计算指定等级升级所需的经验值
+     * 用于在没有Character实例时计算（如PlayerEntity）
+     */
+    public static int calculateExperienceForLevel(int level) {
+        return EXP_COEFFICIENT_A * level * level + EXP_COEFFICIENT_B * level + EXP_COEFFICIENT_C;
+    }
+
     @Override
     public boolean isInteractable() {
         return true; // 角色都可以交互（查看、攻击等）

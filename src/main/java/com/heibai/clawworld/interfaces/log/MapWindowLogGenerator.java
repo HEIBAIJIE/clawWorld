@@ -118,7 +118,11 @@ public class MapWindowLogGenerator {
             role != null ? role.getName() : "未知",
             player.getLevel()));
         sb.append(String.format("位置: (%d, %d)\n", player.getX(), player.getY()));
-        sb.append(String.format("经验: %d  金币: %d\n", player.getExperience(), player.getGold()));
+        // 显示经验进度：当前经验/升级所需经验 (百分比%)
+        int currentExp = player.getExperience();
+        int requiredExp = player.getExperienceForNextLevel();
+        int progressPercent = player.getExperienceProgressPercent();
+        sb.append(String.format("经验: %d/%d (%d%%)  金币: %d\n", currentExp, requiredExp, progressPercent, player.getGold()));
         sb.append(String.format("力量%d 敏捷%d 智力%d 体力%d\n",
             player.getStrength(), player.getAgility(),
             player.getIntelligence(), player.getVitality()));

@@ -685,6 +685,9 @@ public class CombatServiceImpl implements CombatService {
                     int currentExp = player.getExperience();
                     player.setExperience(currentExp + distribution.getTotalExperience());
                     log.debug("玩家 {} 获得经验: {}", player.getName(), distribution.getTotalExperience());
+
+                    // 检查并处理升级
+                    checkAndProcessLevelUp(player);
                 }
 
                 // 金钱平分
@@ -744,5 +747,110 @@ public class CombatServiceImpl implements CombatService {
         }
 
         log.info("战利品分配完成");
+    }
+
+    /**
+     * 检查并处理玩家升级
+     * 支持连续升级（如果经验足够升多级）
+     */
+    private void checkAndProcessLevelUp(PlayerEntity player) {
+        int requiredExp = com.heibai.clawworld.domain.character.Character.calculateExperienceForLevel(player.getLevel());
+
+        while (player.getExperience() >= requiredExp) {
+            // 扣除升级所需经验
+            player.setExperience(player.getExperience() - requiredExp);
+
+            // 升级
+            int oldLevel = player.getLevel();
+            player.setLevel(oldLevel + 1);
+
+            // 获得5个属性点
+            player.setFreeAttributePoints(player.getFreeAttributePoints() + 5);
+
+            // 更新职业基础属性
+            var roleConfig = configDataManager.getRole(player.getRoleId());
+            if (roleConfig != null) {
+                int newLevel = player.getLevel();
+                player.setBaseMaxHealth((int)(roleConfig.getBaseHealth() + roleConfig.getHealthPerLevel() * (newLevel - 1)));
+                player.setBaseMaxMana((int)(roleConfig.getBaseMana() + roleConfig.getManaPerLevel() * (newLevel - 1)));
+                player.setBasePhysicalAttack((int)(roleConfig.getBasePhysicalAttack() + roleConfig.getPhysicalAttackPerLevel() * (newLevel - 1)));
+                player.setBasePhysicalDefense((int)(roleConfig.getBasePhysicalDefense() + roleConfig.getPhysicalDefensePerLevel() * (newLevel - 1)));
+                player.setBaseMagicAttack((int)(roleConfig.getBaseMagicAttack() + roleConfig.getMagicAttackPerLevel() * (newLevel - 1)));
+                player.setBaseMagicDefense((int)(roleConfig.getBaseMagicDefense() + roleConfig.getMagicDefensePerLevel() * (newLevel - 1)));
+                player.setBaseSpeed((int)(roleConfig.getBaseSpeed() + roleConfig.getSpeedPerLevel() * (newLevel - 1)));
+            }
+
+            // 重新计算最终属性（简化版，不考虑装备）
+            recalculatePlayerStats(player);
+
+            // 升级后回满生命和法力
+            player.setCurrentHealth(player.getMaxHealth());
+            player.setCurrentMana(player.getMaxMana());
+
+            log.info("玩家 {} 升级！{} -> {} (获得5属性点)", player.getName(), oldLevel, player.getLevel());
+
+            // 计算下一级所需经验
+            requiredExp = com.heibai.clawworld.domain.character.Character.calculateExperienceForLevel(player.getLevel());
+        }
+    }
+
+    /**
+     * 重新计算玩家最终属性
+     */
+    private void recalculatePlayerStats(PlayerEntity player) {
+        // 从基础属性开始
+        int maxHealth = player.getBaseMaxHealth();
+        int maxMana = player.getBaseMaxMana();
+        int physicalAttack = player.getBasePhysicalAttack();
+        int physicalDefense = player.getBasePhysicalDefense();
+        int magicAttack = player.getBaseMagicAttack();
+        int magicDefense = player.getBaseMagicDefense();
+        int speed = player.getBaseSpeed();
+        double critRate = player.getBaseCritRate();
+        double critDamage = player.getBaseCritDamage();
+        double hitRate = player.getBaseHitRate();
+        double dodgeRate = player.getBaseDodgeRate();
+
+        // 应用四维属性影响
+        int str = player.getStrength();
+        int agi = player.getAgility();
+        int intel = player.getIntelligence();
+        int vit = player.getVitality();
+
+        // 力量：+2物理攻击，+1物理防御，+0.1%命中
+        physicalAttack += str * 2;
+        physicalDefense += str;
+        hitRate += str * 0.001;
+
+        // 敏捷：+2速度，+0.5%暴击率，+1%暴击伤害，+0.2%命中，+0.2%闪避
+        speed += agi * 2;
+        critRate += agi * 0.005;
+        critDamage += agi * 0.01;
+        hitRate += agi * 0.002;
+        dodgeRate += agi * 0.002;
+
+        // 法力：+10法力上限，+3法术攻击，+1法术防御，+0.1%命中
+        maxMana += intel * 10;
+        magicAttack += intel * 3;
+        magicDefense += intel;
+        hitRate += intel * 0.001;
+
+        // 体力：+15生命上限，+2物理防御，+0.5法术防御
+        maxHealth += vit * 15;
+        physicalDefense += vit * 2;
+        magicDefense += (int)(vit * 0.5);
+
+        // 设置最终属性
+        player.setMaxHealth(maxHealth);
+        player.setMaxMana(maxMana);
+        player.setPhysicalAttack(physicalAttack);
+        player.setPhysicalDefense(physicalDefense);
+        player.setMagicAttack(magicAttack);
+        player.setMagicDefense(magicDefense);
+        player.setSpeed(speed);
+        player.setCritRate(critRate);
+        player.setCritDamage(critDamage);
+        player.setHitRate(hitRate);
+        player.setDodgeRate(dodgeRate);
     }
 }
