@@ -1,8 +1,10 @@
 package com.heibai.clawworld.interfaces.command.impl.map;
 
+import com.heibai.clawworld.application.service.MapEntityService;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
+import com.heibai.clawworld.interfaces.command.CommandServiceLocator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -25,7 +27,14 @@ public class InspectCharacterCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        throw new UnsupportedOperationException("需要注入 MapEntityService 来执行此指令");
+        MapEntityService.EntityInfo info = CommandServiceLocator.getInstance().getMapEntityService()
+                .inspectCharacter(context.getPlayerId(), characterName);
+
+        if (info.isSuccess()) {
+            return CommandResult.success(info.getAttributes().toString());
+        } else {
+            return CommandResult.error(info.getMessage());
+        }
     }
 
     @Override

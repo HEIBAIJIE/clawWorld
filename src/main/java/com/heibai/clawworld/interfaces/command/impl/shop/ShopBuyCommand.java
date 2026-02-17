@@ -1,8 +1,10 @@
 package com.heibai.clawworld.interfaces.command.impl.shop;
 
+import com.heibai.clawworld.application.service.ShopService;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
+import com.heibai.clawworld.interfaces.command.CommandServiceLocator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -23,7 +25,13 @@ public class ShopBuyCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        throw new UnsupportedOperationException("需要注入 ShopService 来执行此指令");
+        String shopId = context.getWindowId().replace("shop_", "");
+        ShopService.OperationResult result = CommandServiceLocator.getInstance().getShopService()
+                .buyItem(context.getPlayerId(), shopId, itemName, quantity);
+
+        return result.isSuccess() ?
+                CommandResult.success(result.getMessage()) :
+                CommandResult.error(result.getMessage());
     }
 
     @Override

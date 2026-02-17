@@ -1,8 +1,10 @@
 package com.heibai.clawworld.interfaces.command.impl.map;
 
+import com.heibai.clawworld.application.service.PlayerSessionService;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
+import com.heibai.clawworld.interfaces.command.CommandServiceLocator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -27,9 +29,22 @@ public class RegisterCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        // 调用玩家会话管理服务的注册接口
-        // 这里只是定义接口调用，具体实现由服务层完成
-        throw new UnsupportedOperationException("需要注入 PlayerSessionService 来执行此指令");
+        PlayerSessionService playerSessionService = CommandServiceLocator.getInstance().getPlayerSessionService();
+        PlayerSessionService.SessionResult result = playerSessionService.registerPlayer(
+                context.getSessionId(),
+                roleName,
+                playerName
+        );
+
+        if (result.isSuccess()) {
+            return CommandResult.successWithWindowChange(
+                    result.getMessage(),
+                    CommandContext.WindowType.MAP,
+                    result.getWindowContent()
+            );
+        } else {
+            return CommandResult.error(result.getMessage());
+        }
     }
 
     @Override

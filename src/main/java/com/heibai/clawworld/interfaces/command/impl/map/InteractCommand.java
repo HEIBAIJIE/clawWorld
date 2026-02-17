@@ -1,8 +1,10 @@
 package com.heibai.clawworld.interfaces.command.impl.map;
 
+import com.heibai.clawworld.application.service.MapEntityService;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
+import com.heibai.clawworld.interfaces.command.CommandServiceLocator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -23,7 +25,22 @@ public class InteractCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        throw new UnsupportedOperationException("需要注入 MapEntityService 来执行此指令");
+        MapEntityService.InteractionResult result = CommandServiceLocator.getInstance().getMapEntityService()
+                .interact(context.getPlayerId(), targetName, option);
+
+        if (result.isSuccess()) {
+            if (result.isWindowChanged()) {
+                return CommandResult.successWithWindowChange(
+                        result.getMessage(),
+                        CommandContext.WindowType.valueOf(result.getNewWindowType()),
+                        "窗口已切换: " + result.getNewWindowType()
+                );
+            } else {
+                return CommandResult.success(result.getMessage());
+            }
+        } else {
+            return CommandResult.error(result.getMessage());
+        }
     }
 
     @Override

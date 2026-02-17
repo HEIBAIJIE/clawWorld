@@ -1,8 +1,10 @@
 package com.heibai.clawworld.interfaces.command.impl.party;
 
+import com.heibai.clawworld.application.service.PartyService;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
+import com.heibai.clawworld.interfaces.command.CommandServiceLocator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -21,7 +23,12 @@ public class PartyAcceptRequestCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        throw new UnsupportedOperationException("需要注入 PartyService 来执行此指令");
+        PartyService.PartyResult result = CommandServiceLocator.getInstance().getPartyService()
+                .acceptJoinRequest(context.getPlayerId(), requesterName);
+
+        return result.isSuccess() ?
+                CommandResult.success(result.getMessage()) :
+                CommandResult.error(result.getMessage());
     }
 
     @Override

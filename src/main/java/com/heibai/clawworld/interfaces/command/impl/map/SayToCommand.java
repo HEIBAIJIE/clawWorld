@@ -1,8 +1,10 @@
 package com.heibai.clawworld.interfaces.command.impl.map;
 
+import com.heibai.clawworld.application.service.ChatService;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
+import com.heibai.clawworld.interfaces.command.CommandServiceLocator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -27,7 +29,12 @@ public class SayToCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        throw new UnsupportedOperationException("需要注入 ChatService 来执行此指令");
+        ChatService.ChatResult result = CommandServiceLocator.getInstance().getChatService()
+                .sendPrivateMessage(context.getPlayerId(), targetPlayer, message);
+
+        return result.isSuccess() ?
+                CommandResult.success(result.getMessage()) :
+                CommandResult.error(result.getMessage());
     }
 
     @Override

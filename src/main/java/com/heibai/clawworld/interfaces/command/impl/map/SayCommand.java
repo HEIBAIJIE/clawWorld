@@ -1,8 +1,10 @@
 package com.heibai.clawworld.interfaces.command.impl.map;
 
+import com.heibai.clawworld.application.service.ChatService;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
+import com.heibai.clawworld.interfaces.command.CommandServiceLocator;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -28,7 +30,25 @@ public class SayCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        throw new UnsupportedOperationException("需要注入 ChatService 来执行此指令");
+        ChatService chatService = CommandServiceLocator.getInstance().getChatService();
+        ChatService.ChatResult result;
+        switch (channel) {
+            case "world":
+                result = chatService.sendWorldMessage(context.getPlayerId(), message);
+                break;
+            case "map":
+                result = chatService.sendMapMessage(context.getPlayerId(), message);
+                break;
+            case "party":
+                result = chatService.sendPartyMessage(context.getPlayerId(), message);
+                break;
+            default:
+                return CommandResult.error("未知的频道: " + channel);
+        }
+
+        return result.isSuccess() ?
+                CommandResult.success(result.getMessage()) :
+                CommandResult.error(result.getMessage());
     }
 
     @Override

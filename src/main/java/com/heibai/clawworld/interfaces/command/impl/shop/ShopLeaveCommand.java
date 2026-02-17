@@ -19,7 +19,11 @@ public class ShopLeaveCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        throw new UnsupportedOperationException("需要注入 ShopService 来执行此指令");
+        return CommandResult.successWithWindowChange(
+                "离开商店",
+                CommandContext.WindowType.MAP,
+                "已离开商店"
+        );
     }
 
     @Override
