@@ -52,6 +52,22 @@ public interface MapEntityService {
     List<MapEntity> getMapEntities(String mapId);
 
     /**
+     * 检查指定位置是否可通行
+     * @param mapId 地图ID
+     * @param x X坐标
+     * @param y Y坐标
+     * @return 是否可通行
+     */
+    boolean isPositionPassable(String mapId, int x, int y);
+
+    /**
+     * 计算从玩家位置出发的可达性地图
+     * @param playerId 玩家ID
+     * @return 可达性地图，key为"x,y"，value为true表示可达
+     */
+    java.util.Set<String> calculateReachabilityMap(String playerId);
+
+    /**
      * 实体信息
      */
     class EntityInfo {

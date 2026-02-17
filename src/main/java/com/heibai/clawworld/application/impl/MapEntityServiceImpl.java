@@ -183,34 +183,171 @@ public class MapEntityServiceImpl implements MapEntityService {
             return MoveResult.error("目标位置超出地图范围");
         }
 
-        // 简化的寻路：检查目标位置是否可达
-        // 实际应该实现A*算法或其他寻路算法
-        // 这里简化为直接移动
+        int startX = player.getX();
+        int startY = player.getY();
+
+        // 如果已经在目标位置
+        if (startX == targetX && startY == targetY) {
+            return MoveResult.success(targetX, targetY, "你已经在目标位置");
+        }
+
+        // 检查目标位置是否可通行
         if (!isPositionPassable(mapConfig, targetX, targetY)) {
             return MoveResult.error("目标位置不可通过");
         }
 
-        // 计算移动距离
-        int distance = Math.abs(targetX - player.getX()) + Math.abs(targetY - player.getY());
-
-        // 根据设计文档：以每0.5秒1格的速度移动
-        // 阻塞请求，直到移动完毕
-        if (distance > 1) {
-            try {
-                // 每格0.5秒，总共需要 distance * 500 毫秒
-                Thread.sleep(distance * 500L);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return MoveResult.error("移动被中断");
-            }
+        // 使用A*算法寻找最短路径
+        List<int[]> path = findPath(mapConfig, startX, startY, targetX, targetY);
+        if (path == null || path.isEmpty()) {
+            return MoveResult.error("无法到达目标位置");
         }
 
-        // 移动到目标位置
-        player.setX(targetX);
-        player.setY(targetY);
+        // 逐步移动
+        int stepCount = path.size();
+        for (int i = 0; i < stepCount; i++) {
+            int[] step = path.get(i);
+
+            // 距离大于1时，从第二步开始每步等待0.5秒
+            // 距离为1时（只有一步）不等待
+            if (stepCount > 1 && i > 0) {
+                try {
+                    Thread.sleep(500L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    // 保存当前位置后返回
+                    playerRepository.save(player);
+                    return MoveResult.error("移动被中断，当前位置: (" + player.getX() + ", " + player.getY() + ")");
+                }
+            }
+
+            // 更新玩家位置
+            player.setX(step[0]);
+            player.setY(step[1]);
+        }
+
+        // 保存最终位置
         playerRepository.save(player);
 
         return MoveResult.success(targetX, targetY, String.format("移动完成，当前位置: (%d, %d)", targetX, targetY));
+    }
+
+    /**
+     * 使用A*算法寻找从起点到终点的最短路径
+     * @return 路径点列表（不包含起点，包含终点），如果无法到达返回null
+     */
+    private List<int[]> findPath(MapConfig mapConfig, int startX, int startY, int targetX, int targetY) {
+        // A*算法节点
+        class Node implements Comparable<Node> {
+            int x, y;
+            int g; // 从起点到当前节点的实际代价
+            int h; // 从当前节点到终点的估计代价（启发式）
+            Node parent;
+
+            Node(int x, int y, int g, int h, Node parent) {
+                this.x = x;
+                this.y = y;
+                this.g = g;
+                this.h = h;
+                this.parent = parent;
+            }
+
+            int f() {
+                return g + h;
+            }
+
+            @Override
+            public int compareTo(Node other) {
+                return Integer.compare(this.f(), other.f());
+            }
+        }
+
+        // 计算启发式距离（切比雪夫距离，因为支持8方向移动）
+        java.util.function.BiFunction<Integer, Integer, Integer> heuristic = (x, y) ->
+            Math.max(Math.abs(x - targetX), Math.abs(y - targetY));
+
+        // 开放列表（待探索）
+        PriorityQueue<Node> openList = new PriorityQueue<>();
+        // 已访问集合
+        Set<String> closedSet = new HashSet<>();
+        // 用于快速查找开放列表中的节点
+        Map<String, Node> openMap = new HashMap<>();
+
+        // 起始节点
+        Node startNode = new Node(startX, startY, 0, heuristic.apply(startX, startY), null);
+        openList.offer(startNode);
+        openMap.put(startX + "," + startY, startNode);
+
+        // 8方向移动
+        int[][] directions = {
+            {-1, -1}, {0, -1}, {1, -1},
+            {-1, 0},          {1, 0},
+            {-1, 1},  {0, 1},  {1, 1}
+        };
+
+        while (!openList.isEmpty()) {
+            Node current = openList.poll();
+            String currentKey = current.x + "," + current.y;
+            openMap.remove(currentKey);
+
+            // 到达目标
+            if (current.x == targetX && current.y == targetY) {
+                // 回溯构建路径
+                List<int[]> path = new ArrayList<>();
+                Node node = current;
+                while (node.parent != null) {
+                    path.add(0, new int[]{node.x, node.y});
+                    node = node.parent;
+                }
+                return path;
+            }
+
+            closedSet.add(currentKey);
+
+            // 探索相邻节点
+            for (int[] dir : directions) {
+                int nx = current.x + dir[0];
+                int ny = current.y + dir[1];
+                String neighborKey = nx + "," + ny;
+
+                // 检查边界
+                if (nx < 0 || nx >= mapConfig.getWidth() || ny < 0 || ny >= mapConfig.getHeight()) {
+                    continue;
+                }
+
+                // 检查是否已访问
+                if (closedSet.contains(neighborKey)) {
+                    continue;
+                }
+
+                // 检查是否可通行
+                if (!isPositionPassable(mapConfig, nx, ny)) {
+                    continue;
+                }
+
+                // 计算移动代价（对角线移动代价稍高，用14表示√2*10，直线用10）
+                int moveCost = (dir[0] != 0 && dir[1] != 0) ? 14 : 10;
+                int newG = current.g + moveCost;
+
+                Node existingNode = openMap.get(neighborKey);
+                if (existingNode != null) {
+                    // 如果新路径更短，更新节点
+                    if (newG < existingNode.g) {
+                        openList.remove(existingNode);
+                        existingNode.g = newG;
+                        existingNode.parent = current;
+                        openList.offer(existingNode);
+                    }
+                } else {
+                    // 添加新节点
+                    Node newNode = new Node(nx, ny, newG, heuristic.apply(nx, ny), current);
+                    openList.offer(newNode);
+                    openMap.put(neighborKey, newNode);
+                }
+            }
+        }
+
+        // 无法到达
+        return null;
     }
 
     @Override
@@ -482,6 +619,15 @@ public class MapEntityServiceImpl implements MapEntityService {
         return entities;
     }
 
+    @Override
+    public boolean isPositionPassable(String mapId, int x, int y) {
+        MapConfig mapConfig = configDataManager.getMap(mapId);
+        if (mapConfig == null) {
+            return false;
+        }
+        return isPositionPassable(mapConfig, x, y);
+    }
+
     /**
      * 检查位置是否可通过
      * 根据设计文档：
@@ -630,5 +776,66 @@ public class MapEntityServiceImpl implements MapEntityService {
         int dx = Math.abs(x2 - x1);
         int dy = Math.abs(y2 - y1);
         return dx <= range && dy <= range;
+    }
+
+    @Override
+    public Set<String> calculateReachabilityMap(String playerId) {
+        Set<String> reachable = new HashSet<>();
+
+        // 获取玩家信息
+        Optional<PlayerEntity> playerOpt = playerRepository.findById(playerId);
+        if (!playerOpt.isPresent()) {
+            return reachable;
+        }
+
+        PlayerEntity player = playerOpt.get();
+        MapConfig mapConfig = configDataManager.getMap(player.getCurrentMapId());
+        if (mapConfig == null) {
+            return reachable;
+        }
+
+        // BFS从玩家位置开始
+        Queue<int[]> queue = new LinkedList<>();
+        int startX = player.getX();
+        int startY = player.getY();
+
+        queue.offer(new int[]{startX, startY});
+        reachable.add(startX + "," + startY);
+
+        int[][] directions = {
+            {-1, -1}, {0, -1}, {1, -1},
+            {-1, 0},          {1, 0},
+            {-1, 1},  {0, 1},  {1, 1}
+        };
+
+        while (!queue.isEmpty()) {
+            int[] current = queue.poll();
+            int cx = current[0];
+            int cy = current[1];
+
+            for (int[] dir : directions) {
+                int nx = cx + dir[0];
+                int ny = cy + dir[1];
+                String key = nx + "," + ny;
+
+                // 检查边界
+                if (nx < 0 || nx >= mapConfig.getWidth() || ny < 0 || ny >= mapConfig.getHeight()) {
+                    continue;
+                }
+
+                // 检查是否已访问
+                if (reachable.contains(key)) {
+                    continue;
+                }
+
+                // 检查是否可通行
+                if (isPositionPassable(mapConfig, nx, ny)) {
+                    reachable.add(key);
+                    queue.offer(new int[]{nx, ny});
+                }
+            }
+        }
+
+        return reachable;
     }
 }

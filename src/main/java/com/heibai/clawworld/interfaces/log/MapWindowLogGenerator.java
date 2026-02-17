@@ -1,6 +1,7 @@
 package com.heibai.clawworld.interfaces.log;
 
 import com.heibai.clawworld.application.service.CharacterInfoService;
+import com.heibai.clawworld.application.service.MapEntityService;
 import com.heibai.clawworld.application.service.PartyService;
 import com.heibai.clawworld.domain.character.Party;
 import com.heibai.clawworld.domain.character.Player;
@@ -25,11 +26,15 @@ public class MapWindowLogGenerator {
     private final CharacterInfoService characterInfoService;
     private final PartyService partyService;
     private final TradeRepository tradeRepository;
+    private final MapEntityService mapEntityService;
 
     /**
      * 生成地图窗口日志
      */
     public void generateMapWindowLogs(GameLogBuilder builder, Player player, GameMap map, List<MapEntity> allEntities, List<ChatMessage> chatHistory) {
+        // 预计算可达性地图（一次BFS，后续直接查询）
+        java.util.Set<String> reachabilityMap = mapEntityService.calculateReachabilityMap(player.getId());
+
         // 1. 地图基本信息
         String mapInfo = String.format("当前地图名：%s，%s%s",
             map.getName(),
@@ -56,10 +61,10 @@ public class MapWindowLogGenerator {
         builder.addWindow("地图窗口", "你的组队情况：\n" + characterInfoService.generatePartyInfo(player));
 
         // 8. 地图实体
-        builder.addWindow("地图窗口", map.getName() + "的地图实体：\n" + generateMapEntities(player, allEntities, map));
+        builder.addWindow("地图窗口", map.getName() + "的地图实体：\n" + generateMapEntities(player, allEntities, map, reachabilityMap));
 
         // 9. 可达目标
-        builder.addWindow("地图窗口", "你移动后可以交互的实体：\n" + generateReachableTargets(player, allEntities));
+        builder.addWindow("地图窗口", "你移动后可以交互的实体：\n" + generateReachableTargets(player, allEntities, map, reachabilityMap));
 
         // 10. 聊天记录
         builder.addWindow("地图窗口", "新增聊天：\n" + generateChatHistory(chatHistory));
@@ -108,7 +113,7 @@ public class MapWindowLogGenerator {
     }
 
 
-    private String generateMapEntities(Player player, List<MapEntity> allEntities, GameMap map) {
+    private String generateMapEntities(Player player, List<MapEntity> allEntities, GameMap map, java.util.Set<String> reachabilityMap) {
         StringBuilder sb = new StringBuilder();
         boolean hasEntities = false;
         for (MapEntity entity : allEntities) {
@@ -119,11 +124,18 @@ public class MapWindowLogGenerator {
             hasEntities = true;
             sb.append(String.format("%s (%d,%d)", entity.getName(), entity.getX(), entity.getY()));
 
-            int distance = Math.abs(entity.getX() - player.getX()) + Math.abs(entity.getY() - player.getY());
-            if (distance <= 1) {
+            int dx = Math.abs(entity.getX() - player.getX());
+            int dy = Math.abs(entity.getY() - player.getY());
+            if (dx <= 1 && dy <= 1) {
                 sb.append(" [可直接交互]");
             } else {
-                sb.append(" [需移动]");
+                // 检查是否有可达路径
+                int[] nearestPos = findNearestReachablePosition(player, entity, map, reachabilityMap);
+                if (nearestPos == null) {
+                    sb.append(" [无可达路径]");
+                } else {
+                    sb.append(" [需移动]");
+                }
             }
 
             if (entity.getEntityType() != null) {
@@ -148,7 +160,7 @@ public class MapWindowLogGenerator {
         return sb.toString();
     }
 
-    private String generateReachableTargets(Player player, List<MapEntity> allEntities) {
+    private String generateReachableTargets(Player player, List<MapEntity> allEntities, GameMap map, java.util.Set<String> reachabilityMap) {
         StringBuilder sb = new StringBuilder();
         boolean hasReachableTarget = false;
         for (MapEntity entity : allEntities) {
@@ -159,15 +171,75 @@ public class MapWindowLogGenerator {
             int dx = Math.abs(entity.getX() - player.getX());
             int dy = Math.abs(entity.getY() - player.getY());
             if ((dx > 1 || dy > 1) && entity.isInteractable()) {
-                sb.append(String.format("%s: 移动到 (%d,%d) 可交互\n",
-                    entity.getName(), entity.getX(), entity.getY()));
-                hasReachableTarget = true;
+                // 找到最近的可达位置
+                int[] nearestPos = findNearestReachablePosition(player, entity, map, reachabilityMap);
+                if (nearestPos != null) {
+                    sb.append(String.format("%s: 移动到 (%d,%d) 可交互\n",
+                        entity.getName(), nearestPos[0], nearestPos[1]));
+                    hasReachableTarget = true;
+                }
+                // 如果没有可达位置，不显示在这个列表中
             }
         }
         if (!hasReachableTarget) {
             sb.append("没有需要移动才能到达的目标");
         }
         return sb.toString();
+    }
+
+    /**
+     * 找到最近的可达位置来与实体交互
+     * 使用预计算的可达性地图，直接查询而不是每次BFS
+     * @param reachabilityMap 预计算的可达性地图
+     * @return [x, y] 或 null（如果没有可达位置）
+     */
+    private int[] findNearestReachablePosition(Player player, MapEntity entity, GameMap map, java.util.Set<String> reachabilityMap) {
+        int entityX = entity.getX();
+        int entityY = entity.getY();
+
+        // 收集候选目标位置并检查可达性
+        int[] nearestPos = null;
+        int minDistance = Integer.MAX_VALUE;
+
+        // 如果实体本身可通过，将实体位置作为候选
+        if (entity.isPassable()) {
+            String key = entityX + "," + entityY;
+            if (reachabilityMap.contains(key)) {
+                int distance = Math.abs(entityX - player.getX()) + Math.abs(entityY - player.getY());
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestPos = new int[]{entityX, entityY};
+                }
+            }
+        }
+
+        // 检查周围8格
+        int[][] offsets = {
+            {-1, -1}, {0, -1}, {1, -1},
+            {-1, 0},          {1, 0},
+            {-1, 1},  {0, 1},  {1, 1}
+        };
+
+        for (int[] offset : offsets) {
+            int checkX = entityX + offset[0];
+            int checkY = entityY + offset[1];
+
+            // 检查是否在地图范围内
+            if (checkX < 0 || checkX >= map.getWidth() || checkY < 0 || checkY >= map.getHeight()) {
+                continue;
+            }
+
+            String key = checkX + "," + checkY;
+            if (reachabilityMap.contains(key)) {
+                int distance = Math.abs(checkX - player.getX()) + Math.abs(checkY - player.getY());
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    nearestPos = new int[]{checkX, checkY};
+                }
+            }
+        }
+
+        return nearestPos;
     }
 
     private String generateChatHistory(List<ChatMessage> chatHistory) {
