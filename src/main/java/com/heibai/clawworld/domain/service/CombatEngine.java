@@ -274,8 +274,13 @@ public class CombatEngine {
         combat.resetActionBar(casterId);
 
         // 检查战斗是否结束
-        if (checkAndFinishCombat(combat)) {
+        List<String> endLogs = checkAndFinishCombat(combat);
+        if (endLogs != null) {
             result.setCombatEnded(true);
+            // 将战斗结束时的新增日志（胜利信息和战利品）添加到结果中
+            for (String log : endLogs) {
+                result.addLog(log);
+            }
         }
 
         return result;
@@ -459,8 +464,13 @@ public class CombatEngine {
 
         CombatActionResult result = CombatActionResult.success("跳过回合");
 
-        if (checkAndFinishCombat(combat)) {
+        List<String> endLogs = checkAndFinishCombat(combat);
+        if (endLogs != null) {
             result.setCombatEnded(true);
+            // 将战斗结束时的新增日志（胜利信息和战利品）添加到结果中
+            for (String log : endLogs) {
+                result.addLog(log);
+            }
         }
 
         return result;
@@ -497,8 +507,13 @@ public class CombatEngine {
 
         CombatActionResult result = CombatActionResult.success("逃离战斗");
 
-        if (checkAndFinishCombat(combat)) {
+        List<String> endLogs = checkAndFinishCombat(combat);
+        if (endLogs != null) {
             result.setCombatEnded(true);
+            // 将战斗结束时的新增日志（胜利信息和战利品）添加到结果中
+            for (String log : endLogs) {
+                result.addLog(log);
+            }
         }
 
         return result;
@@ -703,13 +718,29 @@ public class CombatEngine {
         log.info("战斗超时: combatId={}, type={}", combatId, combat.getCombatType());
     }
 
+    // 战利品分配结果缓存（key: combatId, value: 分配结果）
+    // 战斗结束后保存，供CombatService处理持久化
+    private final Map<String, CombatInstance.RewardDistribution> rewardDistributionCache = new ConcurrentHashMap<>();
+
+    /**
+     * 获取并移除战利品分配结果
+     * 由CombatService在战斗结束后调用，用于持久化战利品
+     */
+    public CombatInstance.RewardDistribution getAndRemoveRewardDistribution(String combatId) {
+        return rewardDistributionCache.remove(combatId);
+    }
+
     /**
      * 检查并结束战斗
+     * @return 战斗结束时新增的日志列表，如果战斗未结束返回null
      */
-    private boolean checkAndFinishCombat(CombatInstance combat) {
+    private List<String> checkAndFinishCombat(CombatInstance combat) {
         if (combat.isFinished()) {
             String combatId = combat.getCombatId();
             combat.setStatus(com.heibai.clawworld.domain.combat.Combat.CombatStatus.FINISHED);
+
+            // 记录当前日志数量，用于获取新增的日志
+            int logCountBefore = combat.getAllLogs().size();
 
             Optional<CombatParty> winner = combat.getWinner();
             if (winner.isPresent()) {
@@ -717,6 +748,19 @@ public class CombatEngine {
                 handleCombatRewards(combat, winner.get());
             } else {
                 combat.addLog("战斗平局！");
+            }
+
+            // 保存战利品分配结果到缓存，供CombatService处理持久化
+            if (combat.getRewardDistribution() != null) {
+                rewardDistributionCache.put(combatId, combat.getRewardDistribution());
+            }
+
+            // 获取新增的日志（胜利信息和战利品）
+            List<CombatInstance.CombatLogEntry> allLogs = combat.getAllLogs();
+            List<String> newLogs = new ArrayList<>();
+            for (int i = logCountBefore; i < allLogs.size(); i++) {
+                CombatInstance.CombatLogEntry entry = allLogs.get(i);
+                newLogs.add(String.format("[#%d] %s", entry.getSequence(), entry.getMessage()));
             }
 
             // 清除等待状态
@@ -733,21 +777,24 @@ public class CombatEngine {
             activeCombats.remove(combatId);
             turnWaiters.remove(combatId);
             log.info("战斗结束: combatId={}", combatId);
-            return true;
+            return newLogs;
         }
 
-        return false;
+        return null;
     }
 
     /**
      * 处理战斗奖励
-     * 根据设计文档：战利品归属于对敌人造成最后攻击的队伍，组队中战胜敌人战利品由队长持有
-     * 注意：这里只记录战利品信息，实际的持久化在战斗结算后由CombatService处理
+     * 根据设计文档：
+     * - 战利品归属于对敌人造成最后攻击的队伍
+     * - 组队中战胜敌人，每个玩家都获得全部经验
+     * - 金钱平分
+     * - 物品归队长持有
      */
     private void handleCombatRewards(CombatInstance combat, CombatParty winner) {
         log.info("战斗 {} 的胜利方 {} 获得战利品", combat.getCombatId(), winner.getFactionId());
 
-        // 计算并记录战利品
+        // 计算总战利品
         int totalExp = 0;
         int totalGold = 0;
         List<String> droppedItems = new ArrayList<>();
@@ -770,17 +817,60 @@ public class CombatEngine {
             }
         }
 
+        // 获取胜利方的所有存活玩家
+        List<CombatCharacter> winnerPlayers = winner.getCharacters().stream()
+            .filter(c -> c.isPlayer() && c.isAlive())
+            .collect(Collectors.toList());
+
+        if (winnerPlayers.isEmpty()) {
+            // 没有存活的玩家，不分配战利品
+            combat.addLog("=== 战利品 ===");
+            combat.addLog("没有存活的玩家，战利品无法分配");
+            return;
+        }
+
+        // 计算分配
+        int playerCount = winnerPlayers.size();
+        int goldPerPlayer = totalGold / playerCount;
+
+        // 找到队长（第一个玩家视为队长，或者有partyLeader标记的）
+        CombatCharacter leader = winnerPlayers.stream()
+            .filter(CombatCharacter::isPartyLeader)
+            .findFirst()
+            .orElse(winnerPlayers.get(0));
+
+        // 创建战利品分配结果
+        CombatInstance.RewardDistribution distribution = new CombatInstance.RewardDistribution();
+        distribution.setWinnerFactionId(winner.getFactionId());
+        distribution.setTotalExperience(totalExp);
+        distribution.setTotalGold(totalGold);
+        distribution.setGoldPerPlayer(goldPerPlayer);
+        distribution.setItems(droppedItems);
+        distribution.setLeaderId(leader.getCharacterId());
+        distribution.setPlayerIds(winnerPlayers.stream()
+            .map(CombatCharacter::getCharacterId)
+            .collect(Collectors.toList()));
+        combat.setRewardDistribution(distribution);
+
         // 添加战利品日志
-        StringBuilder rewardLog = new StringBuilder();
-        rewardLog.append("=== 战利品 ===");
-        combat.addLog(rewardLog.toString());
+        combat.addLog("=== 战利品分配 ===");
 
         if (totalExp > 0) {
-            combat.addLog("获得经验: " + totalExp);
+            if (playerCount == 1) {
+                combat.addLog(leader.getName() + " 获得经验: " + totalExp);
+            } else {
+                combat.addLog("每人获得经验: " + totalExp + " (共" + playerCount + "人)");
+            }
         }
+
         if (totalGold > 0) {
-            combat.addLog("获得金钱: " + totalGold);
+            if (playerCount == 1) {
+                combat.addLog(leader.getName() + " 获得金钱: " + totalGold);
+            } else {
+                combat.addLog("金钱平分: 每人 " + goldPerPlayer + " (总计" + totalGold + ")");
+            }
         }
+
         if (!droppedItems.isEmpty()) {
             for (String itemId : droppedItems) {
                 // 尝试获取物品名称
@@ -796,12 +886,13 @@ public class CombatEngine {
                         }
                     }
                 }
-                combat.addLog("获得物品: " + itemName);
+                combat.addLog(leader.getName() + " 获得物品: " + itemName);
             }
         }
 
-        // 战利品信息已经在CombatInstance中记录，这里不需要额外处理
-        // 实际的物品分配和持久化将在战斗结算后由CombatService处理
+        if (totalExp == 0 && totalGold == 0 && droppedItems.isEmpty()) {
+            combat.addLog("没有获得任何战利品");
+        }
     }
 
     /**

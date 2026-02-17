@@ -188,13 +188,22 @@ public class UnifiedResponseGenerator {
             }
         }
 
-        // 4. 更新玩家的 lastKnownWindowType
+        // 4. 更新玩家的 lastKnownWindowType 和 lastCombatLogSequence
         // 这样下次请求时可以检测到被动窗口变化
         if (account != null) {
+            boolean needSave = false;
             String finalWindowType = newWindowType != null ? newWindowType.name() :
                 (actualCurrentWindowType != null ? actualCurrentWindowType.name() : account.getCurrentWindowType());
             if (finalWindowType != null && !finalWindowType.equals(account.getLastKnownWindowType())) {
                 account.setLastKnownWindowType(finalWindowType);
+                needSave = true;
+            }
+            // 如果 lastCombatLogSequence 被更新了，也需要保存
+            // 注意：在战斗中，每次指令执行后都需要保存新的日志序列号
+            if (actualCurrentWindowType == CommandContext.WindowType.COMBAT) {
+                needSave = true;
+            }
+            if (needSave) {
                 accountRepository.save(account);
             }
         }

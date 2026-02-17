@@ -40,6 +40,9 @@ public class CombatInstance {
     // 伤害统计（用于判定战利品归属）
     private Map<String, DamageRecord> damageRecords;
 
+    // 战利品分配结果（战斗结束时填充）
+    private RewardDistribution rewardDistribution;
+
     // 战斗超时时间（10分钟）
     private static final long COMBAT_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -388,6 +391,29 @@ public class CombatInstance {
                 return firstAttackerFaction;
             }
             return lastAttackerFaction;
+        }
+    }
+
+    /**
+     * 战利品分配结果
+     * 根据设计文档：
+     * - 每个玩家都获得全部经验
+     * - 金钱平分
+     * - 物品归队长
+     */
+    @Data
+    public static class RewardDistribution {
+        private String winnerFactionId;           // 胜利阵营ID
+        private int totalExperience;              // 总经验（每人都获得这么多）
+        private int totalGold;                    // 总金钱
+        private int goldPerPlayer;                // 每人分得的金钱
+        private List<String> items;               // 物品ID列表
+        private String leaderId;                  // 队长ID（物品归属）
+        private List<String> playerIds;           // 所有获得奖励的玩家ID
+
+        public RewardDistribution() {
+            this.items = new ArrayList<>();
+            this.playerIds = new ArrayList<>();
         }
     }
 }

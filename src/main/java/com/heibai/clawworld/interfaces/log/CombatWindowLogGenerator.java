@@ -107,6 +107,7 @@ public class CombatWindowLogGenerator {
                 if (skillConfig != null && !addedSkills.contains(skillConfig.getName())) {
                     addedSkills.add(skillConfig.getName());
                     skills.append("- ").append(skillConfig.getName());
+                    skills.append(" [").append(getTargetTypeName(skillConfig.getTargetType())).append("]");
                     skills.append(" (消耗:").append(skillConfig.getManaCost()).append("MP");
                     if (skillConfig.getCooldown() > 0) {
                         skills.append(", CD:").append(skillConfig.getCooldown()).append("回合");
@@ -116,13 +117,13 @@ public class CombatWindowLogGenerator {
             }
         }
         // 普通攻击总是可用，放在最后
-        skills.append("- 普通攻击 (消耗:0MP, 无CD)\n");
+        skills.append("- 普通攻击 [敌方单体] (消耗:0MP, 无CD)\n");
         builder.addWindow("技能列表", skills.toString().trim());
 
         // 6. 可用指令
         builder.addWindow("可用指令", "【战斗指令】\n" +
-            "cast [技能名称] - 释放非指向技能（如：cast 普通攻击）\n" +
-            "cast [技能名称] [目标名称] - 对目标释放技能（如：cast 普通攻击 哥布林#1）\n" +
+            "cast [技能名称] - 释放敌方群体、我方群体或自己的技能；对单体技能则随机选择目标\n" +
+            "cast [技能名称] [目标名称] - 释放敌方单体或我方单体的技能\n" +
             "use [物品名称] - 使用物品\n" +
             "wait - 跳过回合\n" +
             "end - 逃离战斗（角色视为死亡）");
@@ -279,5 +280,22 @@ public class CombatWindowLogGenerator {
             }
         }
         return characterId;
+    }
+
+    /**
+     * 获取技能目标类型的中文名称
+     */
+    private String getTargetTypeName(String targetType) {
+        if (targetType == null) {
+            return "未知";
+        }
+        return switch (targetType) {
+            case "ENEMY_SINGLE" -> "敌方单体";
+            case "ENEMY_ALL" -> "敌方群体";
+            case "ALLY_SINGLE" -> "我方单体";
+            case "ALLY_ALL" -> "我方群体";
+            case "SELF" -> "自己";
+            default -> targetType;
+        };
     }
 }

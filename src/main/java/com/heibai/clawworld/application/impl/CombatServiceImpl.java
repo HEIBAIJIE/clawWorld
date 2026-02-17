@@ -568,6 +568,14 @@ public class CombatServiceImpl implements CombatService {
         combatChar.setHitRate(character.getHitRate());
         combatChar.setDodgeRate(character.getDodgeRate());
         combatChar.setSkillIds(character.getSkills() != null ? new ArrayList<>(character.getSkills()) : new ArrayList<>());
+
+        // 设置队长标记（用于战利品分配）
+        if (character instanceof Player) {
+            Player player = (Player) character;
+            combatChar.setPartyLeader(player.isPartyLeader());
+            combatChar.setPartyId(player.getPartyId());
+        }
+
         return combatChar;
     }
 
@@ -595,12 +603,20 @@ public class CombatServiceImpl implements CombatService {
     }
 
     /**
-     * 处理战斗结束时的窗口状态转换
+     * 处理战斗结束时的窗口状态转换和战利品分配
      * 将所有参战玩家的窗口状态从COMBAT转换回MAP
      * 注意：战斗结束后战斗实例可能已被移除，所以从数据库中查找参战玩家
      */
     private void handleCombatEndWindowTransition(String combatId) {
         try {
+            // 获取战利品分配结果
+            CombatInstance.RewardDistribution distribution = combatEngine.getAndRemoveRewardDistribution(combatId);
+
+            // 处理战利品分配
+            if (distribution != null) {
+                distributeRewards(distribution);
+            }
+
             // 从数据库中查找所有combatId匹配的玩家
             List<PlayerEntity> playersInCombat = playerRepository.findAll().stream()
                 .filter(p -> combatId.equals(p.getCombatId()))
@@ -637,5 +653,96 @@ public class CombatServiceImpl implements CombatService {
         } catch (Exception e) {
             log.error("处理战斗结束窗口转换失败: combatId={}", combatId, e);
         }
+    }
+
+    /**
+     * 分配战利品
+     * 根据设计文档：
+     * - 每个玩家都获得全部经验
+     * - 金钱平分
+     * - 物品归队长
+     */
+    private void distributeRewards(CombatInstance.RewardDistribution distribution) {
+        if (distribution == null || distribution.getPlayerIds() == null || distribution.getPlayerIds().isEmpty()) {
+            return;
+        }
+
+        log.info("开始分配战利品: winnerFaction={}, exp={}, gold={}, items={}, players={}",
+            distribution.getWinnerFactionId(),
+            distribution.getTotalExperience(),
+            distribution.getTotalGold(),
+            distribution.getItems().size(),
+            distribution.getPlayerIds().size());
+
+        // 为每个玩家分配经验和金钱
+        for (String playerId : distribution.getPlayerIds()) {
+            Optional<PlayerEntity> playerOpt = playerRepository.findById(playerId);
+            if (playerOpt.isPresent()) {
+                PlayerEntity player = playerOpt.get();
+
+                // 每个玩家都获得全部经验
+                if (distribution.getTotalExperience() > 0) {
+                    int currentExp = player.getExperience();
+                    player.setExperience(currentExp + distribution.getTotalExperience());
+                    log.debug("玩家 {} 获得经验: {}", player.getName(), distribution.getTotalExperience());
+                }
+
+                // 金钱平分
+                if (distribution.getGoldPerPlayer() > 0) {
+                    int currentGold = player.getGold();
+                    player.setGold(currentGold + distribution.getGoldPerPlayer());
+                    log.debug("玩家 {} 获得金钱: {}", player.getName(), distribution.getGoldPerPlayer());
+                }
+
+                playerRepository.save(player);
+            }
+        }
+
+        // 物品归队长
+        if (distribution.getItems() != null && !distribution.getItems().isEmpty() && distribution.getLeaderId() != null) {
+            Optional<PlayerEntity> leaderOpt = playerRepository.findById(distribution.getLeaderId());
+            if (leaderOpt.isPresent()) {
+                PlayerEntity leader = leaderOpt.get();
+
+                // 获取队长的背包
+                List<PlayerEntity.InventorySlotData> inventory = leader.getInventory();
+                if (inventory == null) {
+                    inventory = new ArrayList<>();
+                }
+
+                for (String itemId : distribution.getItems()) {
+                    // 检查是否已有该物品
+                    boolean found = false;
+                    for (var slot : inventory) {
+                        if (itemId.equals(slot.getItemId())) {
+                            slot.setQuantity(slot.getQuantity() + 1);
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    // 如果没有，添加新的物品槽
+                    if (!found && inventory.size() < 50) {
+                        PlayerEntity.InventorySlotData newSlot = new PlayerEntity.InventorySlotData();
+                        newSlot.setItemId(itemId);
+                        newSlot.setQuantity(1);
+                        // 判断物品类型
+                        if (configDataManager.getEquipment(itemId) != null) {
+                            newSlot.setType("EQUIPMENT");
+                        } else {
+                            newSlot.setType("ITEM");
+                        }
+                        inventory.add(newSlot);
+                    }
+
+                    log.debug("队长 {} 获得物品: {}", leader.getName(), itemId);
+                }
+
+                leader.setInventory(inventory);
+                playerRepository.save(leader);
+            }
+        }
+
+        log.info("战利品分配完成");
     }
 }

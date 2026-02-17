@@ -86,6 +86,9 @@ public class AuthService {
 
                 // 清理玩家的残留交易记录
                 cleanupPlayerTrades(account.getPlayerId());
+
+                // 清理玩家的战斗状态（处理异常离线的情况）
+                cleanupPlayerCombatState(player);
             }
 
             // 生成背景日志
@@ -208,6 +211,26 @@ public class AuthService {
      */
     private String generateSessionId() {
         return UUID.randomUUID().toString();
+    }
+
+    /**
+     * 清理玩家的战斗状态
+     * 在玩家上线时调用，处理异常离线导致的战斗状态残留
+     */
+    private void cleanupPlayerCombatState(Player player) {
+        if (player != null && player.isInCombat()) {
+            player.setInCombat(false);
+            player.setCombatId(null);
+            // 保存到数据库
+            Optional<com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity> playerEntityOpt =
+                playerRepository.findById(player.getId());
+            if (playerEntityOpt.isPresent()) {
+                com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity playerEntity = playerEntityOpt.get();
+                playerEntity.setInCombat(false);
+                playerEntity.setCombatId(null);
+                playerRepository.save(playerEntity);
+            }
+        }
     }
 
     /**

@@ -20,6 +20,7 @@ public class CombatCharacter {
     private String factionId;
     private String partyId; // 队伍ID（用于战利品分配）
     private String enemyConfigId; // 敌人配置ID（仅敌人使用，用于获取掉落配置）
+    private boolean partyLeader; // 是否是队长（用于战利品分配）
 
     // 生命和法力
     private int maxHealth;
@@ -131,5 +132,12 @@ public class CombatCharacter {
      */
     public boolean isEnemy() {
         return "ENEMY".equals(characterType);
+    }
+
+    /**
+     * 是否是队长
+     */
+    public boolean isPartyLeader() {
+        return partyLeader;
     }
 }

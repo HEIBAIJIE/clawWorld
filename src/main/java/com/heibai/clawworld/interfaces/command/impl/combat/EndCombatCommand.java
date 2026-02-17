@@ -28,8 +28,13 @@ public class EndCombatCommand extends Command {
 
         if (result.isSuccess()) {
             if (result.isCombatEnded()) {
+                // 战斗结束时，将战利品日志作为消息的一部分返回
+                String message = result.getMessage();
+                if (result.getBattleLog() != null && !result.getBattleLog().isEmpty()) {
+                    message = result.getBattleLog();
+                }
                 return CommandResult.successWithWindowChange(
-                        result.getMessage(),
+                        message,
                         CommandContext.WindowType.MAP,
                         "已退出战斗，返回地图"
                 );

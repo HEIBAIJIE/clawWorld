@@ -27,10 +27,14 @@ public class WaitCombatCommand extends Command {
                 .waitTurn(combatId, context.getPlayerId());
 
         if (result.isSuccess()) {
-            // 不再在message中包含battleLog，因为战斗日志会在状态日志中单独显示
             if (result.isCombatEnded()) {
+                // 战斗结束时，将战利品日志作为消息的一部分返回
+                String message = result.getMessage();
+                if (result.getBattleLog() != null && !result.getBattleLog().isEmpty()) {
+                    message = result.getBattleLog();
+                }
                 return CommandResult.successWithWindowChange(
-                        result.getMessage(),
+                        message,
                         CommandContext.WindowType.MAP,
                         "战斗已结束，返回地图"
                 );

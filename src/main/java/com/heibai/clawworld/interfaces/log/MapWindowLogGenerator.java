@@ -136,16 +136,50 @@ public class MapWindowLogGenerator {
 
     private String generateSkills(Player player) {
         StringBuilder sb = new StringBuilder();
+        // 始终显示普通攻击
+        sb.append("- 普通攻击 [敌方单体] (消耗:0MP, 无CD) - 基础物理攻击\n");
+
         if (player.getSkills() != null && !player.getSkills().isEmpty()) {
             for (String skillId : player.getSkills()) {
-                String skillName = configDataManager.getSkill(skillId) != null ?
-                    configDataManager.getSkill(skillId).getName() : skillId;
-                sb.append(skillName).append("\n");
+                // 跳过普通攻击，已经在上面显示了
+                if ("basic_attack".equals(skillId) || "普通攻击".equals(skillId)) {
+                    continue;
+                }
+                var skillConfig = configDataManager.getSkill(skillId);
+                if (skillConfig != null) {
+                    sb.append("- ").append(skillConfig.getName());
+                    sb.append(" [").append(getTargetTypeName(skillConfig.getTargetType())).append("]");
+                    sb.append(" (消耗:").append(skillConfig.getManaCost()).append("MP");
+                    if (skillConfig.getCooldown() > 0) {
+                        sb.append(", CD:").append(skillConfig.getCooldown()).append("回合");
+                    } else {
+                        sb.append(", 无CD");
+                    }
+                    sb.append(")");
+                    if (skillConfig.getDescription() != null && !skillConfig.getDescription().isEmpty()) {
+                        sb.append(" - ").append(skillConfig.getDescription());
+                    }
+                    sb.append("\n");
+                } else {
+                    sb.append("- ").append(skillId).append("\n");
+                }
             }
-        } else {
-            sb.append("普通攻击");
         }
         return sb.toString();
+    }
+
+    private String getTargetTypeName(String targetType) {
+        if (targetType == null) {
+            return "未知";
+        }
+        return switch (targetType) {
+            case "ENEMY_SINGLE" -> "敌方单体";
+            case "ENEMY_ALL" -> "敌方群体";
+            case "ALLY_SINGLE" -> "我方单体";
+            case "ALLY_ALL" -> "我方群体";
+            case "SELF" -> "自己";
+            default -> targetType;
+        };
     }
 
     private String generateEquipment(Player player) {
