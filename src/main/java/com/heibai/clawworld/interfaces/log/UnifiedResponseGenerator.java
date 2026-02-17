@@ -152,7 +152,7 @@ public class UnifiedResponseGenerator {
             }
         }
 
-        builder.addState("指令响应", "错误: " + errorMessage);
+        builder.addState("指令响应", errorMessage);
         return builder.build();
     }
 

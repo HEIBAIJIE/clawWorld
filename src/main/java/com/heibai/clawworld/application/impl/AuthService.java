@@ -36,6 +36,8 @@ public class AuthService {
     private final MapInitializationService mapInitializationService;
     private final MapEntityService mapEntityService;
     private final ChatService chatService;
+    private final com.heibai.clawworld.infrastructure.persistence.repository.TradeRepository tradeRepository;
+    private final com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository playerRepository;
 
     /**
      * 登录或注册
@@ -79,6 +81,9 @@ public class AuthService {
             Player player = null;
             if (account.getPlayerId() != null) {
                 player = playerSessionService.getPlayerState(account.getPlayerId());
+
+                // 清理玩家的残留交易记录
+                cleanupPlayerTrades(account.getPlayerId());
             }
 
             // 生成背景日志
@@ -158,6 +163,12 @@ public class AuthService {
         Optional<AccountEntity> account = accountRepository.findBySessionId(sessionId);
         if (account.isPresent()) {
             AccountEntity entity = account.get();
+
+            // 清理玩家的残留交易记录
+            if (entity.getPlayerId() != null) {
+                cleanupPlayerTrades(entity.getPlayerId());
+            }
+
             entity.setOnline(false);
             entity.setLastLogoutTime(System.currentTimeMillis());
             entity.setSessionId(null);
@@ -185,6 +196,55 @@ public class AuthService {
      */
     private String generateSessionId() {
         return UUID.randomUUID().toString();
+    }
+
+    /**
+     * 清理玩家的残留交易记录
+     * 在玩家上线或下线时调用，清理所有未完成的交易
+     */
+    private void cleanupPlayerTrades(String playerId) {
+        // 查找玩家的所有PENDING和ACTIVE状态的交易
+        List<com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity> pendingTrades =
+            tradeRepository.findActiveTradesByPlayerId(
+                com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity.TradeStatus.PENDING, playerId);
+        List<com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity> activeTrades =
+            tradeRepository.findActiveTradesByPlayerId(
+                com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity.TradeStatus.ACTIVE, playerId);
+
+        // 合并所有需要清理的交易
+        List<com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity> allTrades = new ArrayList<>();
+        allTrades.addAll(pendingTrades);
+        allTrades.addAll(activeTrades);
+
+        // 取消所有交易
+        for (com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity trade : allTrades) {
+            trade.setStatus(com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity.TradeStatus.CANCELLED);
+            tradeRepository.save(trade);
+
+            // 清理双方玩家的tradeId
+            String initiatorId = trade.getInitiatorId();
+            String receiverId = trade.getReceiverId();
+
+            if (initiatorId != null) {
+                Optional<com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity> initiatorOpt =
+                    playerRepository.findById(initiatorId);
+                if (initiatorOpt.isPresent()) {
+                    com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity initiator = initiatorOpt.get();
+                    initiator.setTradeId(null);
+                    playerRepository.save(initiator);
+                }
+            }
+
+            if (receiverId != null) {
+                Optional<com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity> receiverOpt =
+                    playerRepository.findById(receiverId);
+                if (receiverOpt.isPresent()) {
+                    com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity receiver = receiverOpt.get();
+                    receiver.setTradeId(null);
+                    playerRepository.save(receiver);
+                }
+            }
+        }
     }
 
     /**

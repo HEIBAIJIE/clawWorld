@@ -1,4 +1,4 @@
-package com.heibai.clawworld.config;
+package com.heibai.clawworld.infrastructure.config;
 
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;

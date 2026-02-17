@@ -53,6 +53,12 @@ class AuthServiceTest {
     @Mock
     private ChatService chatService;
 
+    @Mock
+    private com.heibai.clawworld.infrastructure.persistence.repository.TradeRepository tradeRepository;
+
+    @Mock
+    private com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository playerRepository;
+
     @InjectMocks
     private AuthService authService;
 
@@ -101,6 +107,9 @@ class AuthServiceTest {
         mockPlayer.setId("player1");
         mockPlayer.setMapId("starter_village");
         when(playerSessionService.getPlayerState("player1")).thenReturn(mockPlayer);
+
+        // Mock trade cleanup
+        when(tradeRepository.findActiveTradesByPlayerId(any(), anyString())).thenReturn(new ArrayList<>());
 
         GameLogBuilder mockBuilder = new GameLogBuilder();
         mockBuilder.addBackground("test", "Welcome back!");
@@ -194,6 +203,9 @@ class AuthServiceTest {
         testAccount.setOnline(true);
         when(accountRepository.findBySessionId(sessionId)).thenReturn(Optional.of(testAccount));
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Mock trade cleanup
+        when(tradeRepository.findActiveTradesByPlayerId(any(), anyString())).thenReturn(new ArrayList<>());
 
         // Act
         authService.logout(sessionId);

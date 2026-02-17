@@ -29,6 +29,7 @@ public class TradeServiceImpl implements TradeService {
     private final TradeMapper tradeMapper;
     private final PlayerSessionService playerSessionService;
     private final com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository playerRepository;
+    private final com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository accountRepository;
 
     @Override
     @Transactional
@@ -82,10 +83,22 @@ public class TradeServiceImpl implements TradeService {
         TradeEntity entity = tradeMapper.toEntity(trade);
         tradeRepository.save(entity);
 
-        String windowId = "trade_window_" + trade.getId();
+        // 更新发起者的tradeId（但不切换窗口，因为还在等待对方接受）
+        Player requester = playerSessionService.getPlayerState(requesterId);
+        if (requester != null) {
+            requester.setTradeId(trade.getId());
+            com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity requesterEntity =
+                playerRepository.findById(requesterId).orElse(null);
+            if (requesterEntity != null) {
+                requesterEntity.setTradeId(trade.getId());
+                playerRepository.save(requesterEntity);
+            }
+        }
+
         log.info("发起交易: tradeId={}, requesterId={}, targetPlayerId={}", trade.getId(), requesterId, targetPlayerId);
 
-        return TradeResult.success(trade.getId(), windowId, "发起交易成功");
+        // 发起交易时不返回windowId，不切换窗口
+        return TradeResult.success(trade.getId(), null, "已向 " + targetPlayerName + " 发起交易请求，等待对方接受");
     }
 
     @Override
@@ -113,6 +126,36 @@ public class TradeServiceImpl implements TradeService {
         // 接受交易
         tradeEntity.setStatus(TradeEntity.TradeStatus.ACTIVE);
         tradeRepository.save(tradeEntity);
+
+        // 更新双方玩家的tradeId
+        String initiatorId = tradeEntity.getInitiatorId();
+        String receiverId = tradeEntity.getReceiverId();
+
+        // 更新发起者的tradeId
+        com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity initiatorEntity =
+            playerRepository.findById(initiatorId).orElse(null);
+        if (initiatorEntity != null) {
+            initiatorEntity.setTradeId(tradeEntity.getId());
+            playerRepository.save(initiatorEntity);
+        }
+
+        // 更新接收者的tradeId
+        com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity receiverEntity =
+            playerRepository.findById(receiverId).orElse(null);
+        if (receiverEntity != null) {
+            receiverEntity.setTradeId(tradeEntity.getId());
+            playerRepository.save(receiverEntity);
+        }
+
+        // 更新发起者的窗口状态
+        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> initiatorAccountOpt =
+            accountRepository.findByPlayerId(initiatorId);
+        if (initiatorAccountOpt.isPresent()) {
+            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = initiatorAccountOpt.get();
+            account.setCurrentWindowType("TRADE");
+            account.setCurrentWindowId("trade_window_" + tradeEntity.getId());
+            accountRepository.save(account);
+        }
 
         String windowId = "trade_window_" + tradeEntity.getId();
 
@@ -146,6 +189,24 @@ public class TradeServiceImpl implements TradeService {
         // 拒绝交易
         tradeEntity.setStatus(TradeEntity.TradeStatus.CANCELLED);
         tradeRepository.save(tradeEntity);
+
+        // 清理发起者的tradeId（拒绝时只需要清理发起者，因为接收者还没有设置tradeId）
+        com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity initiatorEntity =
+            playerRepository.findById(tradeEntity.getInitiatorId()).orElse(null);
+        if (initiatorEntity != null) {
+            initiatorEntity.setTradeId(null);
+            playerRepository.save(initiatorEntity);
+        }
+
+        // 清理发起者的窗口状态
+        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> initiatorAccountOpt =
+            accountRepository.findByPlayerId(tradeEntity.getInitiatorId());
+        if (initiatorAccountOpt.isPresent()) {
+            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = initiatorAccountOpt.get();
+            account.setCurrentWindowType("MAP");
+            account.setCurrentWindowId(null);
+            accountRepository.save(account);
+        }
 
         log.info("拒绝交易: tradeId={}, playerId={}", tradeEntity.getId(), playerId);
 
@@ -426,6 +487,9 @@ public class TradeServiceImpl implements TradeService {
         tradeEntity.setStatus(TradeEntity.TradeStatus.CANCELLED);
         tradeRepository.save(tradeEntity);
 
+        // 清理双方玩家的tradeId和窗口状态
+        clearTradeState(tradeEntity.getInitiatorId(), tradeEntity.getReceiverId());
+
         log.info("取消交易: tradeId={}, playerId={}", tradeId, playerId);
 
         return OperationResult.success("取消交易成功");
@@ -498,6 +562,9 @@ public class TradeServiceImpl implements TradeService {
             // 标记交易完成
             tradeEntity.setStatus(TradeEntity.TradeStatus.COMPLETED);
             tradeRepository.save(tradeEntity);
+
+            // 清理双方玩家的tradeId和窗口状态
+            clearTradeState(tradeEntity.getInitiatorId(), tradeEntity.getReceiverId());
 
             log.info("交易完成: tradeId={}", tradeEntity.getId());
 
@@ -600,5 +667,46 @@ public class TradeServiceImpl implements TradeService {
             .map(com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity::getId)
             .findFirst()
             .orElse(null);
+    }
+
+    /**
+     * 清理交易状态：清除双方玩家的tradeId和窗口状态
+     */
+    private void clearTradeState(String initiatorId, String receiverId) {
+        // 清理发起者的tradeId
+        com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity initiatorEntity =
+            playerRepository.findById(initiatorId).orElse(null);
+        if (initiatorEntity != null) {
+            initiatorEntity.setTradeId(null);
+            playerRepository.save(initiatorEntity);
+        }
+
+        // 清理接收者的tradeId
+        com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity receiverEntity =
+            playerRepository.findById(receiverId).orElse(null);
+        if (receiverEntity != null) {
+            receiverEntity.setTradeId(null);
+            playerRepository.save(receiverEntity);
+        }
+
+        // 清理发起者的窗口状态，切换回地图窗口
+        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> initiatorAccountOpt =
+            accountRepository.findByPlayerId(initiatorId);
+        if (initiatorAccountOpt.isPresent()) {
+            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = initiatorAccountOpt.get();
+            account.setCurrentWindowType("MAP");
+            account.setCurrentWindowId(null);
+            accountRepository.save(account);
+        }
+
+        // 清理接收者的窗口状态，切换回地图窗口
+        Optional<com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity> receiverAccountOpt =
+            accountRepository.findByPlayerId(receiverId);
+        if (receiverAccountOpt.isPresent()) {
+            com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity account = receiverAccountOpt.get();
+            account.setCurrentWindowType("MAP");
+            account.setCurrentWindowId(null);
+            accountRepository.save(account);
+        }
     }
 }
