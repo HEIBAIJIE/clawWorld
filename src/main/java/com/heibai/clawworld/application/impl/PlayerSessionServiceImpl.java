@@ -118,25 +118,10 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         // 战斗状态
         player.setInCombat(false);
 
-        // 保存玩家
+        // 保存玩家（初始状态没有队伍）
         PlayerEntity playerEntity = playerMapper.toEntity(player);
-        playerRepository.save(playerEntity);
-
-        // 创建单人队伍
-        PartyEntity party = new PartyEntity();
-        party.setId(UUID.randomUUID().toString());
-        party.setLeaderId(player.getId());
-        party.setMemberIds(new ArrayList<>());
-        party.getMemberIds().add(player.getId());
-        party.setFaction(player.getFaction());
-        party.setCreatedTime(System.currentTimeMillis());
-        party.setPendingInvitations(new ArrayList<>());
-        party.setPendingRequests(new ArrayList<>());
-        partyRepository.save(party);
-
-        // 更新玩家的队伍信息
-        playerEntity.setPartyId(party.getId());
-        playerEntity.setPartyLeader(true);
+        playerEntity.setPartyId(null);
+        playerEntity.setPartyLeader(false);
         playerRepository.save(playerEntity);
 
         // 更新账号信息

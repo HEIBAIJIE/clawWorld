@@ -116,7 +116,6 @@ class PlayerSessionServiceImplTest {
         when(accountRepository.existsByNickname("TestPlayer")).thenReturn(false);
         when(configDataManager.getAllRoles()).thenReturn(Collections.singletonList(testRole));
         when(playerRepository.save(any(PlayerEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(partyRepository.save(any(PartyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerMapper.toEntity(any(Player.class))).thenReturn(testPlayer);
         when(configMapper.toDomain(any(RoleConfig.class))).thenReturn(new Role());
@@ -136,7 +135,7 @@ class PlayerSessionServiceImplTest {
         assertNotNull(result.getPlayerId());
         assertNotNull(result.getWindowContent());
         verify(playerRepository, atLeastOnce()).save(any(PlayerEntity.class));
-        verify(partyRepository).save(any(PartyEntity.class));
+        // 注意：新玩家不再创建队伍，所以不验证partyRepository.save()
         verify(accountRepository).save(any(AccountEntity.class));
         verify(playerStatsService).recalculateStats(any(Player.class), any(Role.class));
     }
