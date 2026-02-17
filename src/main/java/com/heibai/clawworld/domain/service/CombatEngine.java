@@ -652,6 +652,7 @@ public class CombatEngine {
      * - 组队中战胜敌人，每个玩家都获得全部经验
      * - 金钱平分
      * - 物品归队长持有
+     * - 战斗结束后玩家不会回复生命值和法力值
      */
     private void handleCombatRewards(CombatInstance combat, CombatParty winner) {
         log.info("战斗 {} 的胜利方 {} 获得战利品", combat.getCombatId(), winner.getFactionId());
@@ -684,10 +685,39 @@ public class CombatEngine {
             .filter(c -> c.isPlayer() && c.isAlive())
             .collect(Collectors.toList());
 
+        // 创建战利品分配结果
+        CombatInstance.RewardDistribution distribution = new CombatInstance.RewardDistribution();
+        distribution.setWinnerFactionId(winner.getFactionId());
+
+        // 保存所有玩家的最终状态（包括所有参战方的玩家）
+        for (CombatParty party : combat.getParties().values()) {
+            for (CombatCharacter character : party.getCharacters()) {
+                if (character.isPlayer()) {
+                    distribution.getPlayerFinalStates().put(
+                        character.getCharacterId(),
+                        new CombatInstance.PlayerFinalState(character.getCurrentHealth(), character.getCurrentMana())
+                    );
+                }
+                // 记录被击败的敌人
+                if (character.isEnemy() && !character.isAlive()) {
+                    if (character.getEnemyMapId() != null && character.getEnemyInstanceId() != null) {
+                        distribution.getDefeatedEnemies().add(
+                            new CombatInstance.DefeatedEnemy(
+                                character.getEnemyMapId(),
+                                character.getEnemyInstanceId(),
+                                character.getEnemyRespawnSeconds()
+                            )
+                        );
+                    }
+                }
+            }
+        }
+
         if (winnerPlayers.isEmpty()) {
             // 没有存活的玩家，不分配战利品
             combat.addLog("=== 战利品 ===");
             combat.addLog("没有存活的玩家，战利品无法分配");
+            combat.setRewardDistribution(distribution);
             return;
         }
 
@@ -701,9 +731,6 @@ public class CombatEngine {
             .findFirst()
             .orElse(winnerPlayers.get(0));
 
-        // 创建战利品分配结果
-        CombatInstance.RewardDistribution distribution = new CombatInstance.RewardDistribution();
-        distribution.setWinnerFactionId(winner.getFactionId());
         distribution.setTotalExperience(totalExp);
         distribution.setTotalGold(totalGold);
         distribution.setGoldPerPlayer(goldPerPlayer);

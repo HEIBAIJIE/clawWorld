@@ -321,6 +321,14 @@ public class MapEntityServiceImpl implements MapEntityService {
                 // 拾取交互
                 return InteractionResult.success("拾取 " + targetName);
 
+            case "休息":
+            case "rest":
+                // 篝火休息交互：回满生命和法力
+                player.setCurrentHealth(player.getMaxHealth());
+                player.setCurrentMana(player.getMaxMana());
+                playerRepository.save(player);
+                return InteractionResult.success("你在篝火旁休息，生命和法力已完全恢复");
+
             // 玩家间交互选项
             case "邀请组队":
             case "invite party":
@@ -479,7 +487,9 @@ public class MapEntityServiceImpl implements MapEntityService {
 
     /**
      * 检查位置是否可通过
-     * 根据设计文档：树、岩石、山脉、河流、海洋、墙不可通过
+     * 根据设计文档：
+     * - 树、岩石、山脉、河流、海洋、墙不可通过
+     * - 在消灭敌人以前，无法进入敌人所在的格子
      */
     private boolean isPositionPassable(MapConfig mapConfig, int x, int y) {
         // 检查坐标是否在地图范围内
@@ -496,6 +506,15 @@ public class MapEntityServiceImpl implements MapEntityService {
 
         for (String terrain : terrainTypes) {
             if (impassableTerrains.contains(terrain)) {
+                return false;
+            }
+        }
+
+        // 检查该位置是否有存活的敌人
+        List<com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity> enemies =
+            enemyInstanceRepository.findByMapId(mapConfig.getId());
+        for (var enemy : enemies) {
+            if (enemy.getX() == x && enemy.getY() == y && !enemy.isDead()) {
                 return false;
             }
         }

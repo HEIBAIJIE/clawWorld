@@ -230,6 +230,7 @@ public class MapInitializationService {
             case "ENEMY" -> entityFactory.createEnemyInstance(config, mapId);
             case "NPC" -> entityFactory.createNpcInstance(config, mapId);
             case "WAYPOINT" -> entityFactory.createWaypointInstance(config, mapId);
+            case "CAMPFIRE" -> entityFactory.createCampfireInstance(config, mapId);
             default -> {
                 log.warn("Unknown entity type: {} for entity: {}",
                         config.getEntityType(), config.getEntityId());

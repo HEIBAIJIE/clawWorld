@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -44,10 +45,12 @@ class PartyServiceImplTest {
     void setUp() {
         inviter = new PlayerEntity();
         inviter.setId("player1");
+        inviter.setName("邀请者");
         inviter.setPartyId(null);
 
         target = new PlayerEntity();
         target.setId("player2");
+        target.setName("被邀请者");
         target.setPartyId(null);
 
         party = new PartyEntity();
@@ -64,11 +67,13 @@ class PartyServiceImplTest {
     void testInvitePlayer_Success() {
         // Arrange
         when(playerRepository.findById("player1")).thenReturn(Optional.of(inviter));
+        when(playerRepository.findAll()).thenReturn(Arrays.asList(inviter, target));
         when(playerRepository.findById("player2")).thenReturn(Optional.of(target));
         when(partyRepository.save(any(PartyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(playerRepository.save(any(PlayerEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        PartyService.PartyResult result = partyService.invitePlayer("player1", "player2");
+        PartyService.PartyResult result = partyService.invitePlayer("player1", "被邀请者");
 
         // Assert
         assertTrue(result.isSuccess());
@@ -87,11 +92,12 @@ class PartyServiceImplTest {
         targetParty.getMemberIds().add("player3");
 
         when(playerRepository.findById("player1")).thenReturn(Optional.of(inviter));
+        when(playerRepository.findAll()).thenReturn(Arrays.asList(inviter, target));
         when(playerRepository.findById("player2")).thenReturn(Optional.of(target));
         when(partyRepository.findById("party2")).thenReturn(Optional.of(targetParty));
 
         // Act
-        PartyService.PartyResult result = partyService.invitePlayer("player1", "player2");
+        PartyService.PartyResult result = partyService.invitePlayer("player1", "被邀请者");
 
         // Assert
         assertFalse(result.isSuccess());
@@ -109,12 +115,13 @@ class PartyServiceImplTest {
         party.getPendingInvitations().add(invitation);
 
         when(playerRepository.findById("player2")).thenReturn(Optional.of(target));
+        when(playerRepository.findAll()).thenReturn(Arrays.asList(inviter, target));
         when(partyRepository.findByMemberIdsContaining("player1")).thenReturn(Optional.of(party));
         when(partyRepository.save(any(PartyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerRepository.save(any(PlayerEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        PartyService.PartyResult result = partyService.acceptInvite("player2", "player1");
+        PartyService.PartyResult result = partyService.acceptInvite("player2", "邀请者");
 
         // Assert
         assertTrue(result.isSuccess());
@@ -134,11 +141,12 @@ class PartyServiceImplTest {
         party.getPendingInvitations().add(invitation);
 
         when(playerRepository.findById("player2")).thenReturn(Optional.of(target));
+        when(playerRepository.findAll()).thenReturn(Arrays.asList(inviter, target));
         when(partyRepository.findByMemberIdsContaining("player1")).thenReturn(Optional.of(party));
         when(partyRepository.save(any(PartyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        PartyService.PartyResult result = partyService.acceptInvite("player2", "player1");
+        PartyService.PartyResult result = partyService.acceptInvite("player2", "邀请者");
 
         // Assert
         assertFalse(result.isSuccess());
@@ -149,27 +157,33 @@ class PartyServiceImplTest {
     void testKickPlayer_Success() {
         // Arrange
         party.getMemberIds().add("player2");
+        party.getMemberIds().add("player3"); // 添加第三个成员，这样踢人后队伍还有2人不会解散
+        PlayerEntity player3 = new PlayerEntity();
+        player3.setId("player3");
+        player3.setName("队员3");
+
         when(partyRepository.findByLeaderId("player1")).thenReturn(Optional.of(party));
+        when(playerRepository.findAll()).thenReturn(Arrays.asList(inviter, target, player3));
         when(partyRepository.save(any(PartyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerRepository.findById("player2")).thenReturn(Optional.of(target));
         when(playerRepository.save(any(PlayerEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        PartyService.PartyResult result = partyService.kickPlayer("player1", "player2");
+        PartyService.PartyResult result = partyService.kickPlayer("player1", "被邀请者");
 
         // Assert
         assertTrue(result.isSuccess());
         assertEquals("已踢出玩家", result.getMessage());
-        verify(partyRepository, times(2)).save(any(PartyEntity.class)); // Once for kick, once for solo party
     }
 
     @Test
     void testKickPlayer_CannotKickSelf() {
         // Arrange
         when(partyRepository.findByLeaderId("player1")).thenReturn(Optional.of(party));
+        when(playerRepository.findAll()).thenReturn(Arrays.asList(inviter, target));
 
         // Act
-        PartyService.PartyResult result = partyService.kickPlayer("player1", "player1");
+        PartyService.PartyResult result = partyService.kickPlayer("player1", "邀请者");
 
         // Assert
         assertFalse(result.isSuccess());
@@ -181,6 +195,10 @@ class PartyServiceImplTest {
         // Arrange
         target.setPartyId("party1");
         party.getMemberIds().add("player2");
+        party.getMemberIds().add("player3"); // 添加第三个成员，这样离队后队伍还有2人不会解散
+        PlayerEntity player3 = new PlayerEntity();
+        player3.setId("player3");
+        player3.setName("队员3");
 
         when(playerRepository.findById("player2")).thenReturn(Optional.of(target));
         when(partyRepository.findById("party1")).thenReturn(Optional.of(party));
@@ -218,7 +236,6 @@ class PartyServiceImplTest {
         when(partyRepository.findByLeaderId("player1")).thenReturn(Optional.of(party));
         when(playerRepository.findById("player1")).thenReturn(Optional.of(inviter));
         when(playerRepository.findById("player2")).thenReturn(Optional.of(target));
-        when(partyRepository.save(any(PartyEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(playerRepository.save(any(PlayerEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act

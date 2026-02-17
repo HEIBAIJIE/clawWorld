@@ -8,6 +8,7 @@ import com.heibai.clawworld.infrastructure.config.data.map.MapEntityConfig;
 import com.heibai.clawworld.domain.character.Enemy;
 import com.heibai.clawworld.domain.character.Npc;
 import com.heibai.clawworld.domain.item.Rarity;
+import com.heibai.clawworld.domain.map.Campfire;
 import com.heibai.clawworld.domain.map.Waypoint;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -244,5 +245,25 @@ public class EntityFactory {
 
         // 如果格式不符合预期，返回原始名称
         return templateName;
+    }
+
+    /**
+     * 从MapEntityConfig创建Campfire实例
+     */
+    public Campfire createCampfireInstance(MapEntityConfig config, String mapId) {
+        Campfire campfire = new Campfire();
+        campfire.setId(config.getEntityId());
+        campfire.setName("篝火");
+        campfire.setDescription("温暖的篝火，可以在此休息恢复体力");
+
+        // 位置
+        campfire.setMapId(mapId);
+        campfire.setX(config.getX());
+        campfire.setY(config.getY());
+
+        log.debug("Created Campfire instance at ({}, {}) on map {}",
+                campfire.getX(), campfire.getY(), mapId);
+
+        return campfire;
     }
 }

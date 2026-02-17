@@ -441,10 +441,44 @@ public class CombatInstance {
         private List<String> items;               // 物品ID列表
         private String leaderId;                  // 队长ID（物品归属）
         private List<String> playerIds;           // 所有获得奖励的玩家ID
+        private Map<String, PlayerFinalState> playerFinalStates; // 玩家战斗结束时的状态
+        private List<DefeatedEnemy> defeatedEnemies; // 被击败的敌人列表
 
         public RewardDistribution() {
             this.items = new ArrayList<>();
             this.playerIds = new ArrayList<>();
+            this.playerFinalStates = new HashMap<>();
+            this.defeatedEnemies = new ArrayList<>();
+        }
+    }
+
+    /**
+     * 玩家战斗结束时的状态
+     */
+    @Data
+    public static class PlayerFinalState {
+        private int currentHealth;
+        private int currentMana;
+
+        public PlayerFinalState(int currentHealth, int currentMana) {
+            this.currentHealth = currentHealth;
+            this.currentMana = currentMana;
+        }
+    }
+
+    /**
+     * 被击败的敌人信息
+     */
+    @Data
+    public static class DefeatedEnemy {
+        private String mapId;
+        private String instanceId;
+        private int respawnSeconds;
+
+        public DefeatedEnemy(String mapId, String instanceId, int respawnSeconds) {
+            this.mapId = mapId;
+            this.instanceId = instanceId;
+            this.respawnSeconds = respawnSeconds;
         }
     }
 }

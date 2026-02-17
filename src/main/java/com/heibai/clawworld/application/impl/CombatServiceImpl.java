@@ -548,6 +548,12 @@ public class CombatServiceImpl implements CombatService {
             // 处理战利品分配
             if (distribution != null) {
                 distributeRewards(distribution);
+
+                // 同步玩家的战斗后状态（生命和法力）
+                syncPlayerFinalStates(distribution);
+
+                // 更新被击败敌人的状态
+                updateDefeatedEnemies(distribution);
             }
 
             // 从数据库中查找所有combatId匹配的玩家
@@ -585,6 +591,57 @@ public class CombatServiceImpl implements CombatService {
             }
         } catch (Exception e) {
             log.error("处理战斗结束窗口转换失败: combatId={}", combatId, e);
+        }
+    }
+
+    /**
+     * 更新被击败敌人的状态
+     * 根据设计文档：敌人被击败后短暂消失，然后根据刷新时间定时刷回来
+     */
+    private void updateDefeatedEnemies(CombatInstance.RewardDistribution distribution) {
+        if (distribution == null || distribution.getDefeatedEnemies() == null) {
+            return;
+        }
+
+        for (CombatInstance.DefeatedEnemy defeatedEnemy : distribution.getDefeatedEnemies()) {
+            Optional<com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity> enemyOpt =
+                enemyInstanceRepository.findByMapIdAndInstanceId(defeatedEnemy.getMapId(), defeatedEnemy.getInstanceId());
+
+            if (enemyOpt.isPresent()) {
+                var enemy = enemyOpt.get();
+                enemy.setDead(true);
+                enemy.setLastDeathTime(System.currentTimeMillis());
+                enemy.setInCombat(false);
+                enemy.setCombatId(null);
+                enemyInstanceRepository.save(enemy);
+                log.debug("敌人 {} 被击败，将在 {} 秒后刷新",
+                    enemy.getDisplayName(), defeatedEnemy.getRespawnSeconds());
+            }
+        }
+    }
+
+    /**
+     * 同步玩家的战斗后状态（生命和法力）
+     * 根据设计文档：战斗胜利后玩家不会回复生命值和法力值
+     */
+    private void syncPlayerFinalStates(CombatInstance.RewardDistribution distribution) {
+        if (distribution == null || distribution.getPlayerFinalStates() == null) {
+            return;
+        }
+
+        for (Map.Entry<String, CombatInstance.PlayerFinalState> entry : distribution.getPlayerFinalStates().entrySet()) {
+            String playerId = entry.getKey();
+            CombatInstance.PlayerFinalState finalState = entry.getValue();
+
+            Optional<PlayerEntity> playerOpt = playerRepository.findById(playerId);
+            if (playerOpt.isPresent()) {
+                PlayerEntity player = playerOpt.get();
+                player.setCurrentHealth(finalState.getCurrentHealth());
+                player.setCurrentMana(finalState.getCurrentMana());
+                playerRepository.save(player);
+                log.debug("同步玩家 {} 战斗后状态: HP={}, MP={}",
+                    player.getName(), finalState.getCurrentHealth(), finalState.getCurrentMana());
+            }
         }
     }
 

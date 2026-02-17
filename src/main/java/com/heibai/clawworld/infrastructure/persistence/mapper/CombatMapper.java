@@ -82,6 +82,14 @@ public class CombatMapper {
         combatChar.setHitRate(config.getHitRate());
         combatChar.setDodgeRate(config.getDodgeRate());
 
+        // 设置敌人配置ID（用于战利品计算）
+        combatChar.setEnemyConfigId(enemy.getTemplateId());
+
+        // 设置敌人实例信息（用于战斗结束后更新状态）
+        combatChar.setEnemyMapId(enemy.getMapId());
+        combatChar.setEnemyInstanceId(enemy.getInstanceId());
+        combatChar.setEnemyRespawnSeconds(config.getRespawnSeconds());
+
         // 解析敌人技能
         List<String> skillIds = new ArrayList<>();
         if (config.getSkills() != null && !config.getSkills().isEmpty()) {

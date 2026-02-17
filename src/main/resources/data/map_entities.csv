@@ -1,9 +1,11 @@
 mapId,x,y,entityType,entityId,instanceId
 starter_village,5,5,WAYPOINT,wp_village_center,
 starter_village,3,3,NPC,merchant_john,
+starter_village,7,7,CAMPFIRE,campfire_village,
 town_square,7,7,WAYPOINT,wp_town_entrance,
 town_square,5,5,NPC,blacksmith_tom,
 town_square,8,8,NPC,priest_mary,
+town_square,3,3,CAMPFIRE,campfire_town,
 forest_entrance,0,0,WAYPOINT,wp_forest_entrance,
 forest_entrance,10,10,WAYPOINT,wp_forest_gate,
 forest_entrance,5,5,ENEMY,goblin,goblin_1

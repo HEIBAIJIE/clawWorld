@@ -28,26 +28,26 @@ public class PartyServiceImpl implements PartyService {
 
     @Override
     @Transactional
-    public PartyResult invitePlayer(String inviterId, String targetPlayerId) {
+    public PartyResult invitePlayer(String inviterId, String targetPlayerName) {
         // 验证邀请者
         Optional<PlayerEntity> inviterOpt = playerRepository.findById(inviterId);
         if (!inviterOpt.isPresent()) {
             return PartyResult.error("邀请者不存在");
         }
 
-        // 验证被邀请者
-        Optional<PlayerEntity> targetOpt = playerRepository.findById(targetPlayerId);
-        if (!targetOpt.isPresent()) {
+        // 通过名称查找被邀请者
+        String targetPlayerId = findPlayerIdByName(targetPlayerName);
+        if (targetPlayerId == null) {
             return PartyResult.error("被邀请者不存在");
         }
 
         PlayerEntity inviter = inviterOpt.get();
-        PlayerEntity target = targetOpt.get();
+        PlayerEntity target = playerRepository.findById(targetPlayerId).get();
 
-        // 检查被邀请者是否已在队伍中
+        // 检查被邀请者是否已在队伍中（有真正的队伍）
         if (target.getPartyId() != null) {
             Optional<PartyEntity> targetPartyOpt = partyRepository.findById(target.getPartyId());
-            if (targetPartyOpt.isPresent() && !targetPartyOpt.get().isSolo()) {
+            if (targetPartyOpt.isPresent()) {
                 return PartyResult.error("被邀请者已在队伍中");
             }
         }
@@ -55,13 +55,13 @@ public class PartyServiceImpl implements PartyService {
         // 获取或创建邀请者的队伍
         PartyEntity party;
         if (inviter.getPartyId() == null) {
-            // 创建新队伍
-            party = createParty(inviter);
+            // 邀请者没有队伍，创建一个待确认的队伍（只有邀请者一人）
+            party = createPartyForInviter(inviter);
         } else {
             Optional<PartyEntity> partyOpt = partyRepository.findById(inviter.getPartyId());
             if (!partyOpt.isPresent()) {
                 // 队伍不存在，创建新队伍
-                party = createParty(inviter);
+                party = createPartyForInviter(inviter);
             } else {
                 party = partyOpt.get();
             }
@@ -93,7 +93,7 @@ public class PartyServiceImpl implements PartyService {
 
     @Override
     @Transactional
-    public PartyResult acceptInvite(String playerId, String inviterId) {
+    public PartyResult acceptInvite(String playerId, String inviterName) {
         // 验证玩家
         Optional<PlayerEntity> playerOpt = playerRepository.findById(playerId);
         if (!playerOpt.isPresent()) {
@@ -105,9 +105,15 @@ public class PartyServiceImpl implements PartyService {
         // 检查玩家是否已在队伍中
         if (player.getPartyId() != null) {
             Optional<PartyEntity> currentPartyOpt = partyRepository.findById(player.getPartyId());
-            if (currentPartyOpt.isPresent() && !currentPartyOpt.get().isSolo()) {
+            if (currentPartyOpt.isPresent()) {
                 return PartyResult.error("你已在队伍中");
             }
+        }
+
+        // 通过名称查找邀请者ID
+        String inviterId = findPlayerIdByName(inviterName);
+        if (inviterId == null) {
+            return PartyResult.error("邀请者不存在");
         }
 
         // 查找邀请者的队伍
@@ -139,11 +145,6 @@ public class PartyServiceImpl implements PartyService {
             return PartyResult.error("队伍已满");
         }
 
-        // 移除旧的单人队伍
-        if (player.getPartyId() != null) {
-            partyRepository.deleteById(player.getPartyId());
-        }
-
         // 加入队伍
         party.getMemberIds().add(playerId);
         party.getPendingInvitations().remove(invitation);
@@ -159,7 +160,13 @@ public class PartyServiceImpl implements PartyService {
 
     @Override
     @Transactional
-    public PartyResult rejectInvite(String playerId, String inviterId) {
+    public PartyResult rejectInvite(String playerId, String inviterName) {
+        // 通过名称查找邀请者ID
+        String inviterId = findPlayerIdByName(inviterName);
+        if (inviterId == null) {
+            return PartyResult.error("邀请者不存在");
+        }
+
         // 查找邀请者的队伍
         Optional<PartyEntity> partyOpt = partyRepository.findByMemberIdsContaining(inviterId);
         if (!partyOpt.isPresent()) {
@@ -183,7 +190,7 @@ public class PartyServiceImpl implements PartyService {
 
     @Override
     @Transactional
-    public PartyResult requestJoin(String playerId, String targetPlayerId) {
+    public PartyResult requestJoin(String playerId, String targetPlayerName) {
         // 验证请求者
         Optional<PlayerEntity> playerOpt = playerRepository.findById(playerId);
         if (!playerOpt.isPresent()) {
@@ -195,9 +202,15 @@ public class PartyServiceImpl implements PartyService {
         // 检查请求者是否已在队伍中
         if (player.getPartyId() != null) {
             Optional<PartyEntity> currentPartyOpt = partyRepository.findById(player.getPartyId());
-            if (currentPartyOpt.isPresent() && !currentPartyOpt.get().isSolo()) {
+            if (currentPartyOpt.isPresent()) {
                 return PartyResult.error("你已在队伍中");
             }
+        }
+
+        // 通过名称查找目标玩家ID
+        String targetPlayerId = findPlayerIdByName(targetPlayerName);
+        if (targetPlayerId == null) {
+            return PartyResult.error("目标玩家不存在");
         }
 
         // 查找目标玩家的队伍
@@ -207,11 +220,6 @@ public class PartyServiceImpl implements PartyService {
         }
 
         PartyEntity targetParty = targetPartyOpt.get();
-
-        // 检查是否为单人队伍
-        if (targetParty.isSolo()) {
-            return PartyResult.error("目标玩家不在队伍中");
-        }
 
         // 检查队伍是否已满
         if (targetParty.isFull()) {
@@ -239,7 +247,7 @@ public class PartyServiceImpl implements PartyService {
 
     @Override
     @Transactional
-    public PartyResult acceptJoinRequest(String leaderId, String requesterId) {
+    public PartyResult acceptJoinRequest(String leaderId, String requesterName) {
         // 验证队长
         Optional<PartyEntity> partyOpt = partyRepository.findByLeaderId(leaderId);
         if (!partyOpt.isPresent()) {
@@ -247,6 +255,12 @@ public class PartyServiceImpl implements PartyService {
         }
 
         PartyEntity party = partyOpt.get();
+
+        // 通过名称查找请求者ID
+        String requesterId = findPlayerIdByName(requesterName);
+        if (requesterId == null) {
+            return PartyResult.error("请求者不存在");
+        }
 
         // 查找请求记录
         Optional<PartyEntity.PartyRequestData> requestOpt = party.getPendingRequests().stream()
@@ -277,11 +291,6 @@ public class PartyServiceImpl implements PartyService {
 
         PlayerEntity requester = requesterOpt.get();
 
-        // 移除旧的单人队伍
-        if (requester.getPartyId() != null) {
-            partyRepository.deleteById(requester.getPartyId());
-        }
-
         // 加入队伍
         party.getMemberIds().add(requesterId);
         party.getPendingRequests().remove(request);
@@ -297,7 +306,7 @@ public class PartyServiceImpl implements PartyService {
 
     @Override
     @Transactional
-    public PartyResult rejectJoinRequest(String leaderId, String requesterId) {
+    public PartyResult rejectJoinRequest(String leaderId, String requesterName) {
         // 验证队长
         Optional<PartyEntity> partyOpt = partyRepository.findByLeaderId(leaderId);
         if (!partyOpt.isPresent()) {
@@ -305,6 +314,12 @@ public class PartyServiceImpl implements PartyService {
         }
 
         PartyEntity party = partyOpt.get();
+
+        // 通过名称查找请求者ID
+        String requesterId = findPlayerIdByName(requesterName);
+        if (requesterId == null) {
+            return PartyResult.error("请求者不存在");
+        }
 
         // 查找并移除请求记录
         boolean removed = party.getPendingRequests().removeIf(
@@ -321,7 +336,7 @@ public class PartyServiceImpl implements PartyService {
 
     @Override
     @Transactional
-    public PartyResult kickPlayer(String leaderId, String targetPlayerId) {
+    public PartyResult kickPlayer(String leaderId, String targetPlayerName) {
         // 验证队长
         Optional<PartyEntity> partyOpt = partyRepository.findByLeaderId(leaderId);
         if (!partyOpt.isPresent()) {
@@ -329,6 +344,12 @@ public class PartyServiceImpl implements PartyService {
         }
 
         PartyEntity party = partyOpt.get();
+
+        // 通过名称查找目标玩家ID
+        String targetPlayerId = findPlayerIdByName(targetPlayerName);
+        if (targetPlayerId == null) {
+            return PartyResult.error("目标玩家不存在");
+        }
 
         // 检查目标玩家是否在队伍中
         if (!party.hasMember(targetPlayerId)) {
@@ -342,18 +363,22 @@ public class PartyServiceImpl implements PartyService {
 
         // 移除玩家
         party.getMemberIds().remove(targetPlayerId);
-        partyRepository.save(party);
 
-        // 为被踢出的玩家创建单人队伍
+        // 清除被踢出玩家的队伍信息
         Optional<PlayerEntity> targetOpt = playerRepository.findById(targetPlayerId);
         if (targetOpt.isPresent()) {
             PlayerEntity target = targetOpt.get();
-            PartyEntity soloParty = createParty(target);
-            target.setPartyId(soloParty.getId());
-            target.setPartyLeader(true);
+            target.setPartyId(null);
+            target.setPartyLeader(false);
             playerRepository.save(target);
         }
 
+        // 检查队伍是否需要解散（少于2人）
+        if (party.getMemberIds().size() < 2) {
+            return disbandPartyInternal(party);
+        }
+
+        partyRepository.save(party);
         return PartyResult.success("已踢出玩家");
     }
 
@@ -375,6 +400,10 @@ public class PartyServiceImpl implements PartyService {
         // 查找队伍
         Optional<PartyEntity> partyOpt = partyRepository.findById(player.getPartyId());
         if (!partyOpt.isPresent()) {
+            // 队伍不存在，清理玩家状态
+            player.setPartyId(null);
+            player.setPartyLeader(false);
+            playerRepository.save(player);
             return PartyResult.error("队伍不存在");
         }
 
@@ -387,14 +416,18 @@ public class PartyServiceImpl implements PartyService {
 
         // 移除玩家
         party.getMemberIds().remove(playerId);
-        partyRepository.save(party);
 
-        // 为玩家创建单人队伍
-        PartyEntity soloParty = createParty(player);
-        player.setPartyId(soloParty.getId());
-        player.setPartyLeader(true);
+        // 清除玩家的队伍信息
+        player.setPartyId(null);
+        player.setPartyLeader(false);
         playerRepository.save(player);
 
+        // 检查队伍是否需要解散（少于2人）
+        if (party.getMemberIds().size() < 2) {
+            return disbandPartyInternal(party);
+        }
+
+        partyRepository.save(party);
         return PartyResult.success("已离开队伍");
     }
 
@@ -407,16 +440,20 @@ public class PartyServiceImpl implements PartyService {
             return PartyResult.error("你不是任何队伍的队长");
         }
 
-        PartyEntity party = partyOpt.get();
+        return disbandPartyInternal(partyOpt.get());
+    }
 
-        // 为所有成员创建单人队伍
+    /**
+     * 内部方法：解散队伍
+     */
+    private PartyResult disbandPartyInternal(PartyEntity party) {
+        // 清除所有成员的队伍信息
         for (String memberId : party.getMemberIds()) {
             Optional<PlayerEntity> memberOpt = playerRepository.findById(memberId);
             if (memberOpt.isPresent()) {
                 PlayerEntity member = memberOpt.get();
-                PartyEntity soloParty = createParty(member);
-                member.setPartyId(soloParty.getId());
-                member.setPartyLeader(true);
+                member.setPartyId(null);
+                member.setPartyLeader(false);
                 playerRepository.save(member);
             }
         }
@@ -440,19 +477,36 @@ public class PartyServiceImpl implements PartyService {
     }
 
     /**
-     * 创建单人队伍
+     * 为邀请者创建队伍（只有邀请者一人，等待被邀请者加入）
      */
-    private PartyEntity createParty(PlayerEntity player) {
+    private PartyEntity createPartyForInviter(PlayerEntity inviter) {
         PartyEntity party = new PartyEntity();
         party.setId(UUID.randomUUID().toString());
-        party.setLeaderId(player.getId());
+        party.setLeaderId(inviter.getId());
         party.setMemberIds(new ArrayList<>());
-        party.getMemberIds().add(player.getId());
-        party.setFaction("PLAYER_" + player.getId());
+        party.getMemberIds().add(inviter.getId());
+        party.setFaction("PARTY_" + party.getId());
         party.setCreatedTime(System.currentTimeMillis());
         party.setPendingInvitations(new ArrayList<>());
         party.setPendingRequests(new ArrayList<>());
+
+        // 更新邀请者的队伍信息
+        inviter.setPartyId(party.getId());
+        inviter.setPartyLeader(true);
+        playerRepository.save(inviter);
+
         return partyRepository.save(party);
+    }
+
+    /**
+     * 通过玩家昵称查找玩家ID
+     */
+    private String findPlayerIdByName(String playerName) {
+        return playerRepository.findAll().stream()
+            .filter(p -> p.getName() != null && p.getName().equals(playerName))
+            .map(PlayerEntity::getId)
+            .findFirst()
+            .orElse(null);
     }
 
     /**
