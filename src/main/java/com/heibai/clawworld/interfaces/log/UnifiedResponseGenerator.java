@@ -48,36 +48,47 @@ public class UnifiedResponseGenerator {
                                    CommandContext.WindowType newWindowType) {
         GameLogBuilder builder = new GameLogBuilder();
 
-        Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
-        if (!accountOpt.isPresent()) {
-            builder.addState("指令响应", "错误: 无法获取玩家状态");
-            return builder.build();
-        }
-        AccountEntity account = accountOpt.get();
-
-        // 1. 添加客户端指令日志
-        if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
-            GameLog clientLog = GameLog.builder()
-                .source(GameLog.Source.CLIENT)
-                .timestamp(account.getLastCommandTimestamp())
-                .type(GameLog.Type.COMMAND)
-                .subType("发送指令")
-                .content(account.getLastCommand())
-                .build();
-            builder.addLog(clientLog);
+        // 只有当 playerId 不为 null 时才查询账号信息
+        // 避免查询 playerId=null 时返回多个未注册账号的问题
+        if (playerId != null) {
+            Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
+            if (accountOpt.isPresent()) {
+                AccountEntity account = accountOpt.get();
+                // 1. 添加客户端指令日志
+                if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
+                    GameLog clientLog = GameLog.builder()
+                        .source(GameLog.Source.CLIENT)
+                        .timestamp(account.getLastCommandTimestamp())
+                        .type(GameLog.Type.COMMAND)
+                        .subType("发送指令")
+                        .content(account.getLastCommand())
+                        .build();
+                    builder.addLog(clientLog);
+                }
+            }
         }
 
         // 2. 根据窗口类型生成状态日志
         if (currentWindowType == CommandContext.WindowType.MAP) {
             // 地图窗口：生成环境变化和指令响应
-            stateLogGenerator.generateMapStateLogs(builder, playerId, commandResult);
+            // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
+            if (playerId != null) {
+                stateLogGenerator.generateMapStateLogs(builder, playerId, commandResult);
+            } else {
+                builder.addState("指令响应", commandResult);
+            }
         } else if (currentWindowType == CommandContext.WindowType.COMBAT) {
             // 战斗窗口：生成战斗状态
-            Player player = playerSessionService.getPlayerState(playerId);
-            if (player != null && player.getCombatId() != null) {
-                com.heibai.clawworld.domain.combat.Combat combat = combatService.getCombatState(player.getCombatId());
-                if (combat != null) {
-                    combatWindowLogGenerator.generateCombatStateLogs(builder, combat, playerId, commandResult);
+            // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
+            if (playerId != null) {
+                Player player = playerSessionService.getPlayerState(playerId);
+                if (player != null && player.getCombatId() != null) {
+                    com.heibai.clawworld.domain.combat.Combat combat = combatService.getCombatState(player.getCombatId());
+                    if (combat != null) {
+                        combatWindowLogGenerator.generateCombatStateLogs(builder, combat, playerId, commandResult);
+                    } else {
+                        builder.addState("指令响应", commandResult);
+                    }
                 } else {
                     builder.addState("指令响应", commandResult);
                 }
@@ -86,11 +97,16 @@ public class UnifiedResponseGenerator {
             }
         } else if (currentWindowType == CommandContext.WindowType.TRADE) {
             // 交易窗口：生成交易状态
-            Player player = playerSessionService.getPlayerState(playerId);
-            if (player != null && player.getTradeId() != null) {
-                com.heibai.clawworld.domain.trade.Trade trade = tradeService.getTradeState(player.getTradeId());
-                if (trade != null) {
-                    tradeWindowLogGenerator.generateTradeStateLogs(builder, trade, playerId, commandResult);
+            // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
+            if (playerId != null) {
+                Player player = playerSessionService.getPlayerState(playerId);
+                if (player != null && player.getTradeId() != null) {
+                    com.heibai.clawworld.domain.trade.Trade trade = tradeService.getTradeState(player.getTradeId());
+                    if (trade != null) {
+                        tradeWindowLogGenerator.generateTradeStateLogs(builder, trade, playerId, commandResult);
+                    } else {
+                        builder.addState("指令响应", commandResult);
+                    }
                 } else {
                     builder.addState("指令响应", commandResult);
                 }
@@ -99,12 +115,17 @@ public class UnifiedResponseGenerator {
             }
         } else if (currentWindowType == CommandContext.WindowType.SHOP) {
             // 商店窗口：生成商店状态
-            Player player = playerSessionService.getPlayerState(playerId);
-            if (player != null && player.getCurrentShopId() != null) {
-                com.heibai.clawworld.application.service.ShopService.ShopInfo shopInfo =
-                    shopService.getShopInfo(player.getCurrentShopId());
-                if (shopInfo != null) {
-                    shopWindowLogGenerator.generateShopStateLogs(builder, shopInfo, player, commandResult);
+            // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
+            if (playerId != null) {
+                Player player = playerSessionService.getPlayerState(playerId);
+                if (player != null && player.getCurrentShopId() != null) {
+                    com.heibai.clawworld.application.service.ShopService.ShopInfo shopInfo =
+                        shopService.getShopInfo(player.getCurrentShopId());
+                    if (shopInfo != null) {
+                        shopWindowLogGenerator.generateShopStateLogs(builder, shopInfo, player, commandResult);
+                    } else {
+                        builder.addState("指令响应", commandResult);
+                    }
                 } else {
                     builder.addState("指令响应", commandResult);
                 }
@@ -124,7 +145,10 @@ public class UnifiedResponseGenerator {
             builder.addState("窗口变化", windowChangeMsg);
 
             // 生成新窗口的内容
-            generateNewWindowContent(builder, playerId, newWindowType);
+            // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
+            if (playerId != null) {
+                generateNewWindowContent(builder, playerId, newWindowType);
+            }
         }
 
         return builder.build();
@@ -136,19 +160,23 @@ public class UnifiedResponseGenerator {
     public String generateErrorResponse(String playerId, String errorMessage) {
         GameLogBuilder builder = new GameLogBuilder();
 
-        Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
-        if (accountOpt.isPresent()) {
-            AccountEntity account = accountOpt.get();
-            // 添加客户端指令日志
-            if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
-                GameLog clientLog = GameLog.builder()
-                    .source(GameLog.Source.CLIENT)
-                    .timestamp(account.getLastCommandTimestamp())
-                    .type(GameLog.Type.COMMAND)
-                    .subType("发送指令")
-                    .content(account.getLastCommand())
-                    .build();
-                builder.addLog(clientLog);
+        // 只有当 playerId 不为 null 时才查询账号信息
+        // 避免查询 playerId=null 时返回多个未注册账号的问题
+        if (playerId != null) {
+            Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
+            if (accountOpt.isPresent()) {
+                AccountEntity account = accountOpt.get();
+                // 添加客户端指令日志
+                if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
+                    GameLog clientLog = GameLog.builder()
+                        .source(GameLog.Source.CLIENT)
+                        .timestamp(account.getLastCommandTimestamp())
+                        .type(GameLog.Type.COMMAND)
+                        .subType("发送指令")
+                        .content(account.getLastCommand())
+                        .build();
+                    builder.addLog(clientLog);
+                }
             }
         }
 
