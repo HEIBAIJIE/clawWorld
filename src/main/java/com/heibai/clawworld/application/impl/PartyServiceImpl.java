@@ -155,7 +155,9 @@ public class PartyServiceImpl implements PartyService {
         player.setPartyLeader(false);
         playerRepository.save(player);
 
-        return PartyResult.success("成功加入队伍", party.getId());
+        // 生成队伍状态描述
+        String partyInfo = generatePartyInfo(party);
+        return PartyResult.success("成功加入队伍\n" + partyInfo, party.getId());
     }
 
     @Override
@@ -514,5 +516,27 @@ public class PartyServiceImpl implements PartyService {
      */
     private boolean isExpired(Long timestamp) {
         return System.currentTimeMillis() - timestamp > 5 * 60 * 1000;
+    }
+
+    /**
+     * 生成队伍状态描述
+     */
+    private String generatePartyInfo(PartyEntity party) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("当前队伍成员(").append(party.getMemberIds().size()).append("/4)：\n");
+
+        for (String memberId : party.getMemberIds()) {
+            Optional<PlayerEntity> memberOpt = playerRepository.findById(memberId);
+            if (memberOpt.isPresent()) {
+                PlayerEntity member = memberOpt.get();
+                sb.append("  - ").append(member.getName());
+                if (memberId.equals(party.getLeaderId())) {
+                    sb.append(" [队长]");
+                }
+                sb.append("\n");
+            }
+        }
+
+        return sb.toString().trim();
     }
 }

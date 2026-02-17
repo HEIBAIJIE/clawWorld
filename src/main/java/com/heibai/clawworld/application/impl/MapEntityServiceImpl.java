@@ -33,6 +33,7 @@ public class MapEntityServiceImpl implements MapEntityService {
     private final PartyService partyService;
     private final TradeService tradeService;
     private final CombatService combatService;
+    private final CharacterInfoService characterInfoService;
 
     @Override
     public EntityInfo inspectCharacter(String playerId, String characterName) {
@@ -52,28 +53,13 @@ public class MapEntityServiceImpl implements MapEntityService {
         // 查找目标玩家（通过昵称匹配）
         for (PlayerEntity target : playersOnMap) {
             if (target.getName() != null && target.getName().equals(characterName)) {
-                // 构建详细的角色信息
-                StringBuilder info = new StringBuilder();
-
-                info.append("=== 角色信息 ===\n");
-                info.append("昵称: ").append(target.getName()).append("\n");
-                info.append("等级: ").append(target.getLevel()).append("\n");
-                info.append("位置: (").append(target.getX()).append(", ").append(target.getY()).append(")\n\n");
-
-                info.append("=== 生命与法力 ===\n");
-                info.append("生命值: ").append(target.getCurrentHealth()).append("/").append(target.getMaxHealth()).append("\n");
-                info.append("法力值: ").append(target.getCurrentMana()).append("/").append(target.getMaxMana()).append("\n\n");
-
-                info.append("=== 战斗属性 ===\n");
-                info.append("物理攻击: ").append(target.getPhysicalAttack()).append("\n");
-                info.append("物理防御: ").append(target.getPhysicalDefense()).append("\n");
-                info.append("法术攻击: ").append(target.getMagicAttack()).append("\n");
-                info.append("法术防御: ").append(target.getMagicDefense()).append("\n");
-                info.append("速度: ").append(target.getSpeed()).append("\n");
-                info.append("暴击率: ").append(String.format("%.1f%%", target.getCritRate() * 100)).append("\n");
-                info.append("暴击伤害: ").append(String.format("%.1f%%", target.getCritDamage() * 100)).append("\n");
-
-                return EntityInfo.success(characterName, "PLAYER", info.toString());
+                // 使用 CharacterInfoService 生成角色信息（不包含背包）
+                Player targetPlayer = playerSessionService.getPlayerState(target.getId());
+                if (targetPlayer != null) {
+                    String info = characterInfoService.generateOtherPlayerInfo(targetPlayer);
+                    return EntityInfo.success(characterName, "PLAYER", info);
+                }
+                return EntityInfo.error("无法获取玩家状态");
             }
         }
 

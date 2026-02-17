@@ -27,6 +27,8 @@ public class CommandServiceLocator {
     private final ChatService chatService;
     @Getter
     private final ShopService shopService;
+    @Getter
+    private final CharacterInfoService characterInfoService;
 
     public CommandServiceLocator(
             PlayerSessionService playerSessionService,
@@ -35,7 +37,8 @@ public class CommandServiceLocator {
             CombatService combatService,
             TradeService tradeService,
             ChatService chatService,
-            ShopService shopService) {
+            ShopService shopService,
+            CharacterInfoService characterInfoService) {
         this.playerSessionService = playerSessionService;
         this.mapEntityService = mapEntityService;
         this.partyService = partyService;
@@ -43,6 +46,7 @@ public class CommandServiceLocator {
         this.tradeService = tradeService;
         this.chatService = chatService;
         this.shopService = shopService;
+        this.characterInfoService = characterInfoService;
 
         // 设置单例实例
         CommandServiceLocator.instance = this;

@@ -1,14 +1,12 @@
 package com.heibai.clawworld.interfaces.log;
 
+import com.heibai.clawworld.application.service.CharacterInfoService;
 import com.heibai.clawworld.application.service.PartyService;
 import com.heibai.clawworld.domain.character.Party;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.chat.ChatMessage;
-import com.heibai.clawworld.domain.item.Equipment;
 import com.heibai.clawworld.domain.map.GameMap;
 import com.heibai.clawworld.domain.map.MapEntity;
-import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
-import com.heibai.clawworld.infrastructure.config.data.character.RoleConfig;
 import com.heibai.clawworld.infrastructure.persistence.entity.TradeEntity;
 import com.heibai.clawworld.infrastructure.persistence.repository.TradeRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 地图窗口日志生成器
@@ -25,7 +22,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MapWindowLogGenerator {
 
-    private final ConfigDataManager configDataManager;
+    private final CharacterInfoService characterInfoService;
     private final PartyService partyService;
     private final TradeRepository tradeRepository;
 
@@ -44,19 +41,19 @@ public class MapWindowLogGenerator {
         builder.addWindow("地图窗口", "地图：\n" + generateMapGrid(map, allEntities));
 
         // 3. 玩家状态
-        builder.addWindow("地图窗口", "你的状态：\n" + generatePlayerStatus(player));
+        builder.addWindow("地图窗口", "你的状态：\n" + characterInfoService.generatePlayerStatus(player));
 
         // 4. 技能
-        builder.addWindow("地图窗口", "你的技能：\n" + generateSkills(player));
+        builder.addWindow("地图窗口", "你的技能：\n" + characterInfoService.generateSkills(player));
 
         // 5. 装备
-        builder.addWindow("地图窗口", "你的装备：\n" + generateEquipment(player));
+        builder.addWindow("地图窗口", "你的装备：\n" + characterInfoService.generateEquipment(player));
 
         // 6. 背包
-        builder.addWindow("地图窗口", "你的背包：\n" + generateInventory(player));
+        builder.addWindow("地图窗口", "你的背包：\n" + characterInfoService.generateInventory(player));
 
         // 7. 组队情况
-        builder.addWindow("地图窗口", "你的组队情况：\n" + generatePartyInfo(player));
+        builder.addWindow("地图窗口", "你的组队情况：\n" + characterInfoService.generatePartyInfo(player));
 
         // 8. 地图实体
         builder.addWindow("地图窗口", map.getName() + "的地图实体：\n" + generateMapEntities(player, allEntities, map));
@@ -110,126 +107,6 @@ public class MapWindowLogGenerator {
         return sb.toString();
     }
 
-    private String generatePlayerStatus(Player player) {
-        RoleConfig role = configDataManager.getRole(player.getRoleId());
-        StringBuilder sb = new StringBuilder();
-        sb.append(String.format("角色: %s (%s) Lv.%d\n",
-            player.getName() != null ? player.getName() : "未命名",
-            role != null ? role.getName() : "未知",
-            player.getLevel()));
-        sb.append(String.format("位置: (%d, %d)\n", player.getX(), player.getY()));
-        // 显示经验进度：当前经验/升级所需经验 (百分比%)
-        int currentExp = player.getExperience();
-        int requiredExp = player.getExperienceForNextLevel();
-        int progressPercent = player.getExperienceProgressPercent();
-        sb.append(String.format("经验: %d/%d (%d%%)  金币: %d\n", currentExp, requiredExp, progressPercent, player.getGold()));
-        sb.append(String.format("力量%d 敏捷%d 智力%d 体力%d\n",
-            player.getStrength(), player.getAgility(),
-            player.getIntelligence(), player.getVitality()));
-        sb.append(String.format("生命%d/%d 法力%d/%d\n",
-            player.getCurrentHealth(), player.getMaxHealth(),
-            player.getCurrentMana(), player.getMaxMana()));
-        sb.append(String.format("物攻%d 物防%d 法攻%d 法防%d 速度%d",
-            player.getPhysicalAttack(), player.getPhysicalDefense(),
-            player.getMagicAttack(), player.getMagicDefense(), player.getSpeed()));
-        if (player.getFreeAttributePoints() > 0) {
-            sb.append(String.format("\n可用属性点: %d", player.getFreeAttributePoints()));
-        }
-        return sb.toString();
-    }
-
-    private String generateSkills(Player player) {
-        StringBuilder sb = new StringBuilder();
-        // 始终显示普通攻击
-        sb.append("- 普通攻击 [敌方单体] (消耗:0MP, 无CD) - 基础物理攻击\n");
-
-        if (player.getSkills() != null && !player.getSkills().isEmpty()) {
-            for (String skillId : player.getSkills()) {
-                // 跳过普通攻击，已经在上面显示了
-                if ("basic_attack".equals(skillId) || "普通攻击".equals(skillId)) {
-                    continue;
-                }
-                var skillConfig = configDataManager.getSkill(skillId);
-                if (skillConfig != null) {
-                    sb.append("- ").append(skillConfig.getName());
-                    sb.append(" [").append(getTargetTypeName(skillConfig.getTargetType())).append("]");
-                    sb.append(" (消耗:").append(skillConfig.getManaCost()).append("MP");
-                    if (skillConfig.getCooldown() > 0) {
-                        sb.append(", CD:").append(skillConfig.getCooldown()).append("回合");
-                    } else {
-                        sb.append(", 无CD");
-                    }
-                    sb.append(")");
-                    if (skillConfig.getDescription() != null && !skillConfig.getDescription().isEmpty()) {
-                        sb.append(" - ").append(skillConfig.getDescription());
-                    }
-                    sb.append("\n");
-                } else {
-                    sb.append("- ").append(skillId).append("\n");
-                }
-            }
-        }
-        return sb.toString();
-    }
-
-    private String getTargetTypeName(String targetType) {
-        if (targetType == null) {
-            return "未知";
-        }
-        return switch (targetType) {
-            case "ENEMY_SINGLE" -> "敌方单体";
-            case "ENEMY_ALL" -> "敌方群体";
-            case "ALLY_SINGLE" -> "我方单体";
-            case "ALLY_ALL" -> "我方群体";
-            case "SELF" -> "自己";
-            default -> targetType;
-        };
-    }
-
-    private String generateEquipment(Player player) {
-        StringBuilder sb = new StringBuilder();
-        if (player.getEquipment() != null && !player.getEquipment().isEmpty()) {
-            for (Map.Entry<Equipment.EquipmentSlot, Equipment> entry : player.getEquipment().entrySet()) {
-                sb.append(String.format("%s: %s\n",
-                    getSlotName(entry.getKey()),
-                    entry.getValue().getDisplayName()));
-            }
-        } else {
-            sb.append("无装备");
-        }
-        return sb.toString();
-    }
-
-    private String generateInventory(Player player) {
-        StringBuilder sb = new StringBuilder();
-        if (player.getInventory() != null && !player.getInventory().isEmpty()) {
-            for (Player.InventorySlot slot : player.getInventory()) {
-                if (slot.isItem()) {
-                    sb.append(String.format("%s x%d\n", slot.getItem().getName(), slot.getQuantity()));
-                } else if (slot.isEquipment()) {
-                    sb.append(String.format("%s\n", slot.getEquipment().getDisplayName()));
-                }
-            }
-        } else {
-            sb.append("背包为空");
-        }
-        return sb.toString();
-    }
-
-    private String generatePartyInfo(Player player) {
-        StringBuilder sb = new StringBuilder();
-        if (player.getPartyId() != null) {
-            if (player.isPartyLeader()) {
-                sb.append("你是队长\n");
-            } else {
-                sb.append("你在队伍中\n");
-            }
-            sb.append("队伍ID: ").append(player.getPartyId());
-        } else {
-            sb.append("你当前没有队伍");
-        }
-        return sb.toString();
-    }
 
     private String generateMapEntities(Player player, List<MapEntity> allEntities, GameMap map) {
         StringBuilder sb = new StringBuilder();
@@ -345,31 +222,42 @@ public class MapWindowLogGenerator {
         Party viewerParty = partyService.getPlayerParty(viewer.getId());
         Party targetParty = partyService.getPlayerParty(target.getId());
 
-        if (targetParty == null || targetParty.isSolo()) {
-            options.add("邀请组队");
-        }
+        // 检查是否在同一个队伍
+        boolean inSameParty = viewerParty != null && targetParty != null
+                && viewerParty.getId().equals(targetParty.getId());
 
-        if (targetParty != null && targetParty.getPendingInvitations() != null) {
-            boolean hasInvitation = targetParty.getPendingInvitations().stream()
-                    .anyMatch(inv -> inv.getInviterId().equals(target.getId())
-                            && inv.getInviteeId().equals(viewer.getId())
-                            && !inv.isExpired());
-            if (hasInvitation) {
-                options.add("接受组队邀请");
-                options.add("拒绝组队邀请");
+        // 如果不在同一个队伍，才显示组队相关选项
+        if (!inSameParty) {
+            // 目标没有队伍或只有临时队伍（等待被邀请者加入），可以邀请组队
+            if (targetParty == null || targetParty.isSolo()) {
+                options.add("邀请组队");
             }
-        }
 
-        if (targetParty != null && !targetParty.isSolo()) {
-            options.add("请求加入队伍");
-        }
+            // 检查是否有来自目标的组队邀请
+            if (viewerParty != null && viewerParty.getPendingInvitations() != null) {
+                boolean hasInvitation = viewerParty.getPendingInvitations().stream()
+                        .anyMatch(inv -> inv.getInviterId().equals(target.getId())
+                                && inv.getInviteeId().equals(viewer.getId())
+                                && !inv.isExpired());
+                if (hasInvitation) {
+                    options.add("接受组队邀请");
+                    options.add("拒绝组队邀请");
+                }
+            }
 
-        if (viewerParty != null && viewerParty.isLeader(viewer.getId()) && viewerParty.getPendingRequests() != null) {
-            boolean hasRequest = viewerParty.getPendingRequests().stream()
-                    .anyMatch(req -> req.getRequesterId().equals(target.getId()) && !req.isExpired());
-            if (hasRequest) {
-                options.add("接受组队请求");
-                options.add("拒绝组队请求");
+            // 目标有真正的队伍（2人以上），可以请求加入
+            if (targetParty != null && !targetParty.isSolo()) {
+                options.add("请求加入队伍");
+            }
+
+            // 检查是否有来自目标的加入请求（viewer是队长时）
+            if (viewerParty != null && viewerParty.isLeader(viewer.getId()) && viewerParty.getPendingRequests() != null) {
+                boolean hasRequest = viewerParty.getPendingRequests().stream()
+                        .anyMatch(req -> req.getRequesterId().equals(target.getId()) && !req.isExpired());
+                if (hasRequest) {
+                    options.add("接受组队请求");
+                    options.add("拒绝组队请求");
+                }
             }
         }
 
@@ -390,18 +278,5 @@ public class MapWindowLogGenerator {
             options.add("接受交易请求");
             options.add("拒绝交易请求");
         }
-    }
-
-    private String getSlotName(Equipment.EquipmentSlot slot) {
-        return switch (slot) {
-            case HEAD -> "头部";
-            case CHEST -> "上装";
-            case LEGS -> "下装";
-            case FEET -> "鞋子";
-            case LEFT_HAND -> "左手";
-            case RIGHT_HAND -> "右手";
-            case ACCESSORY1 -> "饰品1";
-            case ACCESSORY2 -> "饰品2";
-        };
     }
 }

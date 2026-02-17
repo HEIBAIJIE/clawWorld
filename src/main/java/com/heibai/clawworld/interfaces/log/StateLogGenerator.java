@@ -258,31 +258,42 @@ public class StateLogGenerator {
         Party viewerParty = partyService.getPlayerParty(viewer.getId());
         Party targetParty = partyService.getPlayerParty(target.getId());
 
-        if (targetParty == null || targetParty.isSolo()) {
-            options.add("邀请组队");
-        }
+        // 检查是否在同一个队伍
+        boolean inSameParty = viewerParty != null && targetParty != null
+                && viewerParty.getId().equals(targetParty.getId());
 
-        if (targetParty != null && targetParty.getPendingInvitations() != null) {
-            boolean hasInvitation = targetParty.getPendingInvitations().stream()
-                    .anyMatch(inv -> inv.getInviterId().equals(target.getId())
-                            && inv.getInviteeId().equals(viewer.getId())
-                            && !inv.isExpired());
-            if (hasInvitation) {
-                options.add("接受组队邀请");
-                options.add("拒绝组队邀请");
+        // 如果不在同一个队伍，才显示组队相关选项
+        if (!inSameParty) {
+            // 目标没有队伍或只有临时队伍（等待被邀请者加入），可以邀请组队
+            if (targetParty == null || targetParty.isSolo()) {
+                options.add("邀请组队");
             }
-        }
 
-        if (targetParty != null && !targetParty.isSolo()) {
-            options.add("请求加入队伍");
-        }
+            // 检查是否有来自目标的组队邀请
+            if (viewerParty != null && viewerParty.getPendingInvitations() != null) {
+                boolean hasInvitation = viewerParty.getPendingInvitations().stream()
+                        .anyMatch(inv -> inv.getInviterId().equals(target.getId())
+                                && inv.getInviteeId().equals(viewer.getId())
+                                && !inv.isExpired());
+                if (hasInvitation) {
+                    options.add("接受组队邀请");
+                    options.add("拒绝组队邀请");
+                }
+            }
 
-        if (viewerParty != null && viewerParty.isLeader(viewer.getId()) && viewerParty.getPendingRequests() != null) {
-            boolean hasRequest = viewerParty.getPendingRequests().stream()
-                    .anyMatch(req -> req.getRequesterId().equals(target.getId()) && !req.isExpired());
-            if (hasRequest) {
-                options.add("接受组队请求");
-                options.add("拒绝组队请求");
+            // 目标有真正的队伍（2人以上），可以请求加入
+            if (targetParty != null && !targetParty.isSolo()) {
+                options.add("请求加入队伍");
+            }
+
+            // 检查是否有来自目标的加入请求（viewer是队长时）
+            if (viewerParty != null && viewerParty.isLeader(viewer.getId()) && viewerParty.getPendingRequests() != null) {
+                boolean hasRequest = viewerParty.getPendingRequests().stream()
+                        .anyMatch(req -> req.getRequesterId().equals(target.getId()) && !req.isExpired());
+                if (hasRequest) {
+                    options.add("接受组队请求");
+                    options.add("拒绝组队请求");
+                }
             }
         }
 

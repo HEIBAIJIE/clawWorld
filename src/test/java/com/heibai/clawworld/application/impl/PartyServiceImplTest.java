@@ -125,7 +125,7 @@ class PartyServiceImplTest {
 
         // Assert
         assertTrue(result.isSuccess());
-        assertEquals("成功加入队伍", result.getMessage());
+        assertTrue(result.getMessage().contains("成功加入队伍"));
         verify(partyRepository).save(any(PartyEntity.class));
         verify(playerRepository).save(any(PlayerEntity.class));
     }

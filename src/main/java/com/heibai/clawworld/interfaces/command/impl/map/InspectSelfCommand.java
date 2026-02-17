@@ -1,5 +1,6 @@
 package com.heibai.clawworld.interfaces.command.impl.map;
 
+import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.interfaces.command.Command;
 import com.heibai.clawworld.interfaces.command.CommandContext;
 import com.heibai.clawworld.interfaces.command.CommandResult;
@@ -24,8 +25,13 @@ public class InspectSelfCommand extends Command {
 
     @Override
     public CommandResult execute(CommandContext context) {
-        String detailedStatus = CommandServiceLocator.getInstance().getPlayerSessionService()
-                .getPlayerDetailedStatus(context.getPlayerId());
+        Player player = CommandServiceLocator.getInstance().getPlayerSessionService()
+                .getPlayerState(context.getPlayerId());
+        if (player == null) {
+            return CommandResult.error("玩家不存在");
+        }
+        String detailedStatus = CommandServiceLocator.getInstance().getCharacterInfoService()
+                .generateSelfInfo(player);
         return CommandResult.success(detailedStatus);
     }
 
