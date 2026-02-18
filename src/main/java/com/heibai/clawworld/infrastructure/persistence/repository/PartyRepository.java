@@ -25,6 +25,11 @@ public interface PartyRepository extends MongoRepository<PartyEntity, String> {
     Optional<PartyEntity> findByMemberIdsContaining(String memberId);
 
     /**
+     * 根据阵营名称查找队伍
+     */
+    Optional<PartyEntity> findByFaction(String faction);
+
+    /**
      * 查找所有成员数量大于指定值的队伍
      */
     @Query("{ 'memberIds': { $exists: true, $not: { $size: 0 } } }")

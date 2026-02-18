@@ -499,7 +499,8 @@ public class PartyServiceImpl implements PartyService {
         party.setLeaderId(inviter.getId());
         party.setMemberIds(new ArrayList<>());
         party.getMemberIds().add(inviter.getId());
-        party.setFaction("PARTY_" + party.getId());
+        // 使用玩家名称生成阵营名，格式为 "#{玩家名}的队伍"
+        party.setFaction(generateFactionName(inviter.getName()));
         party.setCreatedTime(System.currentTimeMillis());
         party.setPendingInvitations(new ArrayList<>());
         party.setPendingRequests(new ArrayList<>());
@@ -510,6 +511,24 @@ public class PartyServiceImpl implements PartyService {
         playerRepository.save(inviter);
 
         return partyRepository.save(party);
+    }
+
+    /**
+     * 生成阵营名称
+     * 格式为 "#{玩家名}的队伍"，如果冲突则加上 #2, #3 等后缀
+     */
+    private String generateFactionName(String playerName) {
+        String baseFaction = playerName + "的队伍";
+        String faction = baseFaction;
+        int suffix = 2;
+
+        // 检查是否有冲突（理论上不会冲突，因为一个人只能有一个队伍）
+        while (partyRepository.findByFaction(faction).isPresent()) {
+            faction = baseFaction + "#" + suffix;
+            suffix++;
+        }
+
+        return faction;
     }
 
     /**

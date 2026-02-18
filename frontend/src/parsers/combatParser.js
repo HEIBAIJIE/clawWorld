@@ -227,12 +227,16 @@ function parseTargetType(text) {
 
 /**
  * 解析战斗动作（从战斗日志中提取）
- * @param {string} content - 日志内容
+ * @param {string} content - 日志内容（可能带有 [#序号] 前缀）
  * @returns {object|null} 动作信息
  */
 export function parseCombatAction(content) {
+  // 去掉可能的序号前缀 "[#序号] "
+  const logMatch = content.match(/^\[#\d+\]\s*(.+)$/)
+  const actionContent = logMatch ? logMatch[1] : content
+
   // 使用技能: "小小 对 史莱姆#1 使用了 普通攻击"
-  const skillMatch = content.match(/^(.+?)\s+对\s+(.+?)\s+使用了\s+(.+)$/)
+  const skillMatch = actionContent.match(/^(.+?)\s+对\s+(.+?)\s+使用了\s+(.+)$/)
   if (skillMatch) {
     return {
       type: 'skill',
@@ -243,7 +247,7 @@ export function parseCombatAction(content) {
   }
 
   // 造成伤害: "造成了 29 点伤害" 或 "造成了 29 点伤害（暴击！）"
-  const damageMatch = content.match(/^造成了\s*(\d+)\s*点伤害(?:（(暴击！?)）)?$/)
+  const damageMatch = actionContent.match(/^造成了\s*(\d+)\s*点伤害(?:（(暴击！?)）)?$/)
   if (damageMatch) {
     return {
       type: 'damage',
@@ -253,7 +257,7 @@ export function parseCombatAction(content) {
   }
 
   // 治疗: "恢复了 50 点生命值"
-  const healMatch = content.match(/^恢复了\s*(\d+)\s*点生命值$/)
+  const healMatch = actionContent.match(/^恢复了\s*(\d+)\s*点生命值$/)
   if (healMatch) {
     return {
       type: 'heal',
@@ -262,7 +266,7 @@ export function parseCombatAction(content) {
   }
 
   // 击败: "史莱姆#1 被击败了！"
-  const defeatMatch = content.match(/^(.+?)\s*被击败了！?$/)
+  const defeatMatch = actionContent.match(/^(.+?)\s*被击败了！?$/)
   if (defeatMatch) {
     return {
       type: 'defeat',
@@ -271,7 +275,7 @@ export function parseCombatAction(content) {
   }
 
   // 回合开始: "=== 轮到 小小 的回合 ==="
-  const turnMatch = content.match(/^===\s*轮到\s*(.+?)\s*的回合\s*===$/)
+  const turnMatch = actionContent.match(/^===\s*轮到\s*(.+?)\s*的回合\s*===$/)
   if (turnMatch) {
     return {
       type: 'turn',
@@ -280,7 +284,7 @@ export function parseCombatAction(content) {
   }
 
   // 等待行动: "小小 等待行动..."
-  const waitMatch = content.match(/^(.+?)\s*等待行动/)
+  const waitMatch = actionContent.match(/^(.+?)\s*等待行动/)
   if (waitMatch) {
     return {
       type: 'wait',
@@ -288,8 +292,8 @@ export function parseCombatAction(content) {
     }
   }
 
-  // 胜利: "阵营 PARTY_xxx 获得胜利！"
-  const victoryMatch = content.match(/^阵营\s*(\S+)\s*获得胜利/)
+  // 胜利: "阵营 xxx 获得胜利！"
+  const victoryMatch = actionContent.match(/^阵营\s*(\S+)\s*获得胜利/)
   if (victoryMatch) {
     return {
       type: 'victory',
@@ -298,12 +302,12 @@ export function parseCombatAction(content) {
   }
 
   // 战利品分配
-  if (content.includes('战利品分配')) {
+  if (actionContent.includes('战利品分配')) {
     return { type: 'loot_header' }
   }
 
-  // 经验分配: "每人获得经验: 200 (共2人)"
-  const expMatch = content.match(/每人获得经验[：:]\s*(\d+)/)
+  // 经验分配: "每人获得经验: 200 (共2人)" 或 "小小 获得经验: 100"
+  const expMatch = actionContent.match(/获得经验[：:]\s*(\d+)/)
   if (expMatch) {
     return {
       type: 'exp',
@@ -311,8 +315,8 @@ export function parseCombatAction(content) {
     }
   }
 
-  // 金钱分配: "金钱平分: 每人 50 (总计100)"
-  const goldMatch = content.match(/金钱平分[：:]\s*每人\s*(\d+)/)
+  // 金钱分配: "金钱平分: 每人 50 (总计100)" 或 "小小 获得金钱: 50"
+  const goldMatch = actionContent.match(/(?:金钱平分[：:]\s*每人\s*|获得金钱[：:]\s*)(\d+)/)
   if (goldMatch) {
     return {
       type: 'gold',
@@ -346,6 +350,7 @@ export function parseCommandResponse(content) {
     const actionContent = logMatch ? logMatch[1] : trimmed
 
     const action = parseCombatAction(actionContent)
+
     if (action) {
       if (action.type === 'skill') {
         currentAction = action

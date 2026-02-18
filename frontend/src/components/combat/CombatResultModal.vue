@@ -56,6 +56,7 @@ const isVictory = computed(() => {
 function handleConfirm() {
   combatStore.closeCombatResult()
   combatStore.reset()
+  // 战斗结束后切换到地图窗口
   mapStore.setWindowType('map')
 }
 </script>

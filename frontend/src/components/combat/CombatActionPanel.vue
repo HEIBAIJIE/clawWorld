@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCombatStore } from '../../stores/combatStore'
 import { useCommand } from '../../composables/useCommand'
 import SkillPanel from './SkillPanel.vue'
@@ -71,6 +71,30 @@ const showSkillPanel = ref(false)
 const showInventoryPanel = ref(false)
 
 const countdownPercent = computed(() => (combatStore.turnCountdown / 10) * 100)
+
+// 倒计时到0时自动发送wait
+function handleTimeout() {
+  // 如果已经显示结算，不发送wait
+  if (combatStore.showResult) {
+    return
+  }
+  if (combatStore.isMyTurn && !combatStore.autoWaitPending) {
+    combatStore.autoWaitPending = true
+    sendCommand('wait').finally(() => {
+      combatStore.autoWaitPending = false
+    })
+  }
+}
+
+// 组件挂载时设置超时回调
+onMounted(() => {
+  combatStore.setTimeoutCallback(handleTimeout)
+})
+
+// 组件卸载时清除回调
+onUnmounted(() => {
+  combatStore.setTimeoutCallback(null)
+})
 
 // 普通攻击（敌方单体技能）
 function handleAttack() {

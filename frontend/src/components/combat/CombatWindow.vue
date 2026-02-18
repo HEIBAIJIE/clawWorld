@@ -1,5 +1,5 @@
 <template>
-  <div class="combat-overlay" v-if="combatStore.isInCombat">
+  <div class="combat-overlay" v-if="combatStore.isInCombat || combatStore.showResult">
     <div class="combat-window sci-panel">
       <!-- 行动条区域 -->
       <ActionBarDisplay />

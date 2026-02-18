@@ -16,7 +16,7 @@
       <MapView />
 
       <!-- 战斗窗口（覆盖在地图上） -->
-      <CombatWindow v-if="mapStore.windowType === 'combat'" />
+      <CombatWindow v-if="mapStore.windowType === 'combat' || combatStore.showResult" />
     </div>
 
     <!-- 功能按钮栏 -->
@@ -33,6 +33,7 @@
 <script setup>
 import { useUIStore } from '../../stores/uiStore'
 import { useMapStore } from '../../stores/mapStore'
+import { useCombatStore } from '../../stores/combatStore'
 import MapView from '../map/MapView.vue'
 import ActionBar from '../panels/ActionBar.vue'
 import CharacterPanel from '../panels/CharacterPanel.vue'
@@ -43,6 +44,7 @@ import CombatWindow from '../combat/CombatWindow.vue'
 
 const uiStore = useUIStore()
 const mapStore = useMapStore()
+const combatStore = useCombatStore()
 </script>
 
 <style scoped>

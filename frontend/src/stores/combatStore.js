@@ -42,6 +42,12 @@ export const useCombatStore = defineStore('combat', () => {
   // 自动wait标记
   const autoWaitPending = ref(false)
 
+  // 倒计时到0时的回调函数
+  const onTimeoutCallback = ref(null)
+
+  // 战斗序列号（用于防止跨战斗的回调触发）
+  const combatSequence = ref(0)
+
   // 战斗特效队列
   const effectQueue = ref([])
 
@@ -100,7 +106,16 @@ export const useCombatStore = defineStore('combat', () => {
 
   // 更新战斗状态
   function updateCombatState(data) {
-    if (data.isInCombat !== undefined) isInCombat.value = data.isInCombat
+    if (data.isInCombat !== undefined) {
+      isInCombat.value = data.isInCombat
+      // 进入新战斗时，重置结算状态并递增战斗序列号
+      if (data.isInCombat) {
+        showResult.value = false
+        combatResult.value = null
+        combatSequence.value++
+        stopCountdown() // 停止旧战斗的倒计时
+      }
+    }
     if (data.combatId !== undefined) combatId.value = data.combatId
     if (data.factions !== undefined) {
       factions.value = data.factions
@@ -199,9 +214,34 @@ export const useCombatStore = defineStore('combat', () => {
   function startCountdown() {
     stopCountdown()
     turnCountdown.value = 10
+    // 记录启动倒计时时的状态
+    const wasMyTurn = isMyTurn.value
+    const startSequence = combatSequence.value
     countdownTimer.value = setInterval(() => {
+      // 如果战斗序列号变了，说明进入了新战斗，停止旧的倒计时
+      if (combatSequence.value !== startSequence) {
+        stopCountdown()
+        return
+      }
+      // 如果已经显示结算，停止倒计时
+      if (showResult.value) {
+        stopCountdown()
+        return
+      }
       if (turnCountdown.value > 0) {
         turnCountdown.value--
+        // 倒计时到0时，如果启动时是自己的回合且现在仍是自己的回合，触发自动wait
+        if (turnCountdown.value === 0) {
+          // 再次检查：如果已经显示结算，不触发回调
+          if (showResult.value) {
+            stopCountdown()
+            return
+          }
+          if (wasMyTurn && isMyTurn.value && onTimeoutCallback.value) {
+            stopCountdown() // 先停止倒计时，避免重复触发
+            onTimeoutCallback.value()
+          }
+        }
       } else {
         stopCountdown()
       }
@@ -214,6 +254,11 @@ export const useCombatStore = defineStore('combat', () => {
       clearInterval(countdownTimer.value)
       countdownTimer.value = null
     }
+  }
+
+  // 设置倒计时超时回调
+  function setTimeoutCallback(callback) {
+    onTimeoutCallback.value = callback
   }
 
   // 进入目标选择模式
@@ -259,6 +304,10 @@ export const useCombatStore = defineStore('combat', () => {
 
   // 显示战斗结果
   function showCombatResult(result) {
+    // 停止倒计时并清除回调，防止战斗结束后继续触发
+    stopCountdown()
+    onTimeoutCallback.value = null
+    isMyTurn.value = false
     combatResult.value = result
     showResult.value = true
   }
@@ -282,6 +331,7 @@ export const useCombatStore = defineStore('combat', () => {
     battleLogs.value = []
     turnCountdown.value = 10
     stopCountdown()
+    combatSequence.value++ // 递增序列号，使旧的回调失效
     targetSelectionMode.value = false
     pendingSkill.value = null
     hoveredTarget.value = null
@@ -305,7 +355,7 @@ export const useCombatStore = defineStore('combat', () => {
     allies, enemies, enemyFactions, aliveEnemies, aliveAllies, currentActor,
     // 方法
     getCharacter, updateCombatState, addBattleLog, updateCharacter,
-    startCountdown, stopCountdown,
+    startCountdown, stopCountdown, setTimeoutCallback,
     enterTargetSelection, exitTargetSelection, setHoveredTarget,
     addEffect, removeEffect, clearExpiredEffects,
     showCombatResult, closeCombatResult, reset

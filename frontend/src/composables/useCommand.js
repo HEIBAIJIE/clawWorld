@@ -384,8 +384,11 @@ export function useCommand() {
           mapStore.setWindowType('combat')
           combatStore.updateCombatState({ isInCombat: true })
         } else if (content.includes('切换到地图窗口')) {
-          mapStore.setWindowType('map')
-          combatStore.reset()
+          // 如果正在显示战斗结果，不要切换窗口类型，让战斗窗口继续显示
+          if (!combatStore.showResult) {
+            mapStore.setWindowType('map')
+            combatStore.reset()
+          }
         }
         break
 
@@ -491,7 +494,8 @@ export function useCommand() {
         }
 
         // 处理战斗中的指令响应（包含战斗结果）
-        if (combatStore.isInCombat) {
+        // 注意：即使 isInCombat 已经被重置，也要检查是否包含战斗结果
+        if (combatStore.isInCombat || content.includes('获得胜利')) {
           processCombatCommandResponse(content)
         }
         break
@@ -677,9 +681,11 @@ export function useCommand() {
    */
   function processCombatLog(content) {
     const action = parseCombatAction(content)
-    if (!action) return
 
+    // 添加到战斗日志
     combatStore.addBattleLog({ content, action })
+
+    if (!action) return
 
     // 根据动作类型添加特效
     if (action.type === 'damage') {
@@ -697,6 +703,27 @@ export function useCommand() {
         type: 'defeat',
         text: `${action.target} 被击败!`
       })
+    } else if (action.type === 'victory') {
+      // 战斗胜利，初始化战斗结果
+      if (!combatStore.combatResult) {
+        const isMyVictory = action.faction === combatStore.myFaction
+        combatStore.showCombatResult({
+          victory: isMyVictory,
+          experience: 0,
+          gold: 0,
+          items: []
+        })
+      }
+    } else if (action.type === 'exp') {
+      // 更新经验值
+      if (combatStore.combatResult) {
+        combatStore.combatResult.experience = action.amount
+      }
+    } else if (action.type === 'gold') {
+      // 更新金币
+      if (combatStore.combatResult) {
+        combatStore.combatResult.gold = action.amount
+      }
     }
   }
 

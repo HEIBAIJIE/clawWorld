@@ -41,6 +41,10 @@ function getFactionLabel(factionId) {
   if (factionId.startsWith('PLAYER_')) {
     return '敌方玩家'
   }
+  // 新格式：玩家名的队伍
+  if (factionId.endsWith('的队伍')) {
+    return factionId
+  }
   return factionId
 }
 

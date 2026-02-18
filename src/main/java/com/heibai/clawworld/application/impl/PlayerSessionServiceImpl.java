@@ -81,7 +81,8 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         player.setRoleId(roleConfig.getId());
         player.setLevel(1);
         player.setExperience(0);
-        player.setFaction("PLAYER_" + player.getId());
+        // 使用玩家名称生成阵营名，格式为 "#{玩家名}的队伍"（单人时也用这个格式保持一致）
+        player.setFaction(playerName + "的队伍");
 
         // 初始化四维属性
         player.setStrength(0);

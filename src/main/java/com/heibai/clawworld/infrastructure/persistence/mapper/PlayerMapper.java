@@ -150,8 +150,8 @@ public class PlayerMapper {
         // 基础属性
         player.setLevel(entity.getLevel());
         player.setExperience(entity.getExperience());
-        // 玩家阵营：没有队伍时阵营为"PLAYER_" + playerId，有队伍时需要在Service层设置为队伍的faction
-        player.setFaction("PLAYER_" + entity.getId());
+        // 玩家阵营：没有队伍时阵营为"#{玩家名}的队伍"，有队伍时需要在Service层设置为队伍的faction
+        player.setFaction(entity.getName() + "的队伍");
 
         // 四维属性
         player.setStrength(entity.getStrength());

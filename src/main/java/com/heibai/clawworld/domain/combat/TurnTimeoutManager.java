@@ -7,18 +7,18 @@ import java.util.concurrent.*;
 
 /**
  * 回合超时管理器
- * 负责管理玩家回合的10秒超时机制
+ * 负责管理玩家回合的超时机制
  *
  * 工作原理：
- * 1. 当轮到某个玩家的回合时，启动10秒定时器
- * 2. 如果玩家在10秒内行动，取消定时器
- * 3. 如果10秒超时，自动执行空过（通过回调通知CombatEngine）
+ * 1. 当轮到某个玩家的回合时，启动12秒定时器（前端显示10秒，留2秒缓冲）
+ * 2. 如果玩家在12秒内行动，取消定时器
+ * 3. 如果12秒超时，自动执行空过（通过回调通知CombatEngine）
  */
 @Slf4j
 public class TurnTimeoutManager {
 
-    // 回合超时时间：10秒
-    private static final long TURN_TIMEOUT_SECONDS = 10;
+    // 回合超时时间：12秒（前端显示10秒，留2秒缓冲避免前端自动wait与后端超时冲突）
+    private static final long TURN_TIMEOUT_SECONDS = 12;
 
     // 定时器线程池
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2, r -> {
