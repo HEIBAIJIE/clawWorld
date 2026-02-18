@@ -56,6 +56,12 @@ export function useCommand() {
       const errorMsg = error.response?.data?.response || error.message || '网络错误'
       console.error('[Command] 指令执行失败:', errorMsg)
       logStore.appendRawText('\n' + errorMsg)
+      // 即使指令失败（如400错误），也要解析响应内容
+      // 因为服务端可能在错误响应中返回了窗口切换等重要信息
+      if (error.response?.data?.response) {
+        console.log('[Command] 解析错误响应中的内容')
+        processResponse(error.response.data.response)
+      }
       return { success: false, message: errorMsg }
     } finally {
       sessionStore.isWaiting = false
