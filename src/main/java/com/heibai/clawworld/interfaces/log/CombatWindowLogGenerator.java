@@ -52,14 +52,15 @@ public class CombatWindowLogGenerator {
         for (Combat.CombatParty party : combat.getParties()) {
             for (Combat.CombatCharacter character : party.getCharacters()) {
                 String statusIcon = character.getCurrentHealth() <= 0 ? "☠" : "♥";
-                participantsStatus.append(String.format("%s %s - HP:%d/%d MP:%d/%d 速度:%d",
+                participantsStatus.append(String.format("%s %s - HP:%d/%d MP:%d/%d 速度:%d 阵营:%s",
                     statusIcon,
                     character.getName(),
                     character.getCurrentHealth(),
                     character.getMaxHealth(),
                     character.getCurrentMana(),
                     character.getMaxMana(),
-                    character.getSpeed()));
+                    character.getSpeed(),
+                    party.getFaction()));
                 if (playerId != null && playerId.equals(character.getCharacterId())) {
                     participantsStatus.append(" (你)");
                 }
@@ -184,13 +185,14 @@ public class CombatWindowLogGenerator {
         for (Combat.CombatParty party : combat.getParties()) {
             for (Combat.CombatCharacter character : party.getCharacters()) {
                 String statusIcon = character.getCurrentHealth() <= 0 ? "☠" : "♥";
-                statusChanges.append(String.format("%s %s - HP:%d/%d MP:%d/%d",
+                statusChanges.append(String.format("%s %s - HP:%d/%d MP:%d/%d 阵营:%s",
                     statusIcon,
                     character.getName(),
                     character.getCurrentHealth(),
                     character.getMaxHealth(),
                     character.getCurrentMana(),
-                    character.getMaxMana()));
+                    character.getMaxMana(),
+                    party.getFaction()));
                 if (playerId != null && playerId.equals(character.getCharacterId())) {
                     statusChanges.append(" (你)");
                 }

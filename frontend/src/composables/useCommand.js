@@ -9,7 +9,10 @@ import { gameApi } from '../api/game'
 import { parseLogText, groupLogsByType, extractBySubType } from '../parsers/logParser'
 import { parseMapGrid, parseEntityList, parseMapInfo, parseMoveToInteract } from '../parsers/mapParser'
 import { parsePlayerState, parseSkills, parseEquipment, parseInventory, parsePartyInfo } from '../parsers/playerParser'
-import { parseFactions, parseCharacterStatus, parseActionBar, parseCombatStatus } from '../parsers/combatParser'
+import {
+  parseFactions, parseCharacterStatus, parseActionBar, parseCombatStatus,
+  parseSkillList, parseCombatAction, parseCommandResponse, needsAutoWait
+} from '../parsers/combatParser'
 
 /**
  * 指令发送和响应处理的composable
@@ -106,6 +109,11 @@ export function useCommand() {
         if (skills.length > 0) {
           playerStore.updateFromParsed({ skills })
         }
+        // 同时更新战斗技能列表
+        const combatSkills = parseSkillList(content)
+        if (combatSkills.length > 0) {
+          combatStore.updateCombatState({ mySkills: combatSkills })
+        }
         break
 
       case '装备栏':
@@ -168,7 +176,14 @@ export function useCommand() {
 
       case '角色状态':
         const characters = parseCharacterStatus(content)
-        combatStore.updateCombatState({ characters })
+        // 先找到自己的名字
+        const selfChar = characters.find(c => c.isSelf)
+        // 同时更新角色和自己的名字，确保 myFaction 能正确计算
+        if (selfChar) {
+          combatStore.updateCombatState({ characters, myName: selfChar.name })
+        } else {
+          combatStore.updateCombatState({ characters })
+        }
         break
 
       case '行动条':
@@ -182,6 +197,19 @@ export function useCommand() {
           isMyTurn: status.isMyTurn,
           currentTurn: status.waitingFor
         })
+        // 轮到自己回合时启动倒计时
+        if (status.isMyTurn) {
+          combatStore.startCountdown()
+        }
+        // 自动wait机制：检测到需要等待时自动发送wait
+        if (status.needsAutoWait && !combatStore.autoWaitPending) {
+          combatStore.autoWaitPending = true
+          setTimeout(() => {
+            sendCommand('wait').finally(() => {
+              combatStore.autoWaitPending = false
+            })
+          }, 100)
+        }
         break
 
       // ===== 兼容旧格式（地图窗口） =====
@@ -350,11 +378,14 @@ export function useCommand() {
 
     switch (subType) {
       case '窗口变化':
-        if (content.includes('地图窗口')) {
+        // 注意：内容格式是 "你已经从XXX窗口切换到YYY窗口"
+        // 需要检查"切换到"后面的目标窗口类型
+        if (content.includes('切换到战斗窗口')) {
+          mapStore.setWindowType('combat')
+          combatStore.updateCombatState({ isInCombat: true })
+        } else if (content.includes('切换到地图窗口')) {
           mapStore.setWindowType('map')
           combatStore.reset()
-        } else if (content.includes('战斗窗口')) {
-          mapStore.setWindowType('combat')
         }
         break
 
@@ -364,6 +395,52 @@ export function useCommand() {
 
       case '队伍变化':
         processPartyChange(content)
+        break
+
+      case '角色状态':
+        // 状态日志中的角色状态更新
+        if (combatStore.isInCombat) {
+          const stateCharacters = parseCharacterStatus(content)
+          const stateSelfChar = stateCharacters.find(c => c.isSelf)
+          // 同时更新角色和自己的名字
+          if (stateSelfChar) {
+            combatStore.updateCombatState({ characters: stateCharacters, myName: stateSelfChar.name })
+          } else {
+            combatStore.updateCombatState({ characters: stateCharacters })
+          }
+        }
+        break
+
+      case '行动条':
+        // 状态日志中的行动条更新
+        if (combatStore.isInCombat) {
+          const stateActionBar = parseActionBar(content)
+          combatStore.updateCombatState({ actionBar: stateActionBar })
+        }
+        break
+
+      case '当前状态':
+        // 状态日志中的当前状态更新
+        if (combatStore.isInCombat) {
+          const stateStatus = parseCombatStatus(content)
+          combatStore.updateCombatState({
+            isMyTurn: stateStatus.isMyTurn,
+            currentTurn: stateStatus.waitingFor
+          })
+          // 轮到自己回合时启动倒计时
+          if (stateStatus.isMyTurn) {
+            combatStore.startCountdown()
+          }
+          // 自动wait机制
+          if (stateStatus.needsAutoWait && !combatStore.autoWaitPending) {
+            combatStore.autoWaitPending = true
+            setTimeout(() => {
+              sendCommand('wait').finally(() => {
+                combatStore.autoWaitPending = false
+              })
+            }, 100)
+          }
+        }
         break
 
       case '指令响应':
@@ -412,10 +489,16 @@ export function useCommand() {
         if (content.includes('队伍已解散')) {
           partyStore.reset()
         }
+
+        // 处理战斗中的指令响应（包含战斗结果）
+        if (combatStore.isInCombat) {
+          processCombatCommandResponse(content)
+        }
         break
 
       case '战斗日志':
-        // 战斗日志已在战斗窗口处理
+        // 解析战斗日志并添加特效
+        processCombatLog(content)
         break
     }
   }
@@ -587,6 +670,67 @@ export function useCommand() {
         mapStore.updateEntity(entity.name, { distance, isInRange })
       }
     })
+  }
+
+  /**
+   * 处理战斗日志，添加战斗特效
+   */
+  function processCombatLog(content) {
+    const action = parseCombatAction(content)
+    if (!action) return
+
+    combatStore.addBattleLog({ content, action })
+
+    // 根据动作类型添加特效
+    if (action.type === 'damage') {
+      combatStore.addEffect({
+        type: action.isCrit ? 'crit' : 'damage',
+        text: action.isCrit ? `${action.amount} 暴击!` : `-${action.amount}`
+      })
+    } else if (action.type === 'heal') {
+      combatStore.addEffect({
+        type: 'heal',
+        text: `+${action.amount}`
+      })
+    } else if (action.type === 'defeat') {
+      combatStore.addEffect({
+        type: 'defeat',
+        text: `${action.target} 被击败!`
+      })
+    }
+  }
+
+  /**
+   * 处理战斗中的指令响应
+   */
+  function processCombatCommandResponse(content) {
+    const result = parseCommandResponse(content)
+
+    // 处理战斗动作特效
+    for (const action of result.actions) {
+      if (action.type === 'skill' && action.damage !== undefined) {
+        combatStore.addEffect({
+          type: action.isCrit ? 'crit' : 'damage',
+          text: action.isCrit ? `${action.damage} 暴击!` : `-${action.damage}`
+        })
+      } else if (action.type === 'defeat') {
+        combatStore.addEffect({
+          type: 'defeat',
+          text: `${action.target} 被击败!`
+        })
+      }
+    }
+
+    // 处理战斗结束
+    if (result.combatEnd) {
+      // 判断是否是自己的阵营获胜
+      const isMyVictory = result.combatEnd.winnerFaction === combatStore.myFaction
+      combatStore.showCombatResult({
+        victory: isMyVictory,
+        experience: result.combatEnd.experience || 0,
+        gold: result.combatEnd.gold || 0
+      })
+    }
   }
 
   /**

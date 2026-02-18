@@ -32,15 +32,17 @@ export function parseFactions(content) {
 /**
  * 解析角色状态
  * 输入格式:
- * "♥ 小小 - HP:116/135 MP:50/55 速度:105 (你)"
- * "☠ 史莱姆#1 - HP:0/50 MP:0/0 速度:80"
+ * "♥ 小小 - HP:116/135 MP:50/55 速度:105 阵营:PARTY_xxx (你)"
+ * "☠ 史莱姆#1 - HP:0/50 MP:0/0 速度:80 阵营:enemy_wolf"
  * @param {string} content - 角色状态文本
  * @returns {array} 角色状态数组
  */
 export function parseCharacterStatus(content) {
   const characters = []
   const lines = content.split('\n')
-  const statusPattern = /^([♥☠])\s*(.+?)\s*-\s*HP[：:](\d+)\/(\d+)\s*MP[：:](\d+)\/(\d+)(?:\s*速度[：:](\d+))?(?:\s*\(你\))?$/
+  // 支持带阵营和不带阵营的格式
+  // 格式: ♥ 小小 - HP:146/180 MP:55/65 速度:111 阵营:PLAYER_xxx (你)
+  const statusPattern = /^([♥☠])\s*(.+?)\s*-\s*HP[：:](\d+)\/(\d+)\s*MP[：:](\d+)\/(\d+)(?:\s*速度[：:](\d+))?(?:\s*阵营[：:]([^\s(]+))?/
 
   for (const line of lines) {
     const match = line.trim().match(statusPattern)
@@ -53,6 +55,7 @@ export function parseCharacterStatus(content) {
         currentMana: parseInt(match[5]),
         maxMana: parseInt(match[6]),
         speed: match[7] ? parseInt(match[7]) : null,
+        faction: match[8] || null,
         isSelf: line.includes('(你)')
       })
     }
@@ -125,7 +128,8 @@ export function parseCombatStatus(content) {
   return {
     isMyTurn: content.includes('★ 轮到你的回合'),
     isWaiting: content.includes('未轮到你的回合'),
-    waitingFor: extractWaitingFor(content)
+    waitingFor: extractWaitingFor(content),
+    needsAutoWait: needsAutoWait(content)
   }
 }
 
@@ -138,6 +142,15 @@ function extractWaitingFor(content) {
 }
 
 /**
+ * 检测是否需要自动wait
+ * @param {string} content - 状态文本
+ * @returns {boolean}
+ */
+export function needsAutoWait(content) {
+  return content.includes('未轮到你的回合，请输入wait继续等待')
+}
+
+/**
  * 解析战斗结果
  * @param {string} content - 结果文本
  * @returns {object|null} 战斗结果
@@ -147,9 +160,11 @@ export function parseCombatResult(content) {
   if (content.includes('获得胜利')) {
     const expMatch = content.match(/每人获得经验[：:]\s*(\d+)/)
     const goldMatch = content.match(/每人\s*(\d+)/)
+    const factionMatch = content.match(/阵营\s*(\S+)\s*获得胜利/)
 
     return {
       victory: true,
+      winnerFaction: factionMatch ? factionMatch[1] : null,
       experience: expMatch ? parseInt(expMatch[1]) : 0,
       gold: goldMatch ? parseInt(goldMatch[1]) : 0
     }
@@ -167,11 +182,208 @@ export function parseCombatResult(content) {
   return null
 }
 
+/**
+ * 解析技能列表
+ * 输入格式:
+ * "- 普通攻击 [敌方单体] (消耗:0MP, 无CD)"
+ * "- 火球术 [敌方单体] (消耗:10MP, CD:2回合)"
+ * @param {string} content - 技能列表文本
+ * @returns {array} 技能数组
+ */
+export function parseSkillList(content) {
+  const skills = []
+  const lines = content.split('\n')
+  const skillPattern = /^-\s*(.+?)\s*\[([^\]]+)\]\s*\(消耗[：:](\d+)MP(?:,\s*(?:无CD|CD[：:](\d+)回合))?\)/
+
+  for (const line of lines) {
+    const match = line.trim().match(skillPattern)
+    if (match) {
+      skills.push({
+        name: match[1].trim(),
+        targetType: parseTargetType(match[2]),
+        targetTypeText: match[2],
+        manaCost: parseInt(match[3]),
+        cooldown: match[4] ? parseInt(match[4]) : 0
+      })
+    }
+  }
+
+  return skills
+}
+
+/**
+ * 解析目标类型
+ */
+function parseTargetType(text) {
+  switch (text) {
+    case '敌方单体': return 'ENEMY_SINGLE'
+    case '敌方群体': return 'ENEMY_ALL'
+    case '我方单体': return 'ALLY_SINGLE'
+    case '我方群体': return 'ALLY_ALL'
+    case '自己': return 'SELF'
+    default: return 'UNKNOWN'
+  }
+}
+
+/**
+ * 解析战斗动作（从战斗日志中提取）
+ * @param {string} content - 日志内容
+ * @returns {object|null} 动作信息
+ */
+export function parseCombatAction(content) {
+  // 使用技能: "小小 对 史莱姆#1 使用了 普通攻击"
+  const skillMatch = content.match(/^(.+?)\s+对\s+(.+?)\s+使用了\s+(.+)$/)
+  if (skillMatch) {
+    return {
+      type: 'skill',
+      attacker: skillMatch[1].trim(),
+      target: skillMatch[2].trim(),
+      skillName: skillMatch[3].trim()
+    }
+  }
+
+  // 造成伤害: "造成了 29 点伤害" 或 "造成了 29 点伤害（暴击！）"
+  const damageMatch = content.match(/^造成了\s*(\d+)\s*点伤害(?:（(暴击！?)）)?$/)
+  if (damageMatch) {
+    return {
+      type: 'damage',
+      amount: parseInt(damageMatch[1]),
+      isCrit: !!damageMatch[2]
+    }
+  }
+
+  // 治疗: "恢复了 50 点生命值"
+  const healMatch = content.match(/^恢复了\s*(\d+)\s*点生命值$/)
+  if (healMatch) {
+    return {
+      type: 'heal',
+      amount: parseInt(healMatch[1])
+    }
+  }
+
+  // 击败: "史莱姆#1 被击败了！"
+  const defeatMatch = content.match(/^(.+?)\s*被击败了！?$/)
+  if (defeatMatch) {
+    return {
+      type: 'defeat',
+      target: defeatMatch[1].trim()
+    }
+  }
+
+  // 回合开始: "=== 轮到 小小 的回合 ==="
+  const turnMatch = content.match(/^===\s*轮到\s*(.+?)\s*的回合\s*===$/)
+  if (turnMatch) {
+    return {
+      type: 'turn',
+      character: turnMatch[1].trim()
+    }
+  }
+
+  // 等待行动: "小小 等待行动..."
+  const waitMatch = content.match(/^(.+?)\s*等待行动/)
+  if (waitMatch) {
+    return {
+      type: 'wait',
+      character: waitMatch[1].trim()
+    }
+  }
+
+  // 胜利: "阵营 PARTY_xxx 获得胜利！"
+  const victoryMatch = content.match(/^阵营\s*(\S+)\s*获得胜利/)
+  if (victoryMatch) {
+    return {
+      type: 'victory',
+      faction: victoryMatch[1]
+    }
+  }
+
+  // 战利品分配
+  if (content.includes('战利品分配')) {
+    return { type: 'loot_header' }
+  }
+
+  // 经验分配: "每人获得经验: 200 (共2人)"
+  const expMatch = content.match(/每人获得经验[：:]\s*(\d+)/)
+  if (expMatch) {
+    return {
+      type: 'exp',
+      amount: parseInt(expMatch[1])
+    }
+  }
+
+  // 金钱分配: "金钱平分: 每人 50 (总计100)"
+  const goldMatch = content.match(/金钱平分[：:]\s*每人\s*(\d+)/)
+  if (goldMatch) {
+    return {
+      type: 'gold',
+      amount: parseInt(goldMatch[1])
+    }
+  }
+
+  return null
+}
+
+/**
+ * 从指令响应中解析战斗结果
+ * @param {string} content - 指令响应内容
+ * @returns {object|null} 战斗结果
+ */
+export function parseCommandResponse(content) {
+  const result = {
+    actions: [],
+    combatEnd: null
+  }
+
+  const lines = content.split('\n')
+  let currentAction = null
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+
+    // 检查是否是带序号的日志
+    const logMatch = trimmed.match(/^\[#\d+\]\s*(.+)$/)
+    const actionContent = logMatch ? logMatch[1] : trimmed
+
+    const action = parseCombatAction(actionContent)
+    if (action) {
+      if (action.type === 'skill') {
+        currentAction = action
+        result.actions.push(action)
+      } else if (action.type === 'damage' && currentAction) {
+        currentAction.damage = action.amount
+        currentAction.isCrit = action.isCrit
+      } else if (action.type === 'defeat') {
+        result.actions.push(action)
+      } else if (action.type === 'victory') {
+        result.combatEnd = {
+          victory: true,
+          winnerFaction: action.faction
+        }
+      } else if (action.type === 'exp') {
+        if (result.combatEnd) {
+          result.combatEnd.experience = action.amount
+        }
+      } else if (action.type === 'gold') {
+        if (result.combatEnd) {
+          result.combatEnd.gold = action.amount
+        }
+      }
+    }
+  }
+
+  return result
+}
+
 export default {
   parseFactions,
   parseCharacterStatus,
   parseActionBar,
   parseBattleLogs,
   parseCombatStatus,
-  parseCombatResult
+  parseCombatResult,
+  parseSkillList,
+  parseCombatAction,
+  parseCommandResponse,
+  needsAutoWait
 }

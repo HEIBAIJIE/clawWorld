@@ -12,7 +12,12 @@
     </div>
 
     <!-- 地图视图 -->
-    <MapView />
+    <div class="map-container">
+      <MapView />
+
+      <!-- 战斗窗口（覆盖在地图上） -->
+      <CombatWindow v-if="mapStore.windowType === 'combat'" />
+    </div>
 
     <!-- 功能按钮栏 -->
     <ActionBar />
@@ -34,12 +39,19 @@ import CharacterPanel from '../panels/CharacterPanel.vue'
 import InventoryPanel from '../panels/InventoryPanel.vue'
 import PartyPanel from '../panels/PartyPanel.vue'
 import EntityListPanel from '../panels/EntityListPanel.vue'
+import CombatWindow from '../combat/CombatWindow.vue'
 
 const uiStore = useUIStore()
 const mapStore = useMapStore()
 </script>
 
 <style scoped>
+.game-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .map-header {
   display: flex;
   align-items: center;
@@ -77,5 +89,11 @@ const mapStore = useMapStore()
   font-size: 11px;
   color: var(--text-muted);
   margin-left: auto;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
 }
 </style>
