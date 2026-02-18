@@ -177,6 +177,8 @@ export function parseInventory(content) {
   for (const line of lines) {
     const trimmed = line.trim()
     if (!trimmed || trimmed === '背包为空') continue
+    // 跳过标题行
+    if (trimmed.includes('你的背包') || trimmed.startsWith('背包')) continue
 
     // 带数量的物品: "小型生命药水 x1"
     const stackMatch = trimmed.match(/^(.+?)\s+x(\d+)$/)

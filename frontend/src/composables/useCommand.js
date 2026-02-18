@@ -4,6 +4,7 @@ import { usePlayerStore } from '../stores/playerStore'
 import { useMapStore } from '../stores/mapStore'
 import { usePartyStore } from '../stores/partyStore'
 import { useCombatStore } from '../stores/combatStore'
+import { useUIStore } from '../stores/uiStore'
 import { gameApi } from '../api/game'
 import { parseLogText, groupLogsByType, extractBySubType } from '../parsers/logParser'
 import { parseMapGrid, parseEntityList, parseMapInfo, parseMoveToInteract } from '../parsers/mapParser'
@@ -20,6 +21,7 @@ export function useCommand() {
   const mapStore = useMapStore()
   const partyStore = usePartyStore()
   const combatStore = useCombatStore()
+  const uiStore = useUIStore()
 
   /**
    * 发送指令
@@ -130,10 +132,22 @@ export function useCommand() {
       }
     }
 
-    // 玩家状态
-    if (content.includes('你的状态') || content.includes('角色:') || content.includes('角色：')) {
+    // 玩家状态（自己的状态）
+    if (content.includes('你的状态')) {
       const playerState = parsePlayerState(content)
       playerStore.updateFromParsed(playerState)
+    }
+    // 查看其他角色（包含"角色:"但不包含"你的状态"）
+    else if ((content.includes('角色:') || content.includes('角色：')) && !content.includes('你的状态')) {
+      const characterData = parsePlayerState(content)
+      // 检查是否是查看自己（名字相同）
+      if (characterData.name && characterData.name !== playerStore.name) {
+        characterData.rawText = content
+        uiStore.openInspectCharacter(characterData)
+      } else if (characterData.name === playerStore.name) {
+        // 更新自己的状态
+        playerStore.updateFromParsed(characterData)
+      }
     }
 
     // 技能列表
@@ -185,6 +199,75 @@ export function useCommand() {
         })
       })
     }
+
+    // 查看物品（包含物品详情关键字）
+    if (content.includes('物品详情') || content.includes('装备详情') ||
+        (content.includes('类型:') && (content.includes('攻击') || content.includes('防御') || content.includes('效果')))) {
+      const itemData = parseItemDetails(content)
+      if (itemData.name) {
+        uiStore.openInspectItem(itemData)
+      }
+    }
+  }
+
+  /**
+   * 解析物品详情
+   */
+  function parseItemDetails(content) {
+    const result = { rawText: content }
+    const lines = content.split('\n')
+
+    // 第一行通常是物品名称
+    if (lines.length > 0) {
+      const firstLine = lines[0].trim()
+      if (firstLine && !firstLine.includes(':') && !firstLine.includes('：')) {
+        result.name = firstLine
+      }
+    }
+
+    // 解析类型
+    const typeMatch = content.match(/类型[：:]\s*(.+)/)
+    if (typeMatch) {
+      result.type = typeMatch[1].trim()
+    }
+
+    // 解析描述
+    const descMatch = content.match(/描述[：:]\s*(.+)/)
+    if (descMatch) {
+      result.description = descMatch[1].trim()
+    }
+
+    // 解析属性
+    result.stats = {}
+    const statPatterns = [
+      { pattern: /物理攻击[：:]\s*\+?(\d+)/, key: 'physicalAttack' },
+      { pattern: /物理防御[：:]\s*\+?(\d+)/, key: 'physicalDefense' },
+      { pattern: /魔法攻击[：:]\s*\+?(\d+)/, key: 'magicAttack' },
+      { pattern: /魔法防御[：:]\s*\+?(\d+)/, key: 'magicDefense' },
+      { pattern: /生命[：:]\s*\+?(\d+)/, key: 'health' },
+      { pattern: /法力[：:]\s*\+?(\d+)/, key: 'mana' },
+      { pattern: /力量[：:]\s*\+?(\d+)/, key: 'strength' },
+      { pattern: /敏捷[：:]\s*\+?(\d+)/, key: 'agility' },
+      { pattern: /智力[：:]\s*\+?(\d+)/, key: 'intelligence' },
+      { pattern: /体力[：:]\s*\+?(\d+)/, key: 'vitality' },
+      { pattern: /速度[：:]\s*\+?(\d+)/, key: 'speed' }
+    ]
+
+    for (const { pattern, key } of statPatterns) {
+      const match = content.match(pattern)
+      if (match) {
+        result.stats[key] = parseInt(match[1])
+      }
+    }
+
+    // 解析等级要求
+    const levelReqMatch = content.match(/等级要求[：:]\s*(\d+)/)
+    if (levelReqMatch) {
+      result.requirements = result.requirements || {}
+      result.requirements.level = parseInt(levelReqMatch[1])
+    }
+
+    return result
   }
 
   /**
@@ -203,7 +286,20 @@ export function useCommand() {
         }
         break
       case '指令响应':
-        // 可以在这里处理特定的指令响应
+        // 处理移动完成响应
+        const moveMatch = content.match(/移动完成，当前位置[：:]\s*\((\d+),\s*(\d+)\)/)
+        if (moveMatch) {
+          playerStore.updateFromParsed({
+            x: parseInt(moveMatch[1]),
+            y: parseInt(moveMatch[2])
+          })
+        }
+
+        // 处理加点响应
+        if (content.includes('添加属性点成功')) {
+          const playerState = parsePlayerState(content)
+          playerStore.updateFromParsed(playerState)
+        }
         break
       case '战斗日志':
         // 战斗日志已在战斗窗口处理

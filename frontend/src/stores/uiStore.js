@@ -9,6 +9,14 @@ export const useUIStore = defineStore('ui', () => {
   const interactionTarget = ref(null)
   const showInteractionModal = ref(false)
 
+  // 查看角色弹窗
+  const inspectCharacter = ref(null)
+  const showInspectCharacterModal = ref(false)
+
+  // 查看物品弹窗
+  const inspectItem = ref(null)
+  const showInspectItemModal = ref(false)
+
   // 右键菜单
   const contextMenu = ref({
     visible: false,
@@ -51,6 +59,30 @@ export const useUIStore = defineStore('ui', () => {
     showInteractionModal.value = false
   }
 
+  // 打开查看角色弹窗
+  function openInspectCharacter(characterData) {
+    inspectCharacter.value = characterData
+    showInspectCharacterModal.value = true
+  }
+
+  // 关闭查看角色弹窗
+  function closeInspectCharacter() {
+    inspectCharacter.value = null
+    showInspectCharacterModal.value = false
+  }
+
+  // 打开查看物品弹窗
+  function openInspectItem(itemData) {
+    inspectItem.value = itemData
+    showInspectItemModal.value = true
+  }
+
+  // 关闭查看物品弹窗
+  function closeInspectItem() {
+    inspectItem.value = null
+    showInspectItemModal.value = false
+  }
+
   // 显示右键菜单
   function showContextMenu(x, y, items, target = null) {
     contextMenu.value = {
@@ -83,11 +115,15 @@ export const useUIStore = defineStore('ui', () => {
     // 状态
     activePanel,
     interactionTarget, showInteractionModal,
+    inspectCharacter, showInspectCharacterModal,
+    inspectItem, showInspectItemModal,
     contextMenu,
     toast,
     // 方法
     togglePanel, closePanel,
     openInteraction, closeInteraction,
+    openInspectCharacter, closeInspectCharacter,
+    openInspectItem, closeInspectItem,
     showContextMenu, hideContextMenu,
     showToast
   }

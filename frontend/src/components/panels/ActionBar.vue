@@ -19,9 +19,6 @@
       title="背包 (2)"
     >
       🎒
-      <span class="badge" v-if="inventoryCount > 0">
-        {{ inventoryCount }}
-      </span>
     </button>
 
     <button
@@ -31,9 +28,6 @@
       title="队伍 (3)"
     >
       👥
-      <span class="badge" v-if="partyStore.memberCount > 1">
-        {{ partyStore.memberCount }}
-      </span>
     </button>
 
     <button
@@ -43,32 +37,14 @@
       title="实体列表 (4)"
     >
       📋
-      <span class="badge" v-if="nearbyEnemyCount > 0">
-        {{ nearbyEnemyCount }}
-      </span>
     </button>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { useUIStore } from '../../stores/uiStore'
 import { usePlayerStore } from '../../stores/playerStore'
-import { usePartyStore } from '../../stores/partyStore'
-import { useMapStore } from '../../stores/mapStore'
 
 const uiStore = useUIStore()
 const playerStore = usePlayerStore()
-const partyStore = usePartyStore()
-const mapStore = useMapStore()
-
-// 背包物品数量
-const inventoryCount = computed(() => playerStore.inventory.length)
-
-// 附近敌人数量
-const nearbyEnemyCount = computed(() => {
-  return mapStore.entities.filter(e =>
-    e.type === 'ENEMY' && e.distance <= 8
-  ).length
-})
 </script>
