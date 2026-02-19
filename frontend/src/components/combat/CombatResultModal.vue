@@ -42,15 +42,37 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useCombatStore } from '../../stores/combatStore'
 import { useMapStore } from '../../stores/mapStore'
+import { useAgentStore } from '../../stores/agentStore'
 
 const combatStore = useCombatStore()
 const mapStore = useMapStore()
+const agentStore = useAgentStore()
 
 const isVictory = computed(() => {
   return combatStore.combatResult?.victory ?? false
+})
+
+// AI代理模式下自动关闭定时器
+let autoCloseTimer = null
+
+onMounted(() => {
+  // 如果智能代理开启，1秒后自动关闭战利品窗口
+  if (agentStore.isEnabled) {
+    autoCloseTimer = setTimeout(() => {
+      handleConfirm()
+    }, 1000)
+  }
+})
+
+onUnmounted(() => {
+  // 清理定时器
+  if (autoCloseTimer) {
+    clearTimeout(autoCloseTimer)
+    autoCloseTimer = null
+  }
 })
 
 function handleConfirm() {

@@ -5,6 +5,7 @@ import { useMapStore } from '../stores/mapStore'
 import { usePartyStore } from '../stores/partyStore'
 import { useCombatStore } from '../stores/combatStore'
 import { useUIStore } from '../stores/uiStore'
+import { useAgentStore } from '../stores/agentStore'
 import { gameApi } from '../api/game'
 import { parseLogText, groupLogsByType, extractBySubType } from '../parsers/logParser'
 import { parseSpecialTerrain, buildMapGrid, parseEntityList, parseMapInfo, parseMoveToInteract } from '../parsers/mapParser'
@@ -25,6 +26,7 @@ export function useCommand() {
   const partyStore = usePartyStore()
   const combatStore = useCombatStore()
   const uiStore = useUIStore()
+  const agentStore = useAgentStore()
 
   /**
    * 发送指令
@@ -539,6 +541,27 @@ export function useCommand() {
         // 处理队伍解散响应
         if (content.includes('队伍已解散')) {
           partyStore.reset()
+        }
+
+        // 处理查看信息响应（从GUI发起的interact查看或inspect）
+        // 智能代理模式下不弹出弹窗，避免干扰AI操作
+        if (!agentStore.isEnabled) {
+          // 敌人信息
+          if (content.includes('=== 敌人信息 ===')) {
+            uiStore.openInfoModal('查看敌人', content.replace('=== 敌人信息 ===', '').trim())
+          }
+          // NPC信息
+          else if (content.includes('=== NPC信息 ===')) {
+            uiStore.openInfoModal('查看NPC', content.replace('=== NPC信息 ===', '').trim())
+          }
+          // 角色信息（其他玩家）
+          else if (content.includes('=== 角色信息 ===')) {
+            uiStore.openInfoModal('查看角色', content.replace('=== 角色信息 ===', '').trim())
+          }
+          // 物品详情
+          else if (content.includes('=== 物品详情 ===')) {
+            uiStore.openInfoModal('查看物品', content.replace('=== 物品详情 ===', '').trim())
+          }
         }
 
         // 处理战斗中的指令响应（包含战斗结果）

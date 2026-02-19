@@ -21,6 +21,9 @@
     <!-- 查看物品弹窗 -->
     <InspectItemModal />
 
+    <!-- 通用信息弹窗 -->
+    <InfoModal />
+
     <!-- 右键菜单 -->
     <ContextMenu />
 
@@ -39,6 +42,7 @@ import LogPanel from '../components/layout/LogPanel.vue'
 import InteractionModal from '../components/modals/InteractionModal.vue'
 import InspectCharacterModal from '../components/modals/InspectCharacterModal.vue'
 import InspectItemModal from '../components/modals/InspectItemModal.vue'
+import InfoModal from '../components/modals/InfoModal.vue'
 import ContextMenu from '../components/modals/ContextMenu.vue'
 
 const uiStore = useUIStore()

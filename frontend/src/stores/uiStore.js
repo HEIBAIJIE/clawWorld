@@ -17,6 +17,13 @@ export const useUIStore = defineStore('ui', () => {
   const inspectItem = ref(null)
   const showInspectItemModal = ref(false)
 
+  // 通用信息弹窗（用于显示敌人、NPC等信息）
+  const infoModal = ref({
+    visible: false,
+    title: '',
+    content: ''
+  })
+
   // 右键菜单
   const contextMenu = ref({
     visible: false,
@@ -91,6 +98,22 @@ export const useUIStore = defineStore('ui', () => {
     showInspectItemModal.value = false
   }
 
+  // 打开通用信息弹窗
+  function openInfoModal(title, content) {
+    console.log('[UIStore] 打开信息弹窗:', title)
+    infoModal.value = {
+      visible: true,
+      title,
+      content
+    }
+  }
+
+  // 关闭通用信息弹窗
+  function closeInfoModal() {
+    console.log('[UIStore] 关闭信息弹窗')
+    infoModal.value.visible = false
+  }
+
   // 显示右键菜单
   function showContextMenu(x, y, items, target = null) {
     console.log('[UIStore] 显示右键菜单:', { x, y, items: items.length, target: target?.name })
@@ -127,6 +150,7 @@ export const useUIStore = defineStore('ui', () => {
     interactionTarget, showInteractionModal,
     inspectCharacter, showInspectCharacterModal,
     inspectItem, showInspectItemModal,
+    infoModal,
     contextMenu,
     toast,
     // 方法
@@ -134,6 +158,7 @@ export const useUIStore = defineStore('ui', () => {
     openInteraction, closeInteraction,
     openInspectCharacter, closeInspectCharacter,
     openInspectItem, closeInspectItem,
+    openInfoModal, closeInfoModal,
     showContextMenu, hideContextMenu,
     showToast
   }
