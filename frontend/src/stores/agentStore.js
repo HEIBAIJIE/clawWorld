@@ -29,6 +29,9 @@ export const useAgentStore = defineStore('agent', () => {
   // 是否正在等待大模型响应
   const isThinking = ref(false)
 
+  // 上一次的思考内容（用于显示）
+  const lastThinking = ref('')
+
   // 配置是否完整
   const isConfigured = computed(() => {
     return config.value.gameGoal.trim() !== '' &&
@@ -75,7 +78,13 @@ export const useAgentStore = defineStore('agent', () => {
   function disable() {
     isEnabled.value = false
     isThinking.value = false
+    lastThinking.value = ''
     console.log('[AgentStore] 智能代理已关闭')
+  }
+
+  // 设置思考内容
+  function setThinking(thinking) {
+    lastThinking.value = thinking
   }
 
   // 添加对话历史
@@ -113,11 +122,13 @@ export const useAgentStore = defineStore('agent', () => {
     conversationHistory,
     pendingCombatLogs,
     isThinking,
+    lastThinking,
     isConfigured,
     restoreConfig,
     saveConfig,
     enable,
     disable,
+    setThinking,
     addMessage,
     clearHistory,
     addPendingCombatLog,

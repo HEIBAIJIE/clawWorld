@@ -138,14 +138,19 @@ ${agentStore.config.behaviorStyle}
 
   /**
    * 解析大模型响应，提取指令
+   * @returns {{ success: boolean, thinking: string, command: string, raw: string }}
    */
   function parseResponse(responseText) {
     try {
       // 尝试直接解析JSON
       const parsed = JSON.parse(responseText)
-      return {
-        thinking: parsed.thinking || '',
-        command: parsed.command || 'wait'
+      if (parsed.command && typeof parsed.command === 'string') {
+        return {
+          success: true,
+          thinking: parsed.thinking || '',
+          command: parsed.command,
+          raw: responseText
+        }
       }
     } catch (e) {
       // 尝试从文本中提取JSON
@@ -153,21 +158,37 @@ ${agentStore.config.behaviorStyle}
       if (jsonMatch) {
         try {
           const parsed = JSON.parse(jsonMatch[0])
-          return {
-            thinking: parsed.thinking || '',
-            command: parsed.command || 'wait'
+          if (parsed.command && typeof parsed.command === 'string') {
+            return {
+              success: true,
+              thinking: parsed.thinking || '',
+              command: parsed.command,
+              raw: responseText
+            }
           }
         } catch (e2) {
-          console.error('[Agent] JSON解析失败:', e2)
+          // 继续尝试其他方式
         }
       }
-      // 如果都失败了，尝试提取command
+      // 尝试提取command字段
       const commandMatch = responseText.match(/"command"\s*:\s*"([^"]+)"/)
       if (commandMatch) {
-        return { thinking: '', command: commandMatch[1] }
+        const thinkingMatch = responseText.match(/"thinking"\s*:\s*"([^"]*)"/)
+        return {
+          success: true,
+          thinking: thinkingMatch ? thinkingMatch[1] : '',
+          command: commandMatch[1],
+          raw: responseText
+        }
       }
-      console.error('[Agent] 无法解析响应:', responseText)
-      return { thinking: '', command: 'wait' }
+    }
+    // 解析失败
+    console.error('[Agent] 无法解析响应:', responseText)
+    return {
+      success: false,
+      thinking: '',
+      command: '',
+      raw: responseText
     }
   }
 
@@ -277,11 +298,28 @@ ${agentStore.config.behaviorStyle}
         console.log('[Agent] 大模型响应:', llmResponse)
 
         // 解析响应
-        const { thinking, command } = parseResponse(llmResponse)
-        console.log('[Agent] 解析结果:', { thinking, command })
+        const parseResult = parseResponse(llmResponse)
+        console.log('[Agent] 解析结果:', parseResult)
 
         // 记录大模型的响应
         agentStore.addMessage('assistant', llmResponse)
+
+        // 检查解析是否成功
+        if (!parseResult.success) {
+          console.warn('[Agent] 响应格式错误，要求大模型重新回答')
+          // 告诉大模型格式有问题
+          agentStore.addMessage('user',
+            `你的上一条响应格式不正确，无法解析。你的响应是：\n${llmResponse}\n\n` +
+            `请严格按照JSON格式响应：{"thinking":"简短思考","command":"指令"}\n` +
+            `不要添加任何额外的文字、解释或markdown代码块。`
+          )
+          // 继续循环，让大模型重新回答
+          await new Promise(resolve => setTimeout(resolve, 500))
+          continue
+        }
+
+        // 更新思考内容显示
+        agentStore.setThinking(parseResult.thinking)
 
         agentStore.isThinking = false
 
@@ -291,7 +329,7 @@ ${agentStore.config.behaviorStyle}
         }
 
         // 发送指令到游戏服务器
-        await sendCommand(command)
+        await sendCommand(parseResult.command)
 
         // 短暂延迟，等待响应处理完成
         await new Promise(resolve => setTimeout(resolve, 1000))

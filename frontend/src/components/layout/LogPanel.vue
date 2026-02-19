@@ -14,7 +14,7 @@
       <!-- 智能代理思考状态 -->
       <div class="agent-thinking" v-if="agentStore.isThinking">
         <span class="thinking-dot"></span>
-        <span>AI思考中...</span>
+        <span>AI思考中... {{ agentStore.lastThinking }}</span>
       </div>
     </div>
 
