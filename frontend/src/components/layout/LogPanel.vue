@@ -10,6 +10,7 @@
         <span class="token-label">约</span>
         <span class="token-count">{{ logStore.formattedTokenCount }}</span>
         <span class="token-label">tokens</span>
+        <span class="token-hint" v-if="agentStore.isEnabled">(实际)</span>
       </div>
       <!-- 智能代理思考状态 -->
       <div class="agent-thinking" v-if="agentStore.isThinking">
@@ -196,6 +197,12 @@ watch(() => logStore.rawText, async () => {
 .token-count {
   color: var(--primary);
   font-weight: 600;
+}
+
+.token-hint {
+  color: var(--primary);
+  font-size: 9px;
+  margin-left: 2px;
 }
 
 .command-input-section {

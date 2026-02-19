@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { estimateTokenCount, formatTokenCount } from '../utils/tokenCounter'
+import { useAgentStore } from './agentStore'
 
 export const useLogStore = defineStore('log', () => {
   // 原始日志文本
@@ -9,8 +10,20 @@ export const useLogStore = defineStore('log', () => {
   // 解析后的日志条目
   const entries = ref([])
 
-  // Token计数
-  const tokenCount = computed(() => estimateTokenCount(rawText.value))
+  // 文本窗口的Token计数（仅供参考）
+  const textTokenCount = computed(() => estimateTokenCount(rawText.value))
+
+  // 实际发送给LLM的Token计数（更准确）
+  const tokenCount = computed(() => {
+    const agentStore = useAgentStore()
+    // 如果agent已启用且有对话历史，使用实际的token计数
+    if (agentStore.isEnabled && agentStore.conversationHistory.length > 0) {
+      return agentStore.actualTokenCount
+    }
+    // 否则使用文本窗口的估算
+    return textTokenCount.value
+  })
+
   const formattedTokenCount = computed(() => formatTokenCount(tokenCount.value))
 
   // 添加原始文本

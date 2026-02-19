@@ -15,6 +15,12 @@
     <div class="map-container">
       <MapView />
 
+      <!-- 左上角角色状态HUD -->
+      <PlayerStatusHUD />
+
+      <!-- 左下角聊天框 -->
+      <ChatBox />
+
       <!-- 战斗窗口（覆盖在地图上） -->
       <CombatWindow v-if="mapStore.windowType === 'combat' || combatStore.showResult" />
     </div>
@@ -41,6 +47,8 @@ import InventoryPanel from '../panels/InventoryPanel.vue'
 import PartyPanel from '../panels/PartyPanel.vue'
 import EntityListPanel from '../panels/EntityListPanel.vue'
 import CombatWindow from '../combat/CombatWindow.vue'
+import PlayerStatusHUD from '../hud/PlayerStatusHUD.vue'
+import ChatBox from '../hud/ChatBox.vue'
 
 const uiStore = useUIStore()
 const mapStore = useMapStore()

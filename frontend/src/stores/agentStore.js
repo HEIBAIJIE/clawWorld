@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { estimateTokenCount } from '../utils/tokenCounter'
 
 export const useAgentStore = defineStore('agent', () => {
   // 智能代理开关
@@ -116,6 +117,25 @@ export const useAgentStore = defineStore('agent', () => {
     return logs
   }
 
+  // 计算实际发送给LLM的token数
+  const actualTokenCount = computed(() => {
+    if (conversationHistory.value.length === 0) {
+      return 0
+    }
+    // 计算所有消息的token数
+    let total = 0
+    for (const msg of conversationHistory.value) {
+      total += estimateTokenCount(msg.content)
+      // 每条消息还有role等元数据，约4 tokens
+      total += 4
+    }
+    // 加上待处理的战斗日志
+    for (const log of pendingCombatLogs.value) {
+      total += estimateTokenCount(log)
+    }
+    return total
+  })
+
   return {
     isEnabled,
     config,
@@ -124,6 +144,7 @@ export const useAgentStore = defineStore('agent', () => {
     isThinking,
     lastThinking,
     isConfigured,
+    actualTokenCount,
     restoreConfig,
     saveConfig,
     enable,
