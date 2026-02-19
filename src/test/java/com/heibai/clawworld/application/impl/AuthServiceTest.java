@@ -9,8 +9,6 @@ import com.heibai.clawworld.domain.service.PlayerLevelService;
 import com.heibai.clawworld.infrastructure.factory.MapInitializationService;
 import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
-import com.heibai.clawworld.interfaces.log.BackgroundLogGenerator;
-import com.heibai.clawworld.interfaces.log.GameLogBuilder;
 import com.heibai.clawworld.interfaces.log.MapWindowLogGenerator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,9 +36,6 @@ class AuthServiceTest {
 
     @Mock
     private PlayerSessionService playerSessionService;
-
-    @Mock
-    private BackgroundLogGenerator backgroundLogGenerator;
 
     @Mock
     private MapWindowLogGenerator mapWindowLogGenerator;
@@ -83,10 +78,6 @@ class AuthServiceTest {
         when(accountRepository.findByUsername("newuser")).thenReturn(Optional.empty());
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        GameLogBuilder mockBuilder = new GameLogBuilder();
-        mockBuilder.addBackground("test", "Welcome to ClawWorld!");
-        when(backgroundLogGenerator.generateBackgroundLogs(null)).thenReturn(mockBuilder);
-
         // Act
         AuthService.LoginResult result = authService.loginOrRegister("newuser", "newpass");
 
@@ -98,7 +89,6 @@ class AuthServiceTest {
         assertTrue(result.isNewUser());
 
         verify(accountRepository).save(any(AccountEntity.class));
-        verify(backgroundLogGenerator).generateBackgroundLogs(null);
     }
 
     @Test
@@ -116,10 +106,6 @@ class AuthServiceTest {
 
         // Mock trade cleanup
         when(tradeRepository.findActiveTradesByPlayerId(any(), anyString())).thenReturn(new ArrayList<>());
-
-        GameLogBuilder mockBuilder = new GameLogBuilder();
-        mockBuilder.addBackground("test", "Welcome back!");
-        when(backgroundLogGenerator.generateBackgroundLogs(any())).thenReturn(mockBuilder);
 
         GameMap mockMap = new GameMap();
         mockMap.setId("starter_village");
@@ -141,7 +127,6 @@ class AuthServiceTest {
         verify(accountRepository).save(any(AccountEntity.class));
         verify(playerSessionService, times(2)).getPlayerState("player1"); // 调用两次：升级前和升级后
         verify(playerLevelService).processLevelUp(any(Player.class));
-        verify(backgroundLogGenerator).generateBackgroundLogs(any());
     }
 
     @Test
@@ -159,7 +144,6 @@ class AuthServiceTest {
         assertNull(result.getContent());
 
         verify(accountRepository, never()).save(any());
-        verify(backgroundLogGenerator, never()).generateBackgroundLogs(any());
     }
 
     @Test
@@ -168,10 +152,6 @@ class AuthServiceTest {
         testAccount.setPlayerId(null);
         when(accountRepository.findByUsername("testuser")).thenReturn(Optional.of(testAccount));
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        GameLogBuilder mockBuilder = new GameLogBuilder();
-        mockBuilder.addBackground("test", "Welcome!");
-        when(backgroundLogGenerator.generateBackgroundLogs(null)).thenReturn(mockBuilder);
 
         // Act
         AuthService.LoginResult result = authService.loginOrRegister("testuser", "testpass");
@@ -183,7 +163,6 @@ class AuthServiceTest {
         assertTrue(result.isNewUser());
 
         verify(playerSessionService, never()).getPlayerState(anyString());
-        verify(backgroundLogGenerator).generateBackgroundLogs(null);
     }
 
     @Test

@@ -11,7 +11,6 @@ import com.heibai.clawworld.domain.service.PlayerLevelService;
 import com.heibai.clawworld.infrastructure.factory.MapInitializationService;
 import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
-import com.heibai.clawworld.interfaces.log.BackgroundLogGenerator;
 import com.heibai.clawworld.interfaces.log.GameLogBuilder;
 import com.heibai.clawworld.interfaces.log.MapWindowLogGenerator;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +31,6 @@ public class AuthService {
 
     private final AccountRepository accountRepository;
     private final PlayerSessionService playerSessionService;
-    private final BackgroundLogGenerator backgroundLogGenerator;
     private final MapWindowLogGenerator mapWindowLogGenerator;
     private final MapInitializationService mapInitializationService;
     private final MapEntityService mapEntityService;
@@ -101,9 +99,6 @@ public class AuthService {
                 player = playerSessionService.getPlayerState(account.getPlayerId());
             }
 
-            // 生成背景日志
-            GameLogBuilder backgroundBuilder = backgroundLogGenerator.generateBackgroundLogs(player);
-
             // 生成窗口内容
             GameLogBuilder windowBuilder = new GameLogBuilder();
             if (player != null) {
@@ -124,10 +119,7 @@ public class AuthService {
                 windowBuilder.addWindow("注册窗口", "可选职业：战士、游侠、法师、牧师");
             }
 
-            // 合并背景和窗口内容
-            String fullContent = backgroundBuilder.build() + "\n" + windowBuilder.build();
-
-            return LoginResult.success(sessionId, fullContent, account.getPlayerId() == null);
+            return LoginResult.success(sessionId, windowBuilder.build(), account.getPlayerId() == null);
         } else {
             // 账号不存在，创建新账号
             AccountEntity newAccount = new AccountEntity();
@@ -146,19 +138,13 @@ public class AuthService {
 
             accountRepository.save(newAccount);
 
-            // 新用户，生成背景日志（不包含玩家信息）
-            GameLogBuilder backgroundBuilder = backgroundLogGenerator.generateBackgroundLogs(null);
-
             // 新用户，生成注册窗口内容
             GameLogBuilder windowBuilder = new GameLogBuilder();
             windowBuilder.addWindow("注册窗口", "欢迎来到ClawWorld！");
             windowBuilder.addWindow("注册窗口", "请使用指令：register [职业名称] [昵称]");
             windowBuilder.addWindow("注册窗口", "可选职业：战士、游侠、法师、牧师");
 
-            // 合并背景和窗口内容
-            String fullContent = backgroundBuilder.build() + "\n" + windowBuilder.build();
-
-            return LoginResult.success(sessionId, fullContent, true);
+            return LoginResult.success(sessionId, windowBuilder.build(), true);
         }
     }
 
