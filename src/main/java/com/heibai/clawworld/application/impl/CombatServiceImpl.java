@@ -1,24 +1,24 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.impl.combat.CombatEndHandler;
+import com.heibai.clawworld.application.impl.combat.CombatInitiationService;
+import com.heibai.clawworld.application.impl.combat.CombatProtectionChecker;
 import com.heibai.clawworld.application.service.WindowStateService;
 import com.heibai.clawworld.domain.combat.CombatCharacter;
 import com.heibai.clawworld.domain.combat.CombatParty;
 import com.heibai.clawworld.domain.service.CombatEngine;
-import com.heibai.clawworld.domain.service.PlayerLevelService;
+import com.heibai.clawworld.domain.service.skill.SkillResolver;
 import com.heibai.clawworld.domain.combat.CombatInstance;
 import com.heibai.clawworld.infrastructure.config.data.map.MapConfig;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.combat.Combat;
 import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
-import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.EnemyInstanceRepository;
-import com.heibai.clawworld.infrastructure.persistence.repository.PartyRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.application.service.CombatService;
 import com.heibai.clawworld.application.service.PlayerSessionService;
 import com.heibai.clawworld.infrastructure.persistence.mapper.CombatMapper;
-import com.heibai.clawworld.infrastructure.persistence.mapper.ConfigMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -37,15 +37,17 @@ public class CombatServiceImpl implements CombatService {
 
     private final CombatEngine combatEngine;
     private final ConfigDataManager configDataManager;
-    private final ConfigMapper configMapper;
     private final CombatMapper combatMapper;
     private final PlayerSessionService playerSessionService;
     private final PlayerRepository playerRepository;
-    private final PlayerLevelService playerLevelService;
     private final WindowStateService windowStateService;
-    private final AccountRepository accountRepository;
     private final EnemyInstanceRepository enemyInstanceRepository;
-    private final PartyRepository partyRepository;
+
+    // 新增的服务
+    private final CombatProtectionChecker protectionChecker;
+    private final CombatInitiationService initiationService;
+    private final CombatEndHandler endHandler;
+    private final SkillResolver skillResolver;
 
     @Override
     public CombatResult initiateCombat(String attackerId, String targetId) {
@@ -56,72 +58,49 @@ public class CombatServiceImpl implements CombatService {
                 return CombatResult.error("攻击者不存在");
             }
 
-            // 从数据库获取目标信息（这里假设目标也是玩家，实际可能是敌人）
+            // 从数据库获取目标信息
             Player target = playerSessionService.getPlayerState(targetId);
             if (target == null) {
                 return CombatResult.error("目标不存在");
             }
 
-            // 检查是否满足战斗条件
-            // 1. 检查双方是否在同一地图
-            if (!attacker.getMapId().equals(target.getMapId())) {
+            // 检查是否在同一地图
+            if (!initiationService.arePlayersOnSameMap(attacker, target)) {
                 return CombatResult.error("目标不在同一地图");
             }
 
-            // 2. 检查地图是否为战斗地图
-            MapConfig mapConfig = configDataManager.getMap(attacker.getMapId());
-            if (mapConfig == null) {
-                return CombatResult.error("地图不存在");
+            // 检查地图是否允许战斗
+            var mapCheck = protectionChecker.checkMapAllowsCombat(attacker.getMapId());
+            if (!mapCheck.allowed()) {
+                return CombatResult.error(mapCheck.errorMessage());
             }
 
-            if (mapConfig.isSafe()) {
-                return CombatResult.error("当前地图不允许战斗");
+            // 检查阵营
+            var factionCheck = protectionChecker.checkFactionCanAttack(attacker.getFaction(), target.getFaction());
+            if (!factionCheck.allowed()) {
+                return CombatResult.error(factionCheck.errorMessage());
             }
 
-            // 3. 检查双方阵营是否不同
-            if (attacker.getFaction().equals(target.getFaction())) {
-                return CombatResult.error("不能攻击同阵营角色");
+            // 收集目标队伍成员
+            List<Player> targetParty = initiationService.collectPartyMembers(target);
+
+            // 检查PVP等级保护
+            var pvpCheck = protectionChecker.checkPvpLevelProtection(attacker.getMapId(), targetParty);
+            if (!pvpCheck.allowed()) {
+                return CombatResult.error(pvpCheck.errorMessage());
             }
 
-            // 收集目标队伍成员（需要先收集才能判断等级保护）
-            List<Player> targetParty = collectPartyMembers(target);
-
-            // 4. 检查PVP等级保护：如果目标队伍中所有玩家都小于等于地图推荐等级，则不能攻击
-            // 但如果队伍中有任何一个玩家高于保护等级，则整个队伍都可以被攻击
-            Integer recommendedLevel = mapConfig.getRecommendedLevel();
-            if (recommendedLevel != null) {
-                boolean hasHighLevelPlayer = false;
-                for (Player member : targetParty) {
-                    if (member.getLevel() > recommendedLevel) {
-                        hasHighLevelPlayer = true;
-                        break;
-                    }
-                }
-                if (!hasHighLevelPlayer) {
-                    return CombatResult.error("无法攻击该队伍，队伍中所有玩家等级都不高于地图推荐等级(" + recommendedLevel + "级)");
-                }
-            }
-
-            // 5. 检查目标是否正在战斗中且受保护
+            // 检查目标是否正在战斗中且受保护
             Optional<PlayerEntity> targetEntityOpt = playerRepository.findById(targetId);
             if (targetEntityOpt.isPresent() && targetEntityOpt.get().isInCombat()) {
-                // 目标正在战斗中，检查队伍是否受保护（队伍中是否有高等级玩家）
-                if (recommendedLevel != null) {
-                    boolean hasHighLevelPlayer = false;
-                    for (Player member : targetParty) {
-                        if (member.getLevel() > recommendedLevel) {
-                            hasHighLevelPlayer = true;
-                            break;
-                        }
-                    }
-                    if (!hasHighLevelPlayer) {
-                        return CombatResult.error("该队伍正在战斗中且受等级保护，无法加入战斗");
-                    }
+                var inCombatCheck = protectionChecker.checkInCombatProtection(attacker.getMapId(), targetParty);
+                if (!inCombatCheck.allowed()) {
+                    return CombatResult.error(inCombatCheck.errorMessage());
                 }
             }
 
             // 收集攻击方队伍成员
-            List<Player> attackerParty = collectPartyMembers(attacker);
+            List<Player> attackerParty = initiationService.collectPartyMembers(attacker);
 
             // 创建战斗
             String combatId = combatEngine.createCombat(attacker.getMapId());
@@ -139,47 +118,7 @@ public class CombatServiceImpl implements CombatService {
             combatEngine.addPartyToCombat(combatId, target.getFaction(), targetCombatChars);
 
             // 更新所有参战玩家的战斗状态并切换窗口
-            List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new ArrayList<>();
-
-            // 更新攻击方玩家状态
-            for (Player player : attackerParty) {
-                Optional<PlayerEntity> playerEntityOpt = playerRepository.findById(player.getId());
-                if (playerEntityOpt.isPresent()) {
-                    PlayerEntity playerEntity = playerEntityOpt.get();
-                    playerEntity.setInCombat(true);
-                    playerEntity.setCombatId(combatId);
-                    playerRepository.save(playerEntity);
-
-                    // 为所有参战玩家添加窗口切换
-                    String currentWindow = windowStateService.getCurrentWindowType(player.getId());
-                    transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
-                        player.getId(), currentWindow, "COMBAT", combatId));
-                }
-            }
-
-            // 更新被攻击方玩家状态
-            for (Player player : targetParty) {
-                Optional<PlayerEntity> playerEntityOpt = playerRepository.findById(player.getId());
-                if (playerEntityOpt.isPresent()) {
-                    PlayerEntity playerEntity = playerEntityOpt.get();
-                    playerEntity.setInCombat(true);
-                    playerEntity.setCombatId(combatId);
-                    playerRepository.save(playerEntity);
-
-                    // 为所有参战玩家添加窗口切换
-                    String currentWindow = windowStateService.getCurrentWindowType(player.getId());
-                    transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
-                        player.getId(), currentWindow, "COMBAT", combatId));
-                }
-            }
-
-            // 批量切换所有参战玩家的窗口状态
-            if (!transitions.isEmpty()) {
-                boolean success = windowStateService.transitionWindows(transitions);
-                if (!success) {
-                    log.warn("部分玩家窗口状态切换失败: combatId={}", combatId);
-                }
-            }
+            updatePlayersForCombat(combatId, attackerParty, targetParty);
 
             // 初始化第一个回合
             combatEngine.initializeFirstTurn(combatId);
@@ -195,35 +134,33 @@ public class CombatServiceImpl implements CombatService {
     }
 
     /**
-     * 收集同地图的队伍成员
-     * 根据设计文档：只有在同一地图的队友才能参战
-     * 如果玩家有队伍，收集同地图的队友；如果没有队伍，只返回玩家自己
+     * 更新参战玩家的战斗状态和窗口
      */
-    private List<Player> collectPartyMembers(Player player) {
-        List<Player> partyMembers = new ArrayList<>();
-        partyMembers.add(player);
+    private void updatePlayersForCombat(String combatId, List<Player>... playerGroups) {
+        List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new ArrayList<>();
 
-        // 如果玩家有队伍，收集同地图的队友
-        if (player.getPartyId() != null) {
-            Optional<com.heibai.clawworld.infrastructure.persistence.entity.PartyEntity> partyOpt =
-                partyRepository.findById(player.getPartyId());
+        for (List<Player> group : playerGroups) {
+            for (Player player : group) {
+                Optional<PlayerEntity> playerEntityOpt = playerRepository.findById(player.getId());
+                if (playerEntityOpt.isPresent()) {
+                    PlayerEntity playerEntity = playerEntityOpt.get();
+                    playerEntity.setInCombat(true);
+                    playerEntity.setCombatId(combatId);
+                    playerRepository.save(playerEntity);
 
-            if (partyOpt.isPresent()) {
-                com.heibai.clawworld.infrastructure.persistence.entity.PartyEntity party = partyOpt.get();
-                for (String memberId : party.getMemberIds()) {
-                    if (!memberId.equals(player.getId())) {
-                        Player member = playerSessionService.getPlayerState(memberId);
-                        // 只收集同地图的队友
-                        if (member != null && member.getMapId() != null
-                            && member.getMapId().equals(player.getMapId())) {
-                            partyMembers.add(member);
-                        }
-                    }
+                    String currentWindow = windowStateService.getCurrentWindowType(player.getId());
+                    transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+                        player.getId(), currentWindow, "COMBAT", combatId));
                 }
             }
         }
 
-        return partyMembers;
+        if (!transitions.isEmpty()) {
+            boolean success = windowStateService.transitionWindows(transitions);
+            if (!success) {
+                log.warn("部分玩家窗口状态切换失败: combatId={}", combatId);
+            }
+        }
     }
 
     @Override
@@ -235,14 +172,10 @@ public class CombatServiceImpl implements CombatService {
                 return CombatResult.error("攻击者不存在");
             }
 
-            // 检查地图是否为战斗地图
-            MapConfig mapConfig = configDataManager.getMap(mapId);
-            if (mapConfig == null) {
-                return CombatResult.error("地图不存在");
-            }
-
-            if (mapConfig.isSafe()) {
-                return CombatResult.error("当前地图不允许战斗");
+            // 检查地图是否允许战斗
+            var mapCheck = protectionChecker.checkMapAllowsCombat(mapId);
+            if (!mapCheck.allowed()) {
+                return CombatResult.error(mapCheck.errorMessage());
             }
 
             // 查找敌人实例
@@ -272,58 +205,21 @@ public class CombatServiceImpl implements CombatService {
                 if (existingCombat.isPresent()) {
                     CombatInstance combat = existingCombat.get();
 
-                    // 检查抢怪保护：检查每个玩家队伍是否受保护
-                    // 如果某个队伍中所有玩家都小于等于地图推荐等级，则该队伍受保护，不允许其他人加入战斗
-                    Integer recommendedLevel = mapConfig.getRecommendedLevel();
-                    if (recommendedLevel != null) {
-                        for (CombatParty party : combat.getParties().values()) {
-                            // 检查这个队伍是否是玩家队伍
-                            boolean isPlayerParty = party.getCharacters().stream()
-                                .anyMatch(c -> c.isPlayer() && c.isAlive());
-                            if (!isPlayerParty) {
-                                continue; // 跳过敌人队伍
-                            }
-
-                            // 检查队伍中是否有高等级玩家
-                            boolean hasHighLevelPlayer = party.getCharacters().stream()
-                                .filter(c -> c.isPlayer() && c.isAlive())
-                                .anyMatch(c -> c.getLevel() > recommendedLevel);
-
-                            if (!hasHighLevelPlayer) {
-                                // 这个队伍受保护
-                                return CombatResult.error("战斗中有受等级保护的队伍（队伍中所有玩家等级都不高于" + recommendedLevel + "级），无法加入战斗");
-                            }
-                        }
+                    // 检查抢怪保护
+                    var stealCheck = protectionChecker.checkMonsterStealProtection(mapId, combat);
+                    if (!stealCheck.allowed()) {
+                        return CombatResult.error(stealCheck.errorMessage());
                     }
 
                     // 将玩家加入现有战斗
-                    List<Player> attackerParty = collectPartyMembers(attacker);
+                    List<Player> attackerParty = initiationService.collectPartyMembers(attacker);
                     List<CombatCharacter> attackerCombatChars = attackerParty.stream()
                         .map(combatMapper::toCombatCharacter)
                         .collect(Collectors.toList());
                     combatEngine.addPartyToCombat(existingCombatId, attacker.getFaction(), attackerCombatChars);
 
                     // 更新所有参战玩家的战斗状态并切换窗口
-                    List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new ArrayList<>();
-                    for (Player player : attackerParty) {
-                        Optional<PlayerEntity> playerEntityOpt = playerRepository.findById(player.getId());
-                        if (playerEntityOpt.isPresent()) {
-                            PlayerEntity playerEntity = playerEntityOpt.get();
-                            playerEntity.setInCombat(true);
-                            playerEntity.setCombatId(existingCombatId);
-                            playerRepository.save(playerEntity);
-
-                            // 为所有参战玩家添加窗口切换
-                            String currentWindow = windowStateService.getCurrentWindowType(player.getId());
-                            transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
-                                player.getId(), currentWindow, "COMBAT", existingCombatId));
-                        }
-                    }
-
-                    // 批量切换所有参战玩家的窗口状态
-                    if (!transitions.isEmpty()) {
-                        windowStateService.transitionWindows(transitions);
-                    }
+                    updatePlayersForCombat(existingCombatId, attackerParty);
 
                     log.info("玩家加入现有战斗: combatId={}, attackerId={}, enemyName={}, partySize={}",
                         existingCombatId, attackerId, enemyDisplayName, attackerParty.size());
@@ -333,9 +229,7 @@ public class CombatServiceImpl implements CombatService {
             }
 
             // 检查玩家是否在敌人附近（九宫格范围内）
-            int dx = Math.abs(attacker.getX() - targetEnemy.getX());
-            int dy = Math.abs(attacker.getY() - targetEnemy.getY());
-            if (dx > 1 || dy > 1) {
+            if (!initiationService.isInInteractionRange(attacker, targetEnemy.getX(), targetEnemy.getY())) {
                 return CombatResult.error("目标敌人不在交互范围内，请先移动到敌人附近");
             }
 
@@ -346,8 +240,8 @@ public class CombatServiceImpl implements CombatService {
                 return CombatResult.error("敌人配置不存在: " + targetEnemy.getTemplateId());
             }
 
-            // 收集同格子同阵营的所有玩家
-            List<Player> attackerParty = collectPartyMembers(attacker);
+            // 收集攻击方队伍成员
+            List<Player> attackerParty = initiationService.collectPartyMembers(attacker);
 
             // 收集同格子的所有敌人（同一阵营）
             String enemyFaction = "enemy_" + targetEnemy.getTemplateId();
@@ -385,29 +279,7 @@ public class CombatServiceImpl implements CombatService {
             combatEngine.addPartyToCombat(combatId, enemyFaction, enemyCombatChars);
 
             // 更新所有参战玩家的战斗状态并切换窗口
-            List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new ArrayList<>();
-            for (Player player : attackerParty) {
-                Optional<PlayerEntity> playerEntityOpt = playerRepository.findById(player.getId());
-                if (playerEntityOpt.isPresent()) {
-                    PlayerEntity playerEntity = playerEntityOpt.get();
-                    playerEntity.setInCombat(true);
-                    playerEntity.setCombatId(combatId);
-                    playerRepository.save(playerEntity);
-
-                    // 为所有参战玩家添加窗口切换
-                    String currentWindow = windowStateService.getCurrentWindowType(player.getId());
-                    transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
-                        player.getId(), currentWindow, "COMBAT", combatId));
-                }
-            }
-
-            // 批量切换所有参战玩家的窗口状态
-            if (!transitions.isEmpty()) {
-                boolean success = windowStateService.transitionWindows(transitions);
-                if (!success) {
-                    log.warn("部分玩家窗口状态切换失败: combatId={}", combatId);
-                }
-            }
+            updatePlayersForCombat(combatId, attackerParty);
 
             // 初始化第一个回合
             combatEngine.initializeFirstTurn(combatId);
@@ -426,8 +298,7 @@ public class CombatServiceImpl implements CombatService {
     public ActionResult castSkill(String combatId, String playerId, String skillName) {
         try {
             // 根据技能名称获取技能ID
-            // 如果skillName就是技能ID，直接使用；否则需要从配置中查找
-            String skillId = findSkillIdByName(skillName);
+            String skillId = skillResolver.findSkillIdByName(skillName);
 
             // 获取战斗实例
             Optional<CombatInstance> combatOpt = combatEngine.getCombat(combatId);
@@ -474,7 +345,7 @@ public class CombatServiceImpl implements CombatService {
             String battleLog = String.join("\n", result.getBattleLog());
 
             if (result.isCombatEnded()) {
-                handleCombatEndWindowTransition(combatId);
+                endHandler.handleCombatEnd(combatId);
                 return ActionResult.combatEnded("战斗结束", battleLog);
             }
 
@@ -489,7 +360,7 @@ public class CombatServiceImpl implements CombatService {
     public ActionResult castSkillOnTarget(String combatId, String playerId, String skillName, String targetName) {
         try {
             // 根据技能名称获取技能ID
-            String skillId = findSkillIdByName(skillName);
+            String skillId = skillResolver.findSkillIdByName(skillName);
 
             // 根据目标名称查找目标ID
             Optional<CombatInstance> combatOpt = combatEngine.getCombat(combatId);
@@ -511,7 +382,7 @@ public class CombatServiceImpl implements CombatService {
             String battleLog = String.join("\n", result.getBattleLog());
 
             if (result.isCombatEnded()) {
-                handleCombatEndWindowTransition(combatId);
+                endHandler.handleCombatEnd(combatId);
                 return ActionResult.combatEnded("战斗结束", battleLog);
             }
 
@@ -601,7 +472,7 @@ public class CombatServiceImpl implements CombatService {
             combat.resetActionBar(playerId);
 
             if (combat.isFinished()) {
-                handleCombatEndWindowTransition(combatId);
+                endHandler.handleCombatEnd(combatId);
                 return ActionResult.combatEnded("战斗结束", resultMessage);
             }
 
@@ -609,7 +480,7 @@ public class CombatServiceImpl implements CombatService {
             CombatEngine.CombatActionResult engineResult = combatEngine.processAfterAction(combatId, playerId);
 
             if (engineResult.isCombatEnded()) {
-                handleCombatEndWindowTransition(combatId);
+                endHandler.handleCombatEnd(combatId);
                 String battleLog = resultMessage + "\n" + String.join("\n", engineResult.getBattleLog());
                 return ActionResult.combatEnded("战斗结束", battleLog);
             }
@@ -634,7 +505,7 @@ public class CombatServiceImpl implements CombatService {
             String battleLog = String.join("\n", result.getBattleLog());
 
             if (result.isCombatEnded()) {
-                handleCombatEndWindowTransition(combatId);
+                endHandler.handleCombatEnd(combatId);
                 return ActionResult.combatEnded("战斗结束", battleLog);
             }
 
@@ -655,7 +526,7 @@ public class CombatServiceImpl implements CombatService {
             }
 
             if (result.isCombatEnded()) {
-                handleCombatEndWindowTransition(combatId);
+                endHandler.handleCombatEnd(combatId);
                 return ActionResult.combatEnded("战斗结束", "");
             }
 
@@ -761,421 +632,10 @@ public class CombatServiceImpl implements CombatService {
     /**
      * 根据技能名称查找技能ID
      * 如果名称本身就是ID，直接返回；否则从配置中查找
+     * @deprecated 使用 SkillResolver.findSkillIdByName 代替
      */
+    @Deprecated
     private String findSkillIdByName(String skillName) {
-        // 处理特殊情况：普通攻击
-        if ("普通攻击".equals(skillName) || "basic_attack".equals(skillName)) {
-            return "basic_attack";
-        }
-
-        // 尝试直接作为ID使用
-        if (configDataManager.getSkill(skillName) != null) {
-            return skillName;
-        }
-
-        // 从所有技能中查找匹配的名称
-        return configDataManager.getAllSkills().stream()
-            .filter(skill -> skill.getName().equals(skillName))
-            .map(skill -> skill.getId())
-            .findFirst()
-            .orElse("basic_attack"); // 找不到时默认使用普通攻击
-    }
-
-    /**
-     * 处理战斗结束时的窗口状态转换和战利品分配
-     * 将所有参战玩家的窗口状态从COMBAT转换回MAP
-     * 注意：战斗结束后战斗实例可能已被移除，所以从数据库中查找参战玩家
-     */
-    private void handleCombatEndWindowTransition(String combatId) {
-        try {
-            // 获取战利品分配结果
-            // 注意：getAndRemoveRewardDistribution 是原子操作，只有一个线程能获取到 distribution
-            // 如果返回 null，说明另一个线程已经在处理战斗结束了，当前线程不需要做任何处理
-            CombatInstance.RewardDistribution distribution = combatEngine.getAndRemoveRewardDistribution(combatId);
-
-            if (distribution == null) {
-                // 另一个线程已经在处理战斗结束，当前线程直接返回
-                // 窗口状态转换会由获取到 distribution 的线程统一处理
-                log.debug("战斗结束处理已由其他线程执行: combatId={}", combatId);
-                return;
-            }
-
-            // 处理战利品分配
-            // 如果敌人需要重置状态（所有玩家撤退的情况）
-            if (distribution.isEnemiesNeedReset()) {
-                resetEnemyStates(distribution);
-            } else {
-                distributeRewards(distribution);
-                // 更新被击败敌人的状态
-                updateDefeatedEnemies(distribution);
-            }
-
-            // 处理被击败玩家的传送和经验惩罚
-            handleDefeatedPlayers(distribution);
-
-            // 同步玩家的战斗后状态（生命和法力）- 只对存活玩家
-            syncPlayerFinalStates(distribution);
-
-            // 收集被击败玩家的ID（这些玩家已经在handleDefeatedPlayers中处理过了，combatId已被清除）
-            Set<String> defeatedPlayerIds = new HashSet<>();
-            if (distribution.getDefeatedPlayers() != null) {
-                for (CombatInstance.DefeatedPlayer dp : distribution.getDefeatedPlayers()) {
-                    defeatedPlayerIds.add(dp.getPlayerId());
-                }
-            }
-
-            // 从数据库中查找所有combatId匹配的玩家（被击败的玩家combatId已被清除，不会出现在这里）
-            List<PlayerEntity> playersInCombat = playerRepository.findAll().stream()
-                .filter(p -> combatId.equals(p.getCombatId()))
-                .collect(Collectors.toList());
-
-            if (playersInCombat.isEmpty() && defeatedPlayerIds.isEmpty()) {
-                log.debug("没有找到参战玩家，可能战斗状态已被清理: combatId={}", combatId);
-                return;
-            }
-
-            List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new java.util.ArrayList<>();
-
-            // 处理存活的玩家（清除战斗状态）
-            for (PlayerEntity player : playersInCombat) {
-                String playerId = player.getId();
-                String currentWindow = windowStateService.getCurrentWindowType(playerId);
-                transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
-                    playerId, currentWindow, "MAP", null));
-
-                // 清除玩家的战斗状态
-                player.setInCombat(false);
-                player.setCombatId(null);
-                playerRepository.save(player);
-            }
-
-            // 为被击败的玩家也添加窗口切换（他们的战斗状态已在handleDefeatedPlayers中清除）
-            for (String defeatedPlayerId : defeatedPlayerIds) {
-                String currentWindow = windowStateService.getCurrentWindowType(defeatedPlayerId);
-                transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
-                    defeatedPlayerId, currentWindow, "MAP", null));
-            }
-
-            if (!transitions.isEmpty()) {
-                boolean success = windowStateService.transitionWindows(transitions);
-                if (success) {
-                    log.info("战斗结束，所有玩家窗口状态已转换回MAP: combatId={}, playerCount={}",
-                        combatId, transitions.size());
-                } else {
-                    log.warn("战斗结束窗口状态转换失败: combatId={}", combatId);
-                }
-            }
-        } catch (Exception e) {
-            log.error("处理战斗结束窗口转换失败: combatId={}", combatId, e);
-        }
-    }
-
-    /**
-     * 处理被击败玩家的传送和经验惩罚
-     * 根据设计文档：
-     * - 玩家被击败后返回上一次使用的位于安全区域的传送点，并恢复满状态
-     * - PVE战斗中，所有玩家被敌人击败时，高于地图推荐等级的玩家掉落10%当前经验值
-     * - PVE战斗中，部分玩家被敌人击败时，被击败的高于地图推荐等级的玩家掉落10%当前经验值
-     * - PVP战斗中，高于地图推荐等级的玩家掉落10%当前经验值
-     */
-    private void handleDefeatedPlayers(CombatInstance.RewardDistribution distribution) {
-        if (distribution == null) {
-            log.debug("handleDefeatedPlayers: distribution is null");
-            return;
-        }
-        if (distribution.getDefeatedPlayers() == null) {
-            log.debug("handleDefeatedPlayers: defeatedPlayers is null");
-            return;
-        }
-        if (distribution.getDefeatedPlayers().isEmpty()) {
-            log.debug("handleDefeatedPlayers: defeatedPlayers is empty");
-            return;
-        }
-
-        log.info("处理被击败玩家: {} 人", distribution.getDefeatedPlayers().size());
-
-        // 获取地图推荐等级
-        Integer recommendedLevel = null;
-        if (distribution.getMapId() != null) {
-            MapConfig mapConfig = configDataManager.getMap(distribution.getMapId());
-            if (mapConfig != null) {
-                recommendedLevel = mapConfig.getRecommendedLevel();
-            }
-        }
-
-        for (CombatInstance.DefeatedPlayer defeatedPlayer : distribution.getDefeatedPlayers()) {
-            Optional<PlayerEntity> playerOpt = playerRepository.findById(defeatedPlayer.getPlayerId());
-            if (!playerOpt.isPresent()) {
-                continue;
-            }
-
-            PlayerEntity player = playerOpt.get();
-
-            // 判断是否需要经验惩罚
-            boolean shouldPenalize = false;
-            if (recommendedLevel != null && defeatedPlayer.getPlayerLevel() > recommendedLevel) {
-                // 玩家等级高于地图推荐等级
-                if (distribution.getCombatType() == CombatInstance.CombatType.PVP) {
-                    // PVP战斗：高于地图推荐等级的玩家掉落10%经验
-                    shouldPenalize = true;
-                } else if (distribution.getCombatType() == CombatInstance.CombatType.PVE) {
-                    // PVE战斗：无论是全部被击败还是部分被击败，高于推荐等级的玩家都掉落10%经验
-                    shouldPenalize = true;
-                }
-            }
-
-            // 执行经验惩罚
-            if (shouldPenalize) {
-                int expPenalty = (int) (player.getExperience() * 0.1);
-                player.setExperience(Math.max(0, player.getExperience() - expPenalty));
-                log.info("玩家 {} 被击败，扣除 {}% 经验值 ({} 点)", player.getName(), 10, expPenalty);
-            }
-
-            // 传送到上次安全传送点并恢复满状态
-            teleportToSafeWaypoint(player);
-
-            // 同时清除战斗状态，避免后续循环覆盖传送后的位置
-            player.setInCombat(false);
-            player.setCombatId(null);
-
-            playerRepository.save(player);
-            log.info("玩家 {} 被击败处理完成，当前位置: ({}, {}) 地图: {}",
-                player.getName(), player.getX(), player.getY(), player.getCurrentMapId());
-        }
-    }
-
-    /**
-     * 将被击败的玩家传送到上次使用的安全区域传送点，并恢复满状态
-     */
-    private void teleportToSafeWaypoint(PlayerEntity player) {
-        String lastSafeWaypointId = player.getLastSafeWaypointId();
-
-        if (lastSafeWaypointId != null) {
-            // 获取传送点配置
-            var waypointConfig = configDataManager.getWaypoint(lastSafeWaypointId);
-            if (waypointConfig != null) {
-                // 传送到该传送点
-                player.setCurrentMapId(waypointConfig.getMapId());
-                player.setX(waypointConfig.getX());
-                player.setY(waypointConfig.getY());
-                log.info("玩家 {} 被击败，传送回安全传送点: {} (地图: {}, 位置: {}, {})",
-                    player.getName(), waypointConfig.getName(), waypointConfig.getMapId(),
-                    waypointConfig.getX(), waypointConfig.getY());
-            } else {
-                // 传送点配置不存在，使用默认传送点
-                teleportToDefaultSafeWaypoint(player);
-            }
-        } else {
-            // 没有记录上次安全传送点，使用默认传送点
-            teleportToDefaultSafeWaypoint(player);
-        }
-
-        // 恢复满状态
-        player.setCurrentHealth(player.getMaxHealth());
-        player.setCurrentMana(player.getMaxMana());
-    }
-
-    /**
-     * 传送到默认安全传送点（第一个安全地图的第一个传送点）
-     */
-    private void teleportToDefaultSafeWaypoint(PlayerEntity player) {
-        // 查找第一个安全地图
-        for (MapConfig mapConfig : configDataManager.getAllMaps()) {
-            if (mapConfig.isSafe()) {
-                // 查找该地图的第一个传送点
-                for (var waypointConfig : configDataManager.getAllWaypoints()) {
-                    if (waypointConfig.getMapId().equals(mapConfig.getId())) {
-                        player.setCurrentMapId(waypointConfig.getMapId());
-                        player.setX(waypointConfig.getX());
-                        player.setY(waypointConfig.getY());
-                        player.setLastSafeWaypointId(waypointConfig.getId());
-                        log.info("玩家 {} 被击败，传送回默认安全传送点: {} (地图: {})",
-                            player.getName(), waypointConfig.getName(), mapConfig.getName());
-                        return;
-                    }
-                }
-            }
-        }
-        log.warn("找不到安全传送点，玩家 {} 保持原位置", player.getName());
-    }
-
-    /**
-     * 重置敌人状态（所有玩家撤退时调用）
-     * 敌人不死亡，只是退出战斗状态
-     */
-    private void resetEnemyStates(CombatInstance.RewardDistribution distribution) {
-        if (distribution == null || distribution.getEnemiesToReset() == null) {
-            return;
-        }
-
-        for (CombatInstance.EnemyToReset enemyToReset : distribution.getEnemiesToReset()) {
-            Optional<com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity> enemyOpt =
-                enemyInstanceRepository.findByMapIdAndInstanceId(enemyToReset.getMapId(), enemyToReset.getInstanceId());
-
-            if (enemyOpt.isPresent()) {
-                var enemy = enemyOpt.get();
-                // 只重置战斗状态，不设置死亡
-                enemy.setInCombat(false);
-                enemy.setCombatId(null);
-                enemyInstanceRepository.save(enemy);
-                log.debug("敌人 {} 状态已重置（玩家撤退）", enemy.getDisplayName());
-            }
-        }
-    }
-
-    /**
-     * 更新被击败敌人的状态
-     * 根据设计文档：敌人被击败后短暂消失，然后根据刷新时间定时刷回来
-     */
-    private void updateDefeatedEnemies(CombatInstance.RewardDistribution distribution) {
-        if (distribution == null || distribution.getDefeatedEnemies() == null) {
-            return;
-        }
-
-        for (CombatInstance.DefeatedEnemy defeatedEnemy : distribution.getDefeatedEnemies()) {
-            Optional<com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity> enemyOpt =
-                enemyInstanceRepository.findByMapIdAndInstanceId(defeatedEnemy.getMapId(), defeatedEnemy.getInstanceId());
-
-            if (enemyOpt.isPresent()) {
-                var enemy = enemyOpt.get();
-                enemy.setDead(true);
-                enemy.setLastDeathTime(System.currentTimeMillis());
-                enemy.setInCombat(false);
-                enemy.setCombatId(null);
-                enemyInstanceRepository.save(enemy);
-                log.debug("敌人 {} 被击败，将在 {} 秒后刷新",
-                    enemy.getDisplayName(), defeatedEnemy.getRespawnSeconds());
-            }
-        }
-    }
-
-    /**
-     * 同步玩家的战斗后状态（生命和法力）
-     * 根据设计文档：战斗胜利后玩家不会回复生命值和法力值
-     * 注意：被击败的玩家已在handleDefeatedPlayers中处理，这里跳过
-     */
-    private void syncPlayerFinalStates(CombatInstance.RewardDistribution distribution) {
-        if (distribution == null || distribution.getPlayerFinalStates() == null) {
-            return;
-        }
-
-        // 收集被击败玩家的ID，这些玩家已经在handleDefeatedPlayers中处理
-        Set<String> defeatedPlayerIds = new HashSet<>();
-        if (distribution.getDefeatedPlayers() != null) {
-            for (CombatInstance.DefeatedPlayer dp : distribution.getDefeatedPlayers()) {
-                defeatedPlayerIds.add(dp.getPlayerId());
-            }
-        }
-
-        for (Map.Entry<String, CombatInstance.PlayerFinalState> entry : distribution.getPlayerFinalStates().entrySet()) {
-            String playerId = entry.getKey();
-
-            // 跳过被击败的玩家（已在handleDefeatedPlayers中处理）
-            if (defeatedPlayerIds.contains(playerId)) {
-                continue;
-            }
-
-            CombatInstance.PlayerFinalState finalState = entry.getValue();
-
-            Optional<PlayerEntity> playerOpt = playerRepository.findById(playerId);
-            if (playerOpt.isPresent()) {
-                PlayerEntity player = playerOpt.get();
-                player.setCurrentHealth(finalState.getCurrentHealth());
-                player.setCurrentMana(finalState.getCurrentMana());
-                playerRepository.save(player);
-                log.debug("同步玩家 {} 战斗后状态: HP={}, MP={}",
-                    player.getName(), finalState.getCurrentHealth(), finalState.getCurrentMana());
-            }
-        }
-    }
-
-    /**
-     * 分配战利品
-     * 根据设计文档：
-     * - 每个玩家都获得全部经验
-     * - 金钱平分
-     * - 物品归队长
-     */
-    private void distributeRewards(CombatInstance.RewardDistribution distribution) {
-        if (distribution == null || distribution.getPlayerIds() == null || distribution.getPlayerIds().isEmpty()) {
-            return;
-        }
-
-        log.info("开始分配战利品: winnerFaction={}, exp={}, gold={}, items={}, players={}",
-            distribution.getWinnerFactionId(),
-            distribution.getTotalExperience(),
-            distribution.getTotalGold(),
-            distribution.getItems().size(),
-            distribution.getPlayerIds().size());
-
-        // 为每个玩家分配经验和金钱
-        for (String playerId : distribution.getPlayerIds()) {
-            Player player = playerSessionService.getPlayerState(playerId);
-            if (player != null) {
-                // 每个玩家都获得全部经验
-                if (distribution.getTotalExperience() > 0) {
-                    boolean leveledUp = playerLevelService.addExperienceAndCheckLevelUp(player, distribution.getTotalExperience());
-                    log.debug("玩家 {} 获得经验: {}", player.getName(), distribution.getTotalExperience());
-
-                    if (leveledUp) {
-                        log.info("玩家 {} 升级到 {} 级！", player.getName(), player.getLevel());
-                    }
-                }
-
-                // 金钱平分
-                if (distribution.getGoldPerPlayer() > 0) {
-                    player.setGold(player.getGold() + distribution.getGoldPerPlayer());
-                    log.debug("玩家 {} 获得金钱: {}", player.getName(), distribution.getGoldPerPlayer());
-                }
-
-                // 保存玩家状态
-                playerSessionService.savePlayerState(player);
-            }
-        }
-
-        // 物品归队长
-        if (distribution.getItems() != null && !distribution.getItems().isEmpty() && distribution.getLeaderId() != null) {
-            Player leader = playerSessionService.getPlayerState(distribution.getLeaderId());
-            if (leader != null) {
-                for (String itemId : distribution.getItems()) {
-                    // 检查是否已有该物品（只对普通物品堆叠）
-                    boolean found = false;
-                    if (configDataManager.getEquipment(itemId) == null) {
-                        // 普通物品可以堆叠
-                        for (Player.InventorySlot slot : leader.getInventory()) {
-                            if (slot.isItem() && slot.getItem().getId().equals(itemId)) {
-                                slot.setQuantity(slot.getQuantity() + 1);
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    // 如果没有找到或是装备，添加新的物品槽
-                    if (!found && leader.getInventory().size() < 50) {
-                        var eqConfig = configDataManager.getEquipment(itemId);
-                        if (eqConfig != null) {
-                            // 装备需要生成实例编号
-                            // TODO: 实现装备实例编号生成逻辑
-                            leader.getInventory().add(Player.InventorySlot.forEquipment(
-                                configMapper.toDomain(eqConfig)));
-                        } else {
-                            var itemConfig = configDataManager.getItem(itemId);
-                            if (itemConfig != null) {
-                                leader.getInventory().add(Player.InventorySlot.forItem(
-                                    configMapper.toDomain(itemConfig), 1));
-                            }
-                        }
-                    }
-
-                    log.debug("队长 {} 获得物品: {}", leader.getName(), itemId);
-                }
-
-                // 保存队长状态
-                playerSessionService.savePlayerState(leader);
-            }
-        }
-
-        log.info("战利品分配完成");
+        return skillResolver.findSkillIdByName(skillName);
     }
 }

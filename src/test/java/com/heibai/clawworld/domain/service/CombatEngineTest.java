@@ -4,6 +4,8 @@ import com.heibai.clawworld.domain.combat.Combat;
 import com.heibai.clawworld.domain.combat.CombatCharacter;
 import com.heibai.clawworld.domain.combat.CombatInstance;
 import com.heibai.clawworld.domain.combat.CombatParty;
+import com.heibai.clawworld.domain.service.skill.SkillExecutor;
+import com.heibai.clawworld.domain.service.skill.SkillResolver;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,11 +27,17 @@ class CombatEngineTest {
 
     private CombatEngine combatEngine;
     private ConfigDataManager configDataManager;
+    private SkillResolver skillResolver;
+    private SkillExecutor skillExecutor;
+    private CombatSettlementService settlementService;
 
     @BeforeEach
     void setUp() {
         configDataManager = Mockito.mock(ConfigDataManager.class);
-        combatEngine = new CombatEngine(configDataManager);
+        skillResolver = Mockito.mock(SkillResolver.class);
+        skillExecutor = Mockito.mock(SkillExecutor.class);
+        settlementService = new CombatSettlementService(configDataManager);
+        combatEngine = new CombatEngine(configDataManager, skillResolver, skillExecutor, settlementService);
     }
 
     // ==================== 战斗创建测试 ====================

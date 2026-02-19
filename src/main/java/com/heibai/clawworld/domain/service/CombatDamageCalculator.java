@@ -2,6 +2,7 @@ package com.heibai.clawworld.domain.service;
 
 import com.heibai.clawworld.domain.combat.CombatCharacter;
 import lombok.Data;
+import org.springframework.stereotype.Component;
 
 import java.util.Random;
 
@@ -9,6 +10,7 @@ import java.util.Random;
  * 伤害计算器
  * 根据设计文档实现伤害计算公式
  */
+@Component
 public class CombatDamageCalculator {
 
     private final Random random;

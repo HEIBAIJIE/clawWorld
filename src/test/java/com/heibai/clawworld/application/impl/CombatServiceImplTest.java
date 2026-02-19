@@ -1,15 +1,21 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.impl.combat.CombatEndHandler;
+import com.heibai.clawworld.application.impl.combat.CombatInitiationService;
+import com.heibai.clawworld.application.impl.combat.CombatProtectionChecker;
 import com.heibai.clawworld.application.service.CombatService;
 import com.heibai.clawworld.application.service.PlayerSessionService;
+import com.heibai.clawworld.application.service.WindowStateService;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.combat.CombatCharacter;
 import com.heibai.clawworld.domain.combat.CombatInstance;
 import com.heibai.clawworld.domain.service.CombatEngine;
+import com.heibai.clawworld.domain.service.skill.SkillResolver;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.infrastructure.config.data.map.MapConfig;
 import com.heibai.clawworld.infrastructure.persistence.mapper.CombatMapper;
 import com.heibai.clawworld.infrastructure.persistence.mapper.ConfigMapper;
+import com.heibai.clawworld.infrastructure.persistence.repository.EnemyInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.PartyRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,6 +58,24 @@ class CombatServiceImplTest {
     @Mock
     private PartyRepository partyRepository;
 
+    @Mock
+    private WindowStateService windowStateService;
+
+    @Mock
+    private EnemyInstanceRepository enemyInstanceRepository;
+
+    @Mock
+    private CombatProtectionChecker protectionChecker;
+
+    @Mock
+    private CombatInitiationService initiationService;
+
+    @Mock
+    private CombatEndHandler endHandler;
+
+    @Mock
+    private SkillResolver skillResolver;
+
     @InjectMocks
     private CombatServiceImpl combatService;
 
@@ -88,9 +112,15 @@ class CombatServiceImplTest {
     void testInitiateCombat_Success() {
         when(playerSessionService.getPlayerState("player1")).thenReturn(attacker);
         when(playerSessionService.getPlayerState("player2")).thenReturn(target);
-        when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
-        // attacker没有队伍，所以不需要mock partyRepository
         when(combatEngine.createCombat("test_map")).thenReturn("combat123");
+
+        // Mock新服务
+        when(initiationService.arePlayersOnSameMap(attacker, target)).thenReturn(true);
+        when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+        when(protectionChecker.checkFactionCanAttack("FACTION_A", "FACTION_B")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+        when(initiationService.collectPartyMembers(target)).thenReturn(java.util.List.of(target));
+        when(initiationService.collectPartyMembers(attacker)).thenReturn(java.util.List.of(attacker));
+        when(protectionChecker.checkPvpLevelProtection(eq("test_map"), anyList())).thenReturn(CombatProtectionChecker.CheckResult.ok());
 
         // Mock combatMapper to return a CombatCharacter for any Player
         CombatCharacter attackerCombatChar = new CombatCharacter();
@@ -141,6 +171,7 @@ class CombatServiceImplTest {
         target.setMapId("other_map");
         when(playerSessionService.getPlayerState("player1")).thenReturn(attacker);
         when(playerSessionService.getPlayerState("player2")).thenReturn(target);
+        when(initiationService.arePlayersOnSameMap(attacker, target)).thenReturn(false);
 
         CombatService.CombatResult result = combatService.initiateCombat("player1", "player2");
 
@@ -154,7 +185,8 @@ class CombatServiceImplTest {
         mapConfig.setSafe(true);
         when(playerSessionService.getPlayerState("player1")).thenReturn(attacker);
         when(playerSessionService.getPlayerState("player2")).thenReturn(target);
-        when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
+        when(initiationService.arePlayersOnSameMap(attacker, target)).thenReturn(true);
+        when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.denied("当前地图不允许战斗"));
 
         CombatService.CombatResult result = combatService.initiateCombat("player1", "player2");
 
@@ -168,7 +200,9 @@ class CombatServiceImplTest {
         target.setFaction("FACTION_A");
         when(playerSessionService.getPlayerState("player1")).thenReturn(attacker);
         when(playerSessionService.getPlayerState("player2")).thenReturn(target);
-        when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
+        when(initiationService.arePlayersOnSameMap(attacker, target)).thenReturn(true);
+        when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+        when(protectionChecker.checkFactionCanAttack("FACTION_A", "FACTION_A")).thenReturn(CombatProtectionChecker.CheckResult.denied("不能攻击同阵营角色"));
 
         CombatService.CombatResult result = combatService.initiateCombat("player1", "player2");
 
@@ -206,7 +240,13 @@ class CombatServiceImplTest {
         enemyParty.addCharacter(enemyChar);
         combat.addParty("FACTION_B", enemyParty);
 
+        // Mock skillResolver
+        when(skillResolver.findSkillIdByName("火球术")).thenReturn("fireball");
+
         when(combatEngine.getCombat("combat123")).thenReturn(Optional.of(combat));
+
+        // Mock configDataManager.getSkill 返回 null，这样 targetId 会是 null
+        when(configDataManager.getSkill("fireball")).thenReturn(null);
 
         CombatEngine.CombatActionResult actionResult = new CombatEngine.CombatActionResult();
         actionResult.setSuccess(true);
@@ -214,8 +254,8 @@ class CombatServiceImplTest {
         actionResult.setBattleLog(new ArrayList<>());
         actionResult.setCombatEnded(false);
 
-        // 由于会自动选择目标，所以targetId不再是null
-        when(combatEngine.executeSkillWithWait(eq("combat123"), eq("player1"), anyString(), anyString()))
+        // targetId 为 null（因为技能配置为 null 且不是普通攻击）
+        when(combatEngine.executeSkillWithWait(eq("combat123"), eq("player1"), eq("fireball"), isNull()))
             .thenReturn(actionResult);
 
         CombatService.ActionResult result = combatService.castSkill("combat123", "player1", "火球术");

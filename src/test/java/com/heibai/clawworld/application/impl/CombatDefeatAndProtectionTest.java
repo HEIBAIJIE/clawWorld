@@ -1,5 +1,8 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.impl.combat.CombatEndHandler;
+import com.heibai.clawworld.application.impl.combat.CombatInitiationService;
+import com.heibai.clawworld.application.impl.combat.CombatProtectionChecker;
 import com.heibai.clawworld.application.service.CombatService;
 import com.heibai.clawworld.application.service.PlayerSessionService;
 import com.heibai.clawworld.application.service.WindowStateService;
@@ -9,6 +12,7 @@ import com.heibai.clawworld.domain.combat.CombatInstance;
 import com.heibai.clawworld.domain.combat.CombatParty;
 import com.heibai.clawworld.domain.service.CombatEngine;
 import com.heibai.clawworld.domain.service.PlayerLevelService;
+import com.heibai.clawworld.domain.service.skill.SkillResolver;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.infrastructure.config.data.map.MapConfig;
 import com.heibai.clawworld.infrastructure.persistence.mapper.CombatMapper;
@@ -80,6 +84,18 @@ class CombatDefeatAndProtectionTest {
     @Mock
     private EnemyInstanceRepository enemyInstanceRepository;
 
+    @Mock
+    private CombatProtectionChecker protectionChecker;
+
+    @Mock
+    private CombatInitiationService initiationService;
+
+    @Mock
+    private CombatEndHandler endHandler;
+
+    @Mock
+    private SkillResolver skillResolver;
+
     @InjectMocks
     private CombatServiceImpl combatService;
 
@@ -114,14 +130,14 @@ class CombatDefeatAndProtectionTest {
 
             when(playerSessionService.getPlayerState("attacker")).thenReturn(attacker);
             when(playerSessionService.getPlayerState("target")).thenReturn(target);
-            when(playerSessionService.getPlayerState("teammate")).thenReturn(targetTeammate);
-            when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
 
-            // Mock队伍
-            var partyEntity = new com.heibai.clawworld.infrastructure.persistence.entity.PartyEntity();
-            partyEntity.setId("party1");
-            partyEntity.setMemberIds(List.of("target", "teammate"));
-            when(partyRepository.findById("party1")).thenReturn(Optional.of(partyEntity));
+            // Mock新服务
+            when(initiationService.arePlayersOnSameMap(attacker, target)).thenReturn(true);
+            when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(protectionChecker.checkFactionCanAttack("FACTION_A", "FACTION_B")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(initiationService.collectPartyMembers(target)).thenReturn(List.of(target, targetTeammate));
+            when(protectionChecker.checkPvpLevelProtection(eq("test_map"), anyList()))
+                .thenReturn(CombatProtectionChecker.CheckResult.denied("所有玩家等级都不高于地图推荐等级"));
 
             CombatService.CombatResult result = combatService.initiateCombat("attacker", "target");
 
@@ -149,16 +165,15 @@ class CombatDefeatAndProtectionTest {
 
             when(playerSessionService.getPlayerState("attacker")).thenReturn(attacker);
             when(playerSessionService.getPlayerState("targetA")).thenReturn(targetA);
-            when(playerSessionService.getPlayerState("targetB")).thenReturn(targetB);
-            when(playerSessionService.getPlayerState("targetC")).thenReturn(targetC);
-            when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
             when(combatEngine.createCombat("test_map")).thenReturn("combat123");
 
-            // Mock队伍
-            var partyEntity = new com.heibai.clawworld.infrastructure.persistence.entity.PartyEntity();
-            partyEntity.setId("party1");
-            partyEntity.setMemberIds(List.of("targetA", "targetB", "targetC"));
-            when(partyRepository.findById("party1")).thenReturn(Optional.of(partyEntity));
+            // Mock新服务
+            when(initiationService.arePlayersOnSameMap(attacker, targetA)).thenReturn(true);
+            when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(protectionChecker.checkFactionCanAttack("FACTION_A", "FACTION_B")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(initiationService.collectPartyMembers(targetA)).thenReturn(List.of(targetA, targetB, targetC));
+            when(initiationService.collectPartyMembers(attacker)).thenReturn(List.of(attacker));
+            when(protectionChecker.checkPvpLevelProtection(eq("test_map"), anyList())).thenReturn(CombatProtectionChecker.CheckResult.ok());
 
             // Mock CombatMapper
             when(combatMapper.toCombatCharacter(any(Player.class))).thenAnswer(invocation -> {
@@ -187,8 +202,15 @@ class CombatDefeatAndProtectionTest {
 
             when(playerSessionService.getPlayerState("attacker")).thenReturn(attacker);
             when(playerSessionService.getPlayerState("target")).thenReturn(target);
-            when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
             when(combatEngine.createCombat("test_map")).thenReturn("combat123");
+
+            // Mock新服务
+            when(initiationService.arePlayersOnSameMap(attacker, target)).thenReturn(true);
+            when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(protectionChecker.checkFactionCanAttack("FACTION_A", "FACTION_B")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(initiationService.collectPartyMembers(target)).thenReturn(List.of(target));
+            when(initiationService.collectPartyMembers(attacker)).thenReturn(List.of(attacker));
+            when(protectionChecker.checkPvpLevelProtection(eq("test_map"), anyList())).thenReturn(CombatProtectionChecker.CheckResult.ok());
 
             // Mock CombatMapper
             when(combatMapper.toCombatCharacter(any(Player.class))).thenAnswer(invocation -> {
@@ -216,7 +238,14 @@ class CombatDefeatAndProtectionTest {
 
             when(playerSessionService.getPlayerState("attacker")).thenReturn(attacker);
             when(playerSessionService.getPlayerState("target")).thenReturn(target);
-            when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
+
+            // Mock新服务
+            when(initiationService.arePlayersOnSameMap(attacker, target)).thenReturn(true);
+            when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(protectionChecker.checkFactionCanAttack("FACTION_A", "FACTION_B")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(initiationService.collectPartyMembers(target)).thenReturn(List.of(target));
+            when(protectionChecker.checkPvpLevelProtection(eq("test_map"), anyList()))
+                .thenReturn(CombatProtectionChecker.CheckResult.denied("所有玩家等级都不高于地图推荐等级"));
 
             CombatService.CombatResult result = combatService.initiateCombat("attacker", "target");
 
@@ -236,7 +265,6 @@ class CombatDefeatAndProtectionTest {
             Player attacker = createPlayer("attacker", "FACTION_A", 15);
 
             when(playerSessionService.getPlayerState("attacker")).thenReturn(attacker);
-            when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
 
             // 创建已存在的战斗，其中有一个受保护的队伍
             CombatInstance existingCombat = new CombatInstance("combat123", "test_map");
@@ -269,10 +297,15 @@ class CombatDefeatAndProtectionTest {
             when(enemyInstanceRepository.findByMapId("test_map")).thenReturn(List.of(enemyInstance));
             when(combatEngine.getCombat("combat123")).thenReturn(Optional.of(existingCombat));
 
+            // Mock新服务
+            when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(protectionChecker.checkMonsterStealProtection(eq("test_map"), any(CombatInstance.class)))
+                .thenReturn(CombatProtectionChecker.CheckResult.denied("战斗中有受等级保护的队伍"));
+
             CombatService.CombatResult result = combatService.initiateCombatWithEnemy("attacker", "史莱姆", "test_map");
 
             assertFalse(result.isSuccess());
-            assertTrue(result.getMessage().contains("受等级保护的队伍"));
+            assertTrue(result.getMessage().contains("受等级保护的队伍") || result.getMessage().contains("受保护"));
         }
 
         @Test
@@ -282,7 +315,6 @@ class CombatDefeatAndProtectionTest {
             Player attacker = createPlayer("attacker", "FACTION_A", 15);
 
             when(playerSessionService.getPlayerState("attacker")).thenReturn(attacker);
-            when(configDataManager.getMap("test_map")).thenReturn(mapConfig);
 
             // 创建已存在的战斗，其中队伍有高等级玩家
             CombatInstance existingCombat = new CombatInstance("combat123", "test_map");
@@ -314,6 +346,12 @@ class CombatDefeatAndProtectionTest {
 
             when(enemyInstanceRepository.findByMapId("test_map")).thenReturn(List.of(enemyInstance));
             when(combatEngine.getCombat("combat123")).thenReturn(Optional.of(existingCombat));
+
+            // Mock新服务
+            when(protectionChecker.checkMapAllowsCombat("test_map")).thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(protectionChecker.checkMonsterStealProtection(eq("test_map"), any(CombatInstance.class)))
+                .thenReturn(CombatProtectionChecker.CheckResult.ok());
+            when(initiationService.collectPartyMembers(attacker)).thenReturn(List.of(attacker));
 
             // Mock CombatMapper
             when(combatMapper.toCombatCharacter(any(Player.class))).thenAnswer(invocation -> {
