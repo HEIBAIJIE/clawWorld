@@ -6,8 +6,10 @@ import com.heibai.clawworld.domain.service.CombatSettlementService;
 import com.heibai.clawworld.domain.window.WindowTransition;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.infrastructure.config.data.map.MapConfig;
+import com.heibai.clawworld.infrastructure.persistence.entity.AccountEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
+import com.heibai.clawworld.infrastructure.persistence.repository.AccountRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.EnemyInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class CombatEndHandler {
     private final EnemyInstanceRepository enemyInstanceRepository;
     private final WindowStateService windowStateService;
     private final CombatRewardDistributor rewardDistributor;
+    private final AccountRepository accountRepository;
 
     // 战斗结束处理完成的信号量，用于等待处理完成
     private final Map<String, CountDownLatch> combatEndLatches = new ConcurrentHashMap<>();
@@ -144,10 +147,12 @@ public class CombatEndHandler {
         }
 
         List<WindowTransition> transitions = new ArrayList<>();
+        Set<String> survivingPlayerIds = new HashSet<>();
 
         // 处理存活的玩家（清除战斗状态）
         for (PlayerEntity player : playersInCombat) {
             String playerId = player.getId();
+            survivingPlayerIds.add(playerId);
             String currentWindow = windowStateService.getCurrentWindowType(playerId);
             transitions.add(WindowTransition.of(playerId, currentWindow, "MAP", null));
 
@@ -161,6 +166,12 @@ public class CombatEndHandler {
         for (String defeatedPlayerId : defeatedPlayerIds) {
             String currentWindow = windowStateService.getCurrentWindowType(defeatedPlayerId);
             transitions.add(WindowTransition.of(defeatedPlayerId, currentWindow, "MAP", null));
+        }
+
+        // 从存活玩家的实体快照中移除被击败的玩家
+        // 因为被击败的玩家已经被传送到其他地图了
+        if (!defeatedPlayerIds.isEmpty()) {
+            removeDefeatedPlayersFromSnapshots(survivingPlayerIds, defeatedPlayerIds);
         }
 
         if (!transitions.isEmpty()) {
@@ -376,6 +387,46 @@ public class CombatEndHandler {
                 playerRepository.save(player);
                 log.debug("同步玩家 {} 战斗后状态: HP={}, MP={}",
                     player.getName(), finalState.getCurrentHealth(), finalState.getCurrentMana());
+            }
+        }
+    }
+
+    /**
+     * 从存活玩家的实体快照中移除被击败的玩家
+     * 因为被击败的玩家已经被传送到其他地图了
+     */
+    private void removeDefeatedPlayersFromSnapshots(Set<String> survivingPlayerIds, Set<String> defeatedPlayerIds) {
+        // 获取被击败玩家的名字
+        Set<String> defeatedPlayerNames = new HashSet<>();
+        for (String defeatedPlayerId : defeatedPlayerIds) {
+            Optional<PlayerEntity> playerOpt = playerRepository.findById(defeatedPlayerId);
+            if (playerOpt.isPresent()) {
+                defeatedPlayerNames.add(playerOpt.get().getName());
+            }
+        }
+
+        if (defeatedPlayerNames.isEmpty()) {
+            return;
+        }
+
+        // 从存活玩家的快照中移除被击败玩家
+        for (String survivingPlayerId : survivingPlayerIds) {
+            Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(survivingPlayerId);
+            if (accountOpt.isPresent()) {
+                AccountEntity account = accountOpt.get();
+                Map<String, AccountEntity.EntitySnapshot> snapshot = account.getLastEntitySnapshot();
+                if (snapshot != null && !snapshot.isEmpty()) {
+                    boolean modified = false;
+                    for (String defeatedName : defeatedPlayerNames) {
+                        if (snapshot.remove(defeatedName) != null) {
+                            modified = true;
+                            log.debug("从玩家 {} 的快照中移除被击败玩家 {}", survivingPlayerId, defeatedName);
+                        }
+                    }
+                    if (modified) {
+                        accountRepository.save(account);
+                    }
+                }
             }
         }
     }
