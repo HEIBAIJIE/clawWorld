@@ -102,12 +102,53 @@ public class CombatServiceImpl implements CombatService {
                 .collect(Collectors.toList());
             combatEngine.addPartyToCombat(combatId, target.getFaction(), targetCombatChars);
 
-            String windowId = "combat_window_" + combatId;
+            // 更新所有参战玩家的战斗状态并切换窗口
+            List<com.heibai.clawworld.domain.window.WindowTransition> transitions = new ArrayList<>();
 
-            log.info("发起战斗: combatId={}, attackerId={}, targetId={}, mapId={}",
-                combatId, attackerId, targetId, attacker.getMapId());
+            // 更新攻击方玩家状态
+            for (Player player : attackerParty) {
+                Optional<PlayerEntity> playerEntityOpt = playerRepository.findById(player.getId());
+                if (playerEntityOpt.isPresent()) {
+                    PlayerEntity playerEntity = playerEntityOpt.get();
+                    playerEntity.setInCombat(true);
+                    playerEntity.setCombatId(combatId);
+                    playerRepository.save(playerEntity);
 
-            return CombatResult.success(combatId, windowId, "战斗开始");
+                    // 为所有参战玩家添加窗口切换
+                    String currentWindow = windowStateService.getCurrentWindowType(player.getId());
+                    transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+                        player.getId(), currentWindow, "COMBAT", combatId));
+                }
+            }
+
+            // 更新被攻击方玩家状态
+            for (Player player : targetParty) {
+                Optional<PlayerEntity> playerEntityOpt = playerRepository.findById(player.getId());
+                if (playerEntityOpt.isPresent()) {
+                    PlayerEntity playerEntity = playerEntityOpt.get();
+                    playerEntity.setInCombat(true);
+                    playerEntity.setCombatId(combatId);
+                    playerRepository.save(playerEntity);
+
+                    // 为所有参战玩家添加窗口切换
+                    String currentWindow = windowStateService.getCurrentWindowType(player.getId());
+                    transitions.add(com.heibai.clawworld.domain.window.WindowTransition.of(
+                        player.getId(), currentWindow, "COMBAT", combatId));
+                }
+            }
+
+            // 批量切换所有参战玩家的窗口状态
+            if (!transitions.isEmpty()) {
+                boolean success = windowStateService.transitionWindows(transitions);
+                if (!success) {
+                    log.warn("部分玩家窗口状态切换失败: combatId={}", combatId);
+                }
+            }
+
+            log.info("发起战斗: combatId={}, attackerId={}, targetId={}, mapId={}, attackerPartySize={}, targetPartySize={}",
+                combatId, attackerId, targetId, attacker.getMapId(), attackerParty.size(), targetParty.size());
+
+            return CombatResult.success(combatId, combatId, "战斗开始");
         } catch (Exception e) {
             log.error("发起战斗失败", e);
             return CombatResult.error("发起战斗失败: " + e.getMessage());
