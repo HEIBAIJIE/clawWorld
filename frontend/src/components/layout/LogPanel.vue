@@ -11,6 +11,11 @@
         <span class="token-count">{{ logStore.formattedTokenCount }}</span>
         <span class="token-label">tokens</span>
       </div>
+      <!-- 智能代理思考状态 -->
+      <div class="agent-thinking" v-if="agentStore.isThinking">
+        <span class="thinking-dot"></span>
+        <span>AI思考中...</span>
+      </div>
     </div>
 
     <!-- 指令输入区 -->
@@ -21,14 +26,22 @@
         type="text"
         placeholder="输入指令..."
         @keyup.enter="handleSendCommand"
-        :disabled="sessionStore.isWaiting"
+        :disabled="sessionStore.isWaiting || agentStore.isEnabled"
       />
       <button
         class="sci-button primary send-button"
         @click="handleSendCommand"
-        :disabled="sessionStore.isWaiting || !commandInput.trim()"
+        :disabled="sessionStore.isWaiting || !commandInput.trim() || agentStore.isEnabled"
       >
         {{ sessionStore.isWaiting ? '等待...' : '发送' }}
+      </button>
+      <button
+        class="sci-button agent-toggle"
+        :class="{ active: agentStore.isEnabled }"
+        @click="handleToggleAgent"
+        :title="agentStore.isEnabled ? '关闭智能代理' : '开启智能代理'"
+      >
+        {{ agentStore.isEnabled ? '代理中' : '智能代理' }}
       </button>
     </div>
   </div>
@@ -38,24 +51,45 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useSessionStore } from '../../stores/sessionStore'
 import { useLogStore } from '../../stores/logStore'
+import { useAgentStore } from '../../stores/agentStore'
 import { useCommand } from '../../composables/useCommand'
+import { useAgent } from '../../composables/useAgent'
 
 const sessionStore = useSessionStore()
 const logStore = useLogStore()
+const agentStore = useAgentStore()
 const { sendCommand } = useCommand()
+const { startAgentLoop } = useAgent()
 
 const commandInput = ref('')
 const logDisplayRef = ref(null)
 
 // 发送指令
 const handleSendCommand = async () => {
-  if (!commandInput.value.trim() || sessionStore.isWaiting) {
+  if (!commandInput.value.trim() || sessionStore.isWaiting || agentStore.isEnabled) {
     return
   }
 
   const command = commandInput.value.trim()
   commandInput.value = ''
   await sendCommand(command)
+}
+
+// 切换智能代理
+const handleToggleAgent = async () => {
+  if (agentStore.isEnabled) {
+    agentStore.disable()
+  } else {
+    if (!agentStore.isConfigured) {
+      alert('请先配置智能代理（点击右上角的"配置代理"按钮）')
+      return
+    }
+    const success = agentStore.enable()
+    if (success) {
+      // 启动代理循环，传入当前文本窗口内容
+      await startAgentLoop(logStore.rawText)
+    }
+  }
 }
 
 // 格式化游戏文本
@@ -178,5 +212,47 @@ watch(() => logStore.rawText, async () => {
 .send-button {
   flex-shrink: 0;
   width: 80px;
+}
+
+.agent-toggle {
+  flex-shrink: 0;
+  min-width: 80px;
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.agent-toggle.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--bg-primary);
+}
+
+.agent-thinking {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(37, 37, 37, 0.9);
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--primary);
+  z-index: 10;
+}
+
+.thinking-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
 }
 </style>

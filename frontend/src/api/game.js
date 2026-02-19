@@ -17,5 +17,10 @@ export const gameApi = {
       sessionId,
       command
     })
+  },
+
+  // 智能代理API代理（后端转发模式）
+  proxyAgentChat(request) {
+    return client.post('/agent/chat', request)
   }
 }

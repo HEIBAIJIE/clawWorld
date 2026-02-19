@@ -47,26 +47,17 @@ public class BackgroundLogGenerator {
             "- 可组队（最多4人）、交易、学习技能、装备物品\n" +
             "- 通过战斗获得经验、金币和装备");
 
-        // 4. 行动目标
-        builder.addBackground("行动目标",
-            "作为玩家，你的目标是：\n" +
-            "- 通过战斗提升等级和战斗力\n" +
-            "- 获取更好的装备（稀有度：普通<优秀<稀有<史诗<传说<神话）\n" +
-            "- 积累金币购买物品\n" +
-            "- 探索地图，挑战更强的敌人\n" +
-            "- 可选择与其他玩家组队");
-
-        // 5. 游玩建议
+        // 4. 游玩建议
         builder.addBackground("游玩建议",
             "- 建议在说话、发起交易、发起组队等玩家交互后等待3-5秒，如果有人回复/响应，会在等待结束后的状态更新中显示");
 
-        // 6. 所有可用指令
+        // 5. 所有可用指令
         builder.addBackground("所有可用指令", generateAllCommandsText());
 
-        // 7. 地图列表
+        // 6. 地图列表
         builder.addBackground("地图列表", generateMapListText());
 
-        // 8. 玩家状态摘要
+        // 7. 玩家状态摘要
         if (player != null) {
             builder.addBackground("你的状态", generatePlayerSummaryText(player));
         } else {
