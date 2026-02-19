@@ -221,15 +221,16 @@ export function useCommand() {
           console.log('[Command] 启动倒计时，服务端时间戳:', timestamp)
           combatStore.startCountdown(timestamp || 0)
         }
-        // 自动wait机制：检测到需要等待时自动发送wait
-        if (status.needsAutoWait && !combatStore.autoWaitPending) {
-          console.log('[Command] 触发自动wait')
-          combatStore.autoWaitPending = true
+        // 自动wait机制：需要等待对方行动时自动发送wait
+        if (status.needsAutoWait) {
+          console.log('[Command] 检测到需要自动wait')
+          // 延迟发送，确保当前响应处理完毕且 isWaiting 已重置
           setTimeout(() => {
-            sendCommand('wait').finally(() => {
-              combatStore.autoWaitPending = false
-            })
-          }, 100)
+            if (!combatStore.isMyTurn && combatStore.isInCombat && !combatStore.showResult) {
+              console.log('[Command] 执行自动wait')
+              sendCommand('wait')
+            }
+          }, 150)
         }
         break
 
@@ -457,14 +458,16 @@ export function useCommand() {
           if (stateStatus.isMyTurn) {
             combatStore.startCountdown(timestamp || 0)
           }
-          // 自动wait机制
-          if (stateStatus.needsAutoWait && !combatStore.autoWaitPending) {
-            combatStore.autoWaitPending = true
+          // 自动wait机制：需要等待对方行动时自动发送wait
+          if (stateStatus.needsAutoWait) {
+            console.log('[Command] 检测到需要自动wait')
+            // 延迟发送，确保当前响应处理完毕且 isWaiting 已重置
             setTimeout(() => {
-              sendCommand('wait').finally(() => {
-                combatStore.autoWaitPending = false
-              })
-            }, 100)
+              if (!combatStore.isMyTurn && combatStore.isInCombat && !combatStore.showResult) {
+                console.log('[Command] 执行自动wait')
+                sendCommand('wait')
+              }
+            }, 150)
           }
         }
         break

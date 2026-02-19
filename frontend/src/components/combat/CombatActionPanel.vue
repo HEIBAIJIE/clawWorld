@@ -78,11 +78,8 @@ function handleTimeout() {
   if (combatStore.showResult) {
     return
   }
-  if (combatStore.isMyTurn && !combatStore.autoWaitPending) {
-    combatStore.autoWaitPending = true
-    sendCommand('wait').finally(() => {
-      combatStore.autoWaitPending = false
-    })
+  if (combatStore.isMyTurn) {
+    sendCommand('wait')
   }
 }
 

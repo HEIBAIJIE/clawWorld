@@ -42,9 +42,6 @@ export const useCombatStore = defineStore('combat', () => {
   const showResult = ref(false)
   const combatResult = ref(null)
 
-  // 自动wait标记
-  const autoWaitPending = ref(false)
-
   // 倒计时到0时的回调函数
   const onTimeoutCallback = ref(null)
 
@@ -389,7 +386,6 @@ export const useCombatStore = defineStore('combat', () => {
     mySkills.value = []
     showResult.value = false
     combatResult.value = null
-    autoWaitPending.value = false
     effectQueue.value = []
     myName.value = ''
     myFaction.value = ''
@@ -400,7 +396,7 @@ export const useCombatStore = defineStore('combat', () => {
     isInCombat, combatId, factions, characters, actionBar,
     currentTurn, isMyTurn, currentActorId, battleLogs,
     turnCountdown, targetSelectionMode, pendingSkill, hoveredTarget,
-    mySkills, showResult, combatResult, autoWaitPending, effectQueue,
+    mySkills, showResult, combatResult, effectQueue,
     myName, myFaction,
     // 计算属性
     allies, enemies, enemyFactions, aliveEnemies, aliveAllies, currentActor,
