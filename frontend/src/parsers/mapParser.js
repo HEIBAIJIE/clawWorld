@@ -88,6 +88,7 @@ function isPassableTerrain(terrain) {
  * 解析实体列表
  * 输入格式:
  * "史莱姆#1 Lv.3 (8,8) [可直接交互] [类型：普通敌人] [交互选项: 查看, 攻击]"
+ * "哥布林#1 Lv.2 (5,5) [已死亡，30秒后刷新] [类型：普通敌人] [交互选项: 查看]"
  * "森林入口 (0,0) [可直接交互] [类型：传送点] [交互选项: 传送到新手村·村中心传送点]"
  * @param {string} content - 实体列表文本
  * @returns {array} 实体数组
@@ -104,17 +105,30 @@ export function parseEntityList(content) {
     let match = trimmed.match(/^(.+?)\s+Lv\.(\d+)\s+\((\d+),(\d+)\)\s+\[([^\]]+)\]\s+\[类型[：:]([^\]]+)\](?:\s+\[交互选项[：:]\s*([^\]]*)\])?/)
 
     if (match) {
-      entities.push({
+      const accessibility = match[5]
+      const entity = {
         name: match[1].trim(),
         level: parseInt(match[2]),
         x: parseInt(match[3]),
         y: parseInt(match[4]),
-        accessibility: match[5],
+        accessibility: accessibility,
         type: mapEntityTypeToInternal(match[6].trim()),
         displayType: match[6].trim(),
         interactionOptions: parseInteractionOptions(match[7] || ''),
-        isInRange: match[5] === '可直接交互'
-      })
+        isInRange: accessibility === '可直接交互',
+        isDead: false,
+        respawnSeconds: 0
+      }
+
+      // 检查是否是死亡状态
+      const deadMatch = accessibility.match(/已死亡，(\d+)秒后刷新/)
+      if (deadMatch) {
+        entity.isDead = true
+        entity.respawnSeconds = parseInt(deadMatch[1])
+        entity.isInRange = false
+      }
+
+      entities.push(entity)
       continue
     }
 
@@ -122,17 +136,30 @@ export function parseEntityList(content) {
     match = trimmed.match(/^(.+?)\s+\((\d+),(\d+)\)\s+\[([^\]]+)\]\s+\[类型[：:]([^\]]+)\](?:\s+\[交互选项[：:]\s*([^\]]*)\])?/)
 
     if (match) {
-      entities.push({
+      const accessibility = match[4]
+      const entity = {
         name: match[1].trim(),
         level: null,
         x: parseInt(match[2]),
         y: parseInt(match[3]),
-        accessibility: match[4],
+        accessibility: accessibility,
         type: mapEntityTypeToInternal(match[5].trim()),
         displayType: match[5].trim(),
         interactionOptions: parseInteractionOptions(match[6] || ''),
-        isInRange: match[4] === '可直接交互'
-      })
+        isInRange: accessibility === '可直接交互',
+        isDead: false,
+        respawnSeconds: 0
+      }
+
+      // 检查是否是死亡状态
+      const deadMatch = accessibility.match(/已死亡，(\d+)秒后刷新/)
+      if (deadMatch) {
+        entity.isDead = true
+        entity.respawnSeconds = parseInt(deadMatch[1])
+        entity.isInRange = false
+      }
+
+      entities.push(entity)
     }
   }
 

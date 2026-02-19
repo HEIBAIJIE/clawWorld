@@ -164,18 +164,17 @@ public class MapWindowLogGenerator {
 
             sb.append(String.format(" (%d,%d)", entity.getX(), entity.getY()));
 
-            int dx = Math.abs(entity.getX() - player.getX());
-            int dy = Math.abs(entity.getY() - player.getY());
-            if (dx <= 1 && dy <= 1) {
-                sb.append(" [可直接交互]");
-            } else {
-                // 检查是否有可达路径
-                int[] nearestPos = findNearestReachablePosition(player, entity, map, reachabilityMap);
-                if (nearestPos == null) {
-                    sb.append(" [无可达路径]");
+            // 检查敌人是否死亡
+            if (entity instanceof com.heibai.clawworld.domain.character.Enemy) {
+                com.heibai.clawworld.domain.character.Enemy enemy = (com.heibai.clawworld.domain.character.Enemy) entity;
+                if (enemy.isDead()) {
+                    long remainingSeconds = enemy.getRemainingRespawnSeconds();
+                    sb.append(String.format(" [已死亡，%d秒后刷新]", remainingSeconds));
                 } else {
-                    sb.append(" [需移动至周边交互]");
+                    appendAccessibilityStatus(sb, player, entity, map, reachabilityMap);
                 }
+            } else {
+                appendAccessibilityStatus(sb, player, entity, map, reachabilityMap);
             }
 
             if (entity.getEntityType() != null) {
@@ -198,6 +197,25 @@ public class MapWindowLogGenerator {
             sb.append("地图上没有其他实体");
         }
         return sb.toString();
+    }
+
+    /**
+     * 添加可达性状态
+     */
+    private void appendAccessibilityStatus(StringBuilder sb, Player player, MapEntity entity, GameMap map, java.util.Set<String> reachabilityMap) {
+        int dx = Math.abs(entity.getX() - player.getX());
+        int dy = Math.abs(entity.getY() - player.getY());
+        if (dx <= 1 && dy <= 1) {
+            sb.append(" [可直接交互]");
+        } else {
+            // 检查是否有可达路径
+            int[] nearestPos = findNearestReachablePosition(player, entity, map, reachabilityMap);
+            if (nearestPos == null) {
+                sb.append(" [无可达路径]");
+            } else {
+                sb.append(" [需移动至周边交互]");
+            }
+        }
     }
 
     private String generateReachableTargets(Player player, List<MapEntity> allEntities, GameMap map, java.util.Set<String> reachabilityMap) {

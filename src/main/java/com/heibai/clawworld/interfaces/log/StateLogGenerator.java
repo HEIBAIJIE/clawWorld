@@ -59,7 +59,11 @@ public class StateLogGenerator {
         // 2. 收集环境变化
         Player currentPlayer = playerSessionService.getPlayerState(playerId);
         if (currentPlayer != null && currentPlayer.getMapId() != null) {
-            List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(currentPlayer.getMapId());
+            String currentMapId = currentPlayer.getMapId();
+            String lastMapId = account.getLastMapId();
+            boolean isMapChanged = lastMapId != null && !lastMapId.equals(currentMapId);
+
+            List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(currentMapId);
 
             // 构建当前实体快照
             Map<String, AccountEntity.EntitySnapshot> currentSnapshot = new HashMap<>();
@@ -75,6 +79,13 @@ public class StateLogGenerator {
                 AccountEntity.EntitySnapshot snapshot = new AccountEntity.EntitySnapshot();
                 snapshot.setX(entity.getX());
                 snapshot.setY(entity.getY());
+                snapshot.setEntityType(entity.getEntityType());
+
+                // 记录敌人的死亡状态
+                if (entity instanceof com.heibai.clawworld.domain.character.Enemy) {
+                    com.heibai.clawworld.domain.character.Enemy enemy = (com.heibai.clawworld.domain.character.Enemy) entity;
+                    snapshot.setIsDead(enemy.isDead());
+                }
 
                 if (entity.isInteractable()) {
                     List<String> options = getEntityInteractionOptions(entity, currentPlayer);
@@ -86,11 +97,14 @@ public class StateLogGenerator {
                 currentSnapshot.put(entity.getName(), snapshot);
             }
 
-            // 分析变化并生成日志
-            generateEntityChangeLogs(builder, lastSnapshot, currentSnapshot, currentEntitiesMap);
+            // 分析变化并生成日志（地图切换时跳过实体变化日志）
+            if (!isMapChanged) {
+                generateEntityChangeLogs(builder, lastSnapshot, currentSnapshot, currentEntitiesMap);
+            }
 
-            // 保存当前快照
+            // 保存当前快照和地图ID
             account.setLastEntitySnapshot(currentSnapshot);
+            account.setLastMapId(currentMapId);
         }
 
         // 3. 队伍状态变化
@@ -174,6 +188,31 @@ public class StateLogGenerator {
                             String.format("%s 移动到 (%d,%d)",
                                 entityName, currentSnap.getX(), currentSnap.getY()));
                     }
+                }
+            }
+        }
+
+        // 检测敌人刷新（从死亡变为存活）
+        for (Map.Entry<String, AccountEntity.EntitySnapshot> entry : currentSnapshot.entrySet()) {
+            String entityName = entry.getKey();
+            AccountEntity.EntitySnapshot currentSnap = entry.getValue();
+            AccountEntity.EntitySnapshot lastSnap = lastSnapshot.get(entityName);
+
+            if (lastSnap != null && "ENEMY".equals(currentSnap.getEntityType())) {
+                Boolean lastIsDead = lastSnap.getIsDead();
+                Boolean currentIsDead = currentSnap.getIsDead();
+                // 从死亡变为存活 = 刷新
+                if (Boolean.TRUE.equals(lastIsDead) && Boolean.FALSE.equals(currentIsDead)) {
+                    MapEntity entity = currentEntitiesMap.get(entityName);
+                    List<String> options = currentSnap.getInteractionOptions();
+                    String optionsStr = (options != null && !options.isEmpty())
+                        ? String.join(", ", options)
+                        : "无";
+                    builder.addState("环境变化",
+                        String.format("ENEMY %s 出现在 (%d,%d)",
+                            entityName, currentSnap.getX(), currentSnap.getY()));
+                    builder.addState("环境变化",
+                        String.format("%s 的交互选项：[%s]", entityName, optionsStr));
                 }
             }
         }

@@ -17,16 +17,20 @@
           v-for="entity in enemies"
           :key="entity.name"
           class="entity-item"
+          :class="{ 'entity-dead': entity.isDead }"
           @click="handleEntityClick(entity)"
         >
-          <div class="entity-icon enemy">👹</div>
+          <div class="entity-icon enemy" :class="{ 'icon-dead': entity.isDead }">👹</div>
           <div class="entity-details">
             <div class="entity-name">
               {{ entity.name }}
               <span v-if="entity.level" class="entity-level">Lv.{{ entity.level }}</span>
             </div>
             <div class="entity-meta">
-              <span class="entity-distance" :class="{ 'in-range': entity.isInRange }">
+              <span v-if="entity.isDead" class="entity-dead-status">
+                已死亡，{{ entity.respawnSeconds }}秒后刷新
+              </span>
+              <span v-else class="entity-distance" :class="{ 'in-range': entity.isInRange }">
                 {{ entity.isInRange ? '可交互' : `距离 ${entity.distance}` }}
               </span>
             </div>
@@ -179,5 +183,18 @@ function handleEntityClick(entity) {
   color: var(--text-muted);
   padding: 24px;
   font-size: 13px;
+}
+
+.entity-dead {
+  opacity: 0.5;
+}
+
+.icon-dead {
+  filter: grayscale(100%);
+}
+
+.entity-dead-status {
+  color: #888;
+  font-size: 11px;
 }
 </style>

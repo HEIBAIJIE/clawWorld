@@ -597,6 +597,34 @@ export function useCommand() {
       return
     }
 
+    // 敌人刷新/出现: "ENEMY 野狼#1 出现在 (6,6)"
+    const enemySpawnMatch = content.match(/ENEMY\s+(.+?)\s+出现在\s+\((\d+),(\d+)\)/)
+    if (enemySpawnMatch) {
+      const enemyName = enemySpawnMatch[1]
+      const x = parseInt(enemySpawnMatch[2])
+      const y = parseInt(enemySpawnMatch[3])
+      // 更新敌人状态：标记为存活
+      const existingEntity = mapStore.entities.find(e => e.name === enemyName)
+      if (existingEntity) {
+        mapStore.updateEntity(enemyName, { x, y, isDead: false, respawnSeconds: 0 })
+      } else {
+        mapStore.addEntity({
+          name: enemyName,
+          x,
+          y,
+          type: 'ENEMY',
+          displayType: '普通敌人',
+          interactionOptions: [],
+          isInRange: mapStore.getDistance(playerStore.x, playerStore.y, x, y) <= 1,
+          distance: mapStore.getDistance(playerStore.x, playerStore.y, x, y),
+          isDead: false,
+          respawnSeconds: 0
+        })
+      }
+      recalculateEntityDistances()
+      return
+    }
+
     // 实体离开地图: "小小 离开了地图"
     const leaveMatch = content.match(/(.+?)\s+离开了地图/)
     if (leaveMatch) {

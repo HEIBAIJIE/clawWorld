@@ -233,6 +233,12 @@ export function useMapRenderer(canvasRef) {
         continue
       }
 
+      // 检查敌人是否死亡，设置透明度
+      const isDead = entity.isDead === true
+      if (isDead) {
+        ctx.globalAlpha = 0.4
+      }
+
       // 绘制实体圆形背景
       const color = ENTITY_COLORS[entity.type] || '#888'
       ctx.fillStyle = color
@@ -257,6 +263,11 @@ export function useMapRenderer(canvasRef) {
         ctx.fillStyle = '#ffd700'
         ctx.font = `${Math.max(8, CELL_SIZE.value * 0.18)}px Arial`
         ctx.fillText(`Lv.${entity.level}`, screenX, screenY - CELL_SIZE.value * 0.45)
+      }
+
+      // 恢复透明度
+      if (isDead) {
+        ctx.globalAlpha = 1.0
       }
     }
   }

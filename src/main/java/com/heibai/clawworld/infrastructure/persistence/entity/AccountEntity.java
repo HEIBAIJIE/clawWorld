@@ -55,6 +55,9 @@ public class AccountEntity {
     // EntitySnapshot包含：位置(x,y)和交互选项列表
     private java.util.Map<String, EntitySnapshot> lastEntitySnapshot;
 
+    // 上次状态的地图ID（用于检测地图切换）
+    private String lastMapId;
+
     // 上次获取的战斗日志序列号（用于增量获取战斗日志）
     private Integer lastCombatLogSequence;
 
@@ -66,6 +69,8 @@ public class AccountEntity {
         private int x;
         private int y;
         private java.util.List<String> interactionOptions;
+        private Boolean isDead; // 敌人死亡状态（仅对敌人有效）
+        private String entityType; // 实体类型
     }
 
     @Data

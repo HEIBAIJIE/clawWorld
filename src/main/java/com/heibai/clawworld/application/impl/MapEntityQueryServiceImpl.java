@@ -207,6 +207,7 @@ public class MapEntityQueryServiceImpl implements MapEntityQueryService {
         enemy.setLastDeathTime(entity.getLastDeathTime());
         enemy.setInCombat(entity.isInCombat());
         enemy.setCombatId(entity.getCombatId());
+        enemy.setDead(entity.isDead());
 
         return enemy;
     }

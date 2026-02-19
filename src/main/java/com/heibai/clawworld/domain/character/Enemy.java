@@ -27,6 +27,9 @@ public class Enemy extends Character {
     private int respawnSeconds;
     private Long lastDeathTime;
 
+    // 死亡状态
+    private boolean isDead;
+
     @Override
     public String getEntityType() {
         return "ENEMY";
@@ -34,12 +37,36 @@ public class Enemy extends Character {
 
     @Override
     public boolean isPassable() {
-        return false; // 敌人未被消灭前不可通过
+        return isDead; // 敌人死亡后可通过
     }
 
     @Override
     public List<String> getInteractionOptions() {
+        if (isDead) {
+            return Arrays.asList("查看");
+        }
         return Arrays.asList("查看", "攻击");
+    }
+
+    @Override
+    public List<String> getInteractionOptions(String viewerFaction, boolean isMapSafe) {
+        if (isDead) {
+            return Arrays.asList("查看");
+        }
+        return Arrays.asList("查看", "攻击");
+    }
+
+    /**
+     * 获取剩余刷新时间（秒）
+     * @return 剩余秒数，如果未死亡或无刷新时间则返回 -1
+     */
+    public long getRemainingRespawnSeconds() {
+        if (!isDead || lastDeathTime == null || respawnSeconds <= 0) {
+            return -1;
+        }
+        long elapsedSeconds = (System.currentTimeMillis() - lastDeathTime) / 1000;
+        long remaining = respawnSeconds - elapsedSeconds;
+        return Math.max(0, remaining);
     }
 
     public enum EnemyTier {
