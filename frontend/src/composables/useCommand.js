@@ -438,6 +438,14 @@ export function useCommand() {
         }
         break
 
+      case '参战方':
+        // 状态日志中的参战方更新（当新阵营加入战斗时）
+        if (combatStore.isInCombat) {
+          const stateFactions = parseFactions(content)
+          combatStore.updateCombatState({ factions: stateFactions })
+        }
+        break
+
       case '行动条':
         // 状态日志中的行动条更新
         if (combatStore.isInCombat) {

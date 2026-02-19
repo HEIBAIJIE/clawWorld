@@ -15,6 +15,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -32,6 +35,9 @@ public class CombatEndHandler {
     private final WindowStateService windowStateService;
     private final CombatRewardDistributor rewardDistributor;
 
+    // 战斗结束处理完成的信号量，用于等待处理完成
+    private final Map<String, CountDownLatch> combatEndLatches = new ConcurrentHashMap<>();
+
     /**
      * 处理战斗结束时的窗口状态转换和战利品分配
      * 将所有参战玩家的窗口状态从COMBAT转换回MAP
@@ -42,31 +48,77 @@ public class CombatEndHandler {
             CombatInstance.RewardDistribution distribution = settlementService.getAndRemoveRewardDistribution(combatId);
 
             if (distribution == null) {
-                // 另一个线程已经在处理战斗结束
-                log.debug("战斗结束处理已由其他线程执行: combatId={}", combatId);
+                // 另一个线程已经在处理战斗结束，等待处理完成
+                log.debug("战斗结束处理已由其他线程执行，等待完成: combatId={}", combatId);
+                waitForCombatEndProcessing(combatId);
                 return;
             }
 
-            // 处理战利品分配
-            if (distribution.isEnemiesNeedReset()) {
-                resetEnemyStates(distribution);
-            } else {
-                rewardDistributor.distributeRewards(distribution);
-                updateDefeatedEnemies(distribution);
+            // 创建信号量，让其他线程可以等待
+            CountDownLatch latch = new CountDownLatch(1);
+            combatEndLatches.put(combatId, latch);
+
+            try {
+                // 处理战利品分配
+                if (distribution.isEnemiesNeedReset()) {
+                    resetEnemyStates(distribution);
+                } else {
+                    rewardDistributor.distributeRewards(distribution);
+                    updateDefeatedEnemies(distribution);
+                }
+
+                // 处理被击败玩家的传送和经验惩罚
+                handleDefeatedPlayers(distribution);
+
+                // 同步玩家的战斗后状态（生命和法力）- 只对存活玩家
+                syncPlayerFinalStates(distribution);
+
+                // 处理窗口状态转换
+                handleWindowTransitions(combatId, distribution);
+            } finally {
+                // 通知等待的线程处理完成
+                latch.countDown();
+                // 延迟清理信号量，确保其他线程有机会获取
+                scheduleCleanup(combatId);
             }
-
-            // 处理被击败玩家的传送和经验惩罚
-            handleDefeatedPlayers(distribution);
-
-            // 同步玩家的战斗后状态（生命和法力）- 只对存活玩家
-            syncPlayerFinalStates(distribution);
-
-            // 处理窗口状态转换
-            handleWindowTransitions(combatId, distribution);
 
         } catch (Exception e) {
             log.error("处理战斗结束失败: combatId={}", combatId, e);
         }
+    }
+
+    /**
+     * 等待战斗结束处理完成
+     */
+    private void waitForCombatEndProcessing(String combatId) {
+        CountDownLatch latch = combatEndLatches.get(combatId);
+        if (latch != null) {
+            try {
+                // 最多等待2秒
+                boolean completed = latch.await(2, TimeUnit.SECONDS);
+                if (!completed) {
+                    log.warn("等待战斗结束处理超时: combatId={}", combatId);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("等待战斗结束处理被中断: combatId={}", combatId);
+            }
+        }
+    }
+
+    /**
+     * 延迟清理信号量
+     */
+    private void scheduleCleanup(String combatId) {
+        // 使用一个简单的延迟清理，5秒后移除
+        new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+                combatEndLatches.remove(combatId);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
     }
 
     /**

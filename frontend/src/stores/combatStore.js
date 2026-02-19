@@ -63,7 +63,7 @@ export const useCombatStore = defineStore('combat', () => {
 
   // 计算属性：敌方角色（按阵营分组）
   const enemyFactions = computed(() => {
-    if (!myFaction.value) return []
+    if (!myFaction.value) return {}
     const grouped = {}
     for (const faction of factions.value) {
       if (faction.id !== myFaction.value) {
@@ -122,6 +122,8 @@ export const useCombatStore = defineStore('combat', () => {
     if (data.factions !== undefined) {
       console.log('[CombatStore] 更新参战方:', data.factions)
       factions.value = data.factions
+      // 参战方更新后，尝试更新我的阵营
+      updateMyFaction()
     }
     // 先设置 myName，这样后续的 updateCharacterFactions 能正确计算 myFaction
     if (data.myName !== undefined) {

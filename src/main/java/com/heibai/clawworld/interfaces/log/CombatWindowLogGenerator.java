@@ -199,6 +199,18 @@ public class CombatWindowLogGenerator {
             builder.addState("指令响应", commandResult);
         }
 
+        // 2.5 参战方信息（当有新阵营加入时，前端需要更新参战方列表）
+        StringBuilder partiesInfo = new StringBuilder();
+        int partyIndex = 1;
+        for (Combat.CombatParty party : combat.getParties()) {
+            partiesInfo.append(String.format("第%d方（%s）：", partyIndex++, party.getFaction()));
+            for (Combat.CombatCharacter character : party.getCharacters()) {
+                partiesInfo.append(character.getName()).append(" ");
+            }
+            partiesInfo.append("\n");
+        }
+        builder.addState("参战方", partiesInfo.toString().trim());
+
         // 3. 角色状态
         StringBuilder statusChanges = new StringBuilder();
         for (Combat.CombatParty party : combat.getParties()) {
