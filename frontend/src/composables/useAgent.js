@@ -46,7 +46,9 @@ ${agentStore.config.behaviorStyle}
 - attribute add [str/agi/int/vit] [数量] - 分配属性点
 - say [world/map/party] [消息] - 聊天
 - say to [玩家名称] [消息] - 私聊
-- wait [秒数] - 等待（最多60秒，用于等待其他玩家响应）
+- inspect self - 查看自身状态
+- inspect [物品] - 查看物品详情（效果、价格等）
+- wait [秒数] - 等待（最多60秒，可用于等待其他玩家响应）
 
 2、战斗窗口：
 - cast [技能名称] - 释放非指向技能
@@ -59,12 +61,15 @@ ${agentStore.config.behaviorStyle}
 - trade add/remove [物品名称] - 添加/移除物品
 - trade money [金额] - 设置金额
 - trade lock/unlock - 锁定/解锁
-- trade confirm - 确认交易
+- trade confirm - 确认交易（双方锁定后有效）
 - trade end - 取消交易
 
 4、商店窗口：
 - shop buy/sell [物品名称] [数量] - 买卖商品
 - shop leave - 离开商店
+
+5、注册窗口：
+- register [职业] [昵称] - 注册角色
 
 ## 响应格式要求
 你必须严格按照以下JSON格式响应，不要添加任何额外文字：
