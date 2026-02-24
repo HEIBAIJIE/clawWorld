@@ -74,6 +74,7 @@ class MapEditor:
         self.canvas.config(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
         self.canvas.bind('<Button-1>', self.on_canvas_click)
         self.canvas.bind('<B1-Motion>', self.on_canvas_drag)
+        self.canvas.bind('<Button-3>', self.on_canvas_right_click)  # 右键查看信息
 
         # 右侧面板 - 工具栏
         right_panel = ttk.Frame(self.frame, width=200)
@@ -91,8 +92,6 @@ class MapEditor:
                         value='terrain', command=self.on_tool_change).pack(anchor=tk.W)
         ttk.Radiobutton(parent, text="实体", variable=self.tool_var,
                         value='entity', command=self.on_tool_change).pack(anchor=tk.W)
-        ttk.Radiobutton(parent, text="删除实体", variable=self.tool_var,
-                        value='delete', command=self.on_tool_change).pack(anchor=tk.W)
 
         ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
 
@@ -129,6 +128,41 @@ class MapEditor:
         # 保存按钮
         ttk.Button(parent, text="保存地图", command=self.save_current_map).pack(fill=tk.X, pady=5)
 
+        ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
+
+        # 格子信息面板
+        ttk.Label(parent, text="格子信息").pack(pady=5)
+        self.cell_info_label = ttk.Label(parent, text="坐标: -")
+        self.cell_info_label.pack(anchor=tk.W)
+        self.terrain_info_label = ttk.Label(parent, text="地形: -")
+        self.terrain_info_label.pack(anchor=tk.W)
+
+        ttk.Label(parent, text="实体列表:").pack(anchor=tk.W, pady=(5, 0))
+
+        # 实体列表框
+        entity_list_frame = ttk.Frame(parent)
+        entity_list_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.entity_listbox = tk.Listbox(entity_list_frame, height=6)
+        self.entity_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.entity_listbox.bind('<Double-Button-1>', self.on_entity_double_click)
+
+        entity_scrollbar = ttk.Scrollbar(entity_list_frame, orient=tk.VERTICAL,
+                                         command=self.entity_listbox.yview)
+        entity_scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.entity_listbox.config(yscrollcommand=entity_scrollbar.set)
+
+        # 提示
+        ttk.Label(parent, text="(双击编辑实体)", font=('Arial', 8)).pack(anchor=tk.W)
+
+        # 删除按钮
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(fill=tk.X, pady=5)
+        ttk.Button(btn_frame, text="删除选中", command=self.delete_selected_entity).pack(side=tk.LEFT, padx=2)
+        ttk.Button(btn_frame, text="删除全部", command=self.delete_all_entities_at_cell).pack(side=tk.LEFT, padx=2)
+
+        ttk.Separator(parent, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=10)
+
         # 图例
         ttk.Label(parent, text="图例").pack(pady=5)
         legend_frame = ttk.Frame(parent)
@@ -141,6 +175,10 @@ class MapEditor:
             canvas.pack(side=tk.LEFT, padx=2)
             canvas.create_oval(2, 2, 13, 13, fill=color, outline='black')
             ttk.Label(row, text=entity_type).pack(side=tk.LEFT)
+
+        # 初始化当前选中格子
+        self.selected_cell = None
+        self.selected_entities = []
 
     def load_data(self):
         """加载所有数据"""
@@ -244,20 +282,64 @@ class MapEditor:
                     fill=color, outline='gray', tags=f'cell_{x}_{y}'
                 )
 
-        # 绘制实体
+        # 绘制实体（支持叠加显示）
+        # 先按位置分组
+        entity_groups = {}
         for e in self.entities:
             if e['mapId'] == map_id:
-                x, y = int(e['x']), int(e['y'])
+                pos = (int(e['x']), int(e['y']))
+                if pos not in entity_groups:
+                    entity_groups[pos] = []
+                entity_groups[pos].append(e)
+
+        # 绘制每个位置的实体
+        for (x, y), entities_at_pos in entity_groups.items():
+            count = len(entities_at_pos)
+            # Y轴翻转
+            base_draw_y = (height - 1 - y) * self.cell_size + self.cell_size // 2
+            base_draw_x = x * self.cell_size + self.cell_size // 2
+
+            if count == 1:
+                # 单个实体，居中显示
+                e = entities_at_pos[0]
                 entity_type = e['entityType']
                 color = ENTITY_COLORS.get(entity_type, '#FFFFFF')
-                # Y轴翻转
-                draw_y = (height - 1 - y) * self.cell_size + self.cell_size // 2
-                draw_x = x * self.cell_size + self.cell_size // 2
                 r = self.cell_size // 3
                 self.canvas.create_oval(
-                    draw_x - r, draw_y - r, draw_x + r, draw_y + r,
+                    base_draw_x - r, base_draw_y - r, base_draw_x + r, base_draw_y + r,
                     fill=color, outline='black', tags=f'entity_{x}_{y}'
                 )
+            else:
+                # 多个实体，按网格排列
+                r = self.cell_size // 4  # 缩小半径
+                # 计算排列方式
+                if count == 2:
+                    offsets = [(-r//2, 0), (r//2, 0)]
+                elif count == 3:
+                    offsets = [(-r//2, -r//2), (r//2, -r//2), (0, r//2)]
+                elif count == 4:
+                    offsets = [(-r//2, -r//2), (r//2, -r//2), (-r//2, r//2), (r//2, r//2)]
+                else:
+                    # 超过4个，环形排列
+                    import math
+                    offsets = []
+                    for i in range(count):
+                        angle = 2 * math.pi * i / count
+                        ox = int(r * 0.8 * math.cos(angle))
+                        oy = int(r * 0.8 * math.sin(angle))
+                        offsets.append((ox, oy))
+
+                for i, e in enumerate(entities_at_pos):
+                    entity_type = e['entityType']
+                    color = ENTITY_COLORS.get(entity_type, '#FFFFFF')
+                    ox, oy = offsets[i] if i < len(offsets) else (0, 0)
+                    draw_x = base_draw_x + ox
+                    draw_y = base_draw_y + oy
+                    small_r = r // 2 if count > 2 else r * 2 // 3
+                    self.canvas.create_oval(
+                        draw_x - small_r, draw_y - small_r, draw_x + small_r, draw_y + small_r,
+                        fill=color, outline='black', tags=f'entity_{x}_{y}_{i}'
+                    )
 
         # 绘制坐标
         for x in range(width):
@@ -283,32 +365,164 @@ class MapEditor:
         if self.current_tool == 'terrain':
             self.handle_canvas_action(event)
 
-    def handle_canvas_action(self, event):
-        """处理画布操作"""
-        if not self.current_map:
-            return
+    def on_canvas_right_click(self, event):
+        """右键点击查看格子信息"""
+        self.update_cell_info(event)
 
-        # 转换为画布坐标
+    def get_cell_coords(self, event):
+        """从事件获取格子坐标"""
+        if not self.current_map:
+            return None, None
+
         canvas_x = self.canvas.canvasx(event.x)
         canvas_y = self.canvas.canvasy(event.y)
 
         width = int(self.current_map['width'])
         height = int(self.current_map['height'])
 
-        # 计算格子坐标
         x = int(canvas_x // self.cell_size)
-        # Y轴翻转
         y = height - 1 - int(canvas_y // self.cell_size)
 
         if not (0 <= x < width and 0 <= y < height):
+            return None, None
+
+        return x, y
+
+    def update_cell_info(self, event):
+        """更新格子信息面板"""
+        x, y = self.get_cell_coords(event)
+        if x is None:
+            return
+
+        map_id = self.current_map['id']
+        self.selected_cell = (x, y)
+
+        # 更新坐标显示
+        self.cell_info_label.config(text=f"坐标: ({x}, {y})")
+
+        # 获取地形
+        terrain = self.terrain_grid[y][x] if hasattr(self, 'terrain_grid') else '-'
+        self.terrain_info_label.config(text=f"地形: {terrain}")
+
+        # 获取该位置的实体
+        self.selected_entities = []
+        self.entity_listbox.delete(0, tk.END)
+
+        for i, e in enumerate(self.entities):
+            if e['mapId'] == map_id and int(e['x']) == x and int(e['y']) == y:
+                self.selected_entities.append(i)
+                self.entity_listbox.insert(tk.END, f"{e['entityType']} - {e['entityId']}")
+
+    def delete_selected_entity(self):
+        """删除选中的实体"""
+        selection = self.entity_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("警告", "请先选择要删除的实体")
+            return
+
+        idx = self.selected_entities[selection[0]]
+        del self.entities[idx]
+        self.draw_map()
+
+        # 刷新信息面板
+        if self.selected_cell:
+            # 模拟事件来刷新
+            self.refresh_cell_info()
+
+    def delete_all_entities_at_cell(self):
+        """删除当前格子的所有实体"""
+        if not self.selected_entities:
+            messagebox.showwarning("警告", "当前格子没有实体")
+            return
+
+        if not messagebox.askyesno("确认", f"确定要删除该位置的所有 {len(self.selected_entities)} 个实体吗？"):
+            return
+
+        # 从后往前删除
+        for idx in sorted(self.selected_entities, reverse=True):
+            del self.entities[idx]
+
+        self.draw_map()
+        self.refresh_cell_info()
+
+    def refresh_cell_info(self):
+        """刷新当前选中格子的信息"""
+        if not self.selected_cell or not self.current_map:
+            return
+
+        x, y = self.selected_cell
+        map_id = self.current_map['id']
+
+        self.selected_entities = []
+        self.entity_listbox.delete(0, tk.END)
+
+        for i, e in enumerate(self.entities):
+            if e['mapId'] == map_id and int(e['x']) == x and int(e['y']) == y:
+                self.selected_entities.append(i)
+                self.entity_listbox.insert(tk.END, f"{e['entityType']} - {e['entityId']}")
+
+    def on_entity_double_click(self, event):
+        """双击实体列表项查看/编辑实体信息"""
+        selection = self.entity_listbox.curselection()
+        if not selection:
+            return
+
+        idx = self.selected_entities[selection[0]]
+        entity = self.entities[idx]
+        entity_type = entity['entityType']
+        entity_id = entity['entityId']
+
+        if entity_type == 'WAYPOINT':
+            self.edit_waypoint_connections(entity_id)
+        else:
+            # 显示实体详情
+            self.show_entity_info(entity)
+
+    def show_entity_info(self, entity):
+        """显示实体详细信息"""
+        dialog = tk.Toplevel(self.frame)
+        dialog.title(f"实体信息 - {entity['entityType']}")
+        dialog.geometry("300x200")
+
+        info_frame = ttk.Frame(dialog, padding=10)
+        info_frame.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(info_frame, text=f"类型: {entity['entityType']}").pack(anchor=tk.W)
+        ttk.Label(info_frame, text=f"ID: {entity['entityId']}").pack(anchor=tk.W)
+        ttk.Label(info_frame, text=f"位置: ({entity['x']}, {entity['y']})").pack(anchor=tk.W)
+        if entity.get('instanceId'):
+            ttk.Label(info_frame, text=f"实例ID: {entity['instanceId']}").pack(anchor=tk.W)
+
+        # 显示额外信息
+        if entity['entityType'] == 'ENEMY':
+            for e in self.enemies:
+                if e['id'] == entity['entityId']:
+                    ttk.Separator(info_frame).pack(fill=tk.X, pady=5)
+                    ttk.Label(info_frame, text=f"名称: {e.get('name', '-')}").pack(anchor=tk.W)
+                    ttk.Label(info_frame, text=f"等级: {e.get('level', '-')}").pack(anchor=tk.W)
+                    break
+        elif entity['entityType'] == 'NPC':
+            for n in self.npcs:
+                if n['id'] == entity['entityId']:
+                    ttk.Separator(info_frame).pack(fill=tk.X, pady=5)
+                    ttk.Label(info_frame, text=f"名称: {n.get('name', '-')}").pack(anchor=tk.W)
+                    break
+
+        ttk.Button(dialog, text="关闭", command=dialog.destroy).pack(pady=10)
+
+    def handle_canvas_action(self, event):
+        """处理画布操作"""
+        if not self.current_map:
+            return
+
+        x, y = self.get_cell_coords(event)
+        if x is None:
             return
 
         if self.current_tool == 'terrain':
             self.set_terrain(x, y)
         elif self.current_tool == 'entity':
             self.add_entity(x, y)
-        elif self.current_tool == 'delete':
-            self.delete_entity(x, y)
 
     def set_terrain(self, x, y):
         """设置地形"""
@@ -345,14 +559,11 @@ class MapEditor:
             messagebox.showwarning("警告", "请选择实体ID")
             return
 
-        # 检查是否已存在实体
-        for e in self.entities:
-            if e['mapId'] == map_id and int(e['x']) == x and int(e['y']) == y:
-                messagebox.showwarning("警告", f"该位置已存在实体: {e['entityType']}")
-                return
-
-        # 生成实例ID
-        instance_id = f"{entity_id}_{x}_{y}" if entity_type == 'ENEMY' else ''
+        # 生成实例ID（为同位置的相同实体生成唯一ID）
+        existing_count = sum(1 for e in self.entities
+                            if e['mapId'] == map_id and int(e['x']) == x and int(e['y']) == y
+                            and e['entityType'] == entity_type and e['entityId'] == entity_id)
+        instance_id = f"{entity_id}_{x}_{y}_{existing_count}" if entity_type == 'ENEMY' else ''
 
         self.entities.append({
             'mapId': map_id,
@@ -362,24 +573,7 @@ class MapEditor:
             'instanceId': instance_id
         })
 
-        # 如果是传送点，询问是否编辑连接
-        if entity_type == 'WAYPOINT':
-            if messagebox.askyesno("传送点", "是否编辑传送点连接？"):
-                self.edit_waypoint_connections(entity_id)
-
         self.draw_map()
-
-    def delete_entity(self, x, y):
-        """删除实体"""
-        map_id = self.current_map['id']
-
-        for i, e in enumerate(self.entities):
-            if e['mapId'] == map_id and int(e['x']) == x and int(e['y']) == y:
-                del self.entities[i]
-                self.draw_map()
-                return
-
-        messagebox.showinfo("提示", "该位置没有实体")
 
     def edit_waypoint_connections(self, waypoint_id):
         """编辑传送点连接"""
