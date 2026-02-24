@@ -128,6 +128,14 @@ export function parseEntityList(content) {
         entity.isInRange = false
       }
 
+      // 检查宝箱是否已开启
+      const chestOpenedMatch = accessibility.match(/已打开(?:，(\d+)秒后刷新)?/)
+      if (chestOpenedMatch) {
+        entity.isOpened = true
+        entity.remainingRespawnSeconds = chestOpenedMatch[1] ? parseInt(chestOpenedMatch[1]) : 0
+        entity.isInRange = false
+      }
+
       entities.push(entity)
       continue
     }
@@ -148,7 +156,9 @@ export function parseEntityList(content) {
         interactionOptions: parseInteractionOptions(match[6] || ''),
         isInRange: accessibility === '可直接交互',
         isDead: false,
-        respawnSeconds: 0
+        respawnSeconds: 0,
+        isOpened: false,
+        remainingRespawnSeconds: 0
       }
 
       // 检查是否是死亡状态
@@ -156,6 +166,14 @@ export function parseEntityList(content) {
       if (deadMatch) {
         entity.isDead = true
         entity.respawnSeconds = parseInt(deadMatch[1])
+        entity.isInRange = false
+      }
+
+      // 检查宝箱是否已开启
+      const chestOpenedMatch = accessibility.match(/已打开(?:，(\d+)秒后刷新)?/)
+      if (chestOpenedMatch) {
+        entity.isOpened = true
+        entity.remainingRespawnSeconds = chestOpenedMatch[1] ? parseInt(chestOpenedMatch[1]) : 0
         entity.isInRange = false
       }
 
@@ -179,11 +197,15 @@ function mapEntityTypeToInternal(displayType) {
     '精英敌人': 'ENEMY_ELITE',
     '地图BOSS': 'ENEMY_BOSS',
     '世界BOSS': 'ENEMY_WORLD_BOSS',
+    '小宝箱': 'CHEST_SMALL',
+    '大宝箱': 'CHEST_LARGE',
     // 兼容旧格式
     'PLAYER': 'PLAYER',
     'ENEMY': 'ENEMY',
     'WAYPOINT': 'WAYPOINT',
-    'CAMPFIRE': 'CAMPFIRE'
+    'CAMPFIRE': 'CAMPFIRE',
+    'CHEST_SMALL': 'CHEST_SMALL',
+    'CHEST_LARGE': 'CHEST_LARGE'
   }
   return typeMap[displayType] || displayType
 }

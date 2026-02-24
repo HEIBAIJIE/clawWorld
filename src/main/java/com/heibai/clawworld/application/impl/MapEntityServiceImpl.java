@@ -1,10 +1,13 @@
 package com.heibai.clawworld.application.impl;
 
 import com.heibai.clawworld.application.service.*;
+import com.heibai.clawworld.infrastructure.config.data.map.ChestConfig;
 import com.heibai.clawworld.infrastructure.config.data.map.MapConfig;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.map.MapEntity;
+import com.heibai.clawworld.infrastructure.persistence.entity.ChestInstanceEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
+import com.heibai.clawworld.infrastructure.persistence.repository.ChestInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.EnemyInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.NpcShopInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
@@ -29,6 +32,7 @@ public class MapEntityServiceImpl implements MapEntityService {
     private final PlayerSessionService playerSessionService;
     private final EnemyInstanceRepository enemyInstanceRepository;
     private final NpcShopInstanceRepository npcShopInstanceRepository;
+    private final ChestInstanceRepository chestInstanceRepository;
 
     // 委托服务
     private final PathfindingService pathfindingService;
@@ -40,6 +44,7 @@ public class MapEntityServiceImpl implements MapEntityService {
     private final TradeService tradeService;
     private final CombatService combatService;
     private final CharacterInfoService characterInfoService;
+    private final ChestService chestService;
 
     @Override
     public EntityInfo inspectCharacter(String playerId, String characterName) {
@@ -141,6 +146,49 @@ public class MapEntityServiceImpl implements MapEntityService {
                 }
 
                 return EntityInfo.success(characterName, "NPC", info.toString());
+            }
+        }
+
+        // 查找宝箱
+        var chestsOnMap = chestInstanceRepository.findByMapId(player.getCurrentMapId());
+        for (var chest : chestsOnMap) {
+            if (chest.getDisplayName() != null && chest.getDisplayName().equals(characterName)) {
+                ChestConfig chestConfig = configDataManager.getChest(chest.getTemplateId());
+                if (chestConfig == null) {
+                    return EntityInfo.error("宝箱配置不存在: " + chest.getTemplateId());
+                }
+
+                StringBuilder info = new StringBuilder();
+                info.append("=== 宝箱信息 ===\n");
+                info.append("名称: ").append(chest.getDisplayName()).append("\n");
+                info.append("描述: ").append(chestConfig.getDescription()).append("\n");
+                info.append("位置: (").append(chest.getX()).append(", ").append(chest.getY()).append(")\n");
+                info.append("类型: ").append("SMALL".equals(chest.getChestType()) ? "小宝箱（个人）" : "大宝箱（服务器）").append("\n\n");
+
+                if ("SMALL".equals(chest.getChestType())) {
+                    boolean hasOpened = chest.hasPlayerOpened(playerId);
+                    info.append("状态: ").append(hasOpened ? "已开启" : "未开启").append("\n");
+                    if (hasOpened) {
+                        info.append("（你已经开启过此宝箱）\n");
+                    }
+                } else {
+                    if (chest.isOpened()) {
+                        long now = System.currentTimeMillis();
+                        long respawnTime = chest.getLastOpenTime() + chestConfig.getRespawnSeconds() * 1000L;
+                        if (now < respawnTime) {
+                            int remaining = (int) ((respawnTime - now) / 1000);
+                            info.append("状态: 已开启\n");
+                            info.append("刷新倒计时: ").append(remaining).append("秒\n");
+                        } else {
+                            info.append("状态: 可开启\n");
+                        }
+                    } else {
+                        info.append("状态: 可开启\n");
+                    }
+                    info.append("刷新时间: ").append(chestConfig.getRespawnSeconds()).append("秒\n");
+                }
+
+                return EntityInfo.success(characterName, "CHEST", info.toString());
             }
         }
 
@@ -284,6 +332,11 @@ public class MapEntityServiceImpl implements MapEntityService {
                 return restResult.isSuccess() ?
                         InteractionResult.success(restResult.getMessage()) :
                         InteractionResult.error(restResult.getMessage());
+
+            // 宝箱交互
+            case "打开":
+            case "open":
+                return handleOpenChest(playerId, targetName);
 
             // 组队交互
             case "邀请组队":
@@ -452,5 +505,12 @@ public class MapEntityServiceImpl implements MapEntityService {
         } else {
             return InteractionResult.error(result.getMessage());
         }
+    }
+
+    private InteractionResult handleOpenChest(String playerId, String targetName) {
+        ChestService.OpenChestResult result = chestService.openChest(playerId, targetName);
+        return result.isSuccess() ?
+                InteractionResult.success(result.getMessage()) :
+                InteractionResult.error(result.getMessage());
     }
 }

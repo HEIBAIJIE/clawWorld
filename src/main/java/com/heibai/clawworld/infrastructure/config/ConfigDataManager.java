@@ -68,7 +68,9 @@ public class ConfigDataManager {
                hasFileChanged("classpath:data/map_terrain.csv") ||
                hasFileChanged("classpath:data/map_entities.csv") ||
                hasFileChanged("classpath:data/npc_shop_items.csv") ||
-               hasFileChanged("classpath:data/role_skills.csv");
+               hasFileChanged("classpath:data/role_skills.csv") ||
+               hasFileChanged("classpath:data/chests.csv") ||
+               hasFileChanged("classpath:data/chest_loot.csv");
     }
 
     private boolean hasFileChanged(String path) throws Exception {
@@ -123,6 +125,8 @@ public class ConfigDataManager {
         mapConfigLoader.loadWaypoints();
         mapConfigLoader.loadMapTerrain();
         mapConfigLoader.loadMapEntities();
+        mapConfigLoader.loadChests();
+        mapConfigLoader.loadChestLoot();
 
         log.info("All configs loaded successfully");
     }
@@ -249,5 +253,18 @@ public class ConfigDataManager {
 
     public List<MapEntityConfig> getMapEntities(String mapId) {
         return mapConfigLoader.getMapEntities(mapId);
+    }
+
+    // ========== 宝箱相关 ==========
+    public ChestConfig getChest(String id) {
+        return mapConfigLoader.getChest(id);
+    }
+
+    public Collection<ChestConfig> getAllChests() {
+        return mapConfigLoader.getAllChests().values();
+    }
+
+    public List<ChestLootConfig> getChestLoot(String chestId) {
+        return mapConfigLoader.getChestLoot(chestId);
     }
 }

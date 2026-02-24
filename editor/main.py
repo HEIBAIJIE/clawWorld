@@ -54,6 +54,7 @@ class GameEditor:
         from npc_editor import NPCEditor
         from skill_editor import SkillEditor
         from role_editor import RoleEditor
+        from chest_editor import ChestEditor
 
         # 创建各个编辑器标签页
         self.map_editor = MapEditor(self.notebook)
@@ -71,6 +72,9 @@ class GameEditor:
         self.npc_editor = NPCEditor(self.notebook)
         self.notebook.add(self.npc_editor.frame, text="NPC编辑器")
 
+        self.chest_editor = ChestEditor(self.notebook)
+        self.notebook.add(self.chest_editor.frame, text="宝箱编辑器")
+
         self.skill_editor = SkillEditor(self.notebook)
         self.notebook.add(self.skill_editor.frame, text="技能编辑器")
 
@@ -84,6 +88,7 @@ class GameEditor:
         self.item_editor.load_data()
         self.equipment_editor.load_data()
         self.npc_editor.load_data()
+        self.chest_editor.load_data()
         self.skill_editor.load_data()
         self.role_editor.load_data()
         messagebox.showinfo("提示", "所有数据已刷新")

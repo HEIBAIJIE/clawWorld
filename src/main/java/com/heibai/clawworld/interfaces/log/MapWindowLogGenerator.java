@@ -173,6 +173,26 @@ public class MapWindowLogGenerator {
                 } else {
                     appendAccessibilityStatus(sb, player, entity, map, reachabilityMap);
                 }
+            }
+            // 检查宝箱状态
+            else if (entity instanceof com.heibai.clawworld.domain.map.Chest) {
+                com.heibai.clawworld.domain.map.Chest chest = (com.heibai.clawworld.domain.map.Chest) entity;
+                if (chest.getChestType() == com.heibai.clawworld.domain.map.Chest.ChestType.SMALL) {
+                    // 小宝箱：检查当前玩家是否已开启
+                    if (chest.isOpenedByCurrentPlayer()) {
+                        sb.append(" [已打开]");
+                    } else {
+                        appendAccessibilityStatus(sb, player, entity, map, reachabilityMap);
+                    }
+                } else {
+                    // 大宝箱：检查是否已被开启且未刷新
+                    if (chest.isOpened() && !chest.canOpen()) {
+                        int remainingSeconds = chest.getRemainingRespawnSeconds();
+                        sb.append(String.format(" [已打开，%d秒后刷新]", remainingSeconds));
+                    } else {
+                        appendAccessibilityStatus(sb, player, entity, map, reachabilityMap);
+                    }
+                }
             } else {
                 appendAccessibilityStatus(sb, player, entity, map, reachabilityMap);
             }
@@ -406,6 +426,8 @@ public class MapWindowLogGenerator {
             case "NPC" -> "NPC";
             case "WAYPOINT" -> "传送点";
             case "CAMPFIRE" -> "篝火";
+            case "CHEST_SMALL" -> "小宝箱";
+            case "CHEST_LARGE" -> "大宝箱";
             case "ENEMY" -> {
                 // 根据敌人等级细分
                 if (entity instanceof com.heibai.clawworld.domain.character.Enemy enemy) {

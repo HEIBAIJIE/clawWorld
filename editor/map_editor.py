@@ -188,6 +188,7 @@ class MapEditor:
         self.waypoints = read_csv('waypoints.csv')
         self.npcs = read_csv('npcs.csv')
         self.enemies = read_csv('enemies.csv')
+        self.chests = read_csv('chests.csv')
 
         self.refresh_map_list()
         self.refresh_entity_ids()
@@ -210,6 +211,10 @@ class MapEditor:
             ids = [e['id'] for e in self.enemies]
         elif entity_type == 'CAMPFIRE':
             ids = ['campfire']
+        elif entity_type in ('CHEST_SMALL', 'CHEST_LARGE'):
+            # 根据宝箱类型筛选
+            chest_type = 'SMALL' if entity_type == 'CHEST_SMALL' else 'LARGE'
+            ids = [c['id'] for c in self.chests if c.get('type') == chest_type]
         self.entity_id_combo['values'] = ids
         if ids:
             self.entity_id_var.set(ids[0])
@@ -506,6 +511,15 @@ class MapEditor:
                 if n['id'] == entity['entityId']:
                     ttk.Separator(info_frame).pack(fill=tk.X, pady=5)
                     ttk.Label(info_frame, text=f"名称: {n.get('name', '-')}").pack(anchor=tk.W)
+                    break
+        elif entity['entityType'] in ('CHEST_SMALL', 'CHEST_LARGE'):
+            for c in self.chests:
+                if c['id'] == entity['entityId']:
+                    ttk.Separator(info_frame).pack(fill=tk.X, pady=5)
+                    ttk.Label(info_frame, text=f"名称: {c.get('name', '-')}").pack(anchor=tk.W)
+                    ttk.Label(info_frame, text=f"类型: {c.get('type', '-')}").pack(anchor=tk.W)
+                    if c.get('type') == 'LARGE':
+                        ttk.Label(info_frame, text=f"刷新时间: {c.get('respawnSeconds', '-')}秒").pack(anchor=tk.W)
                     break
 
         ttk.Button(dialog, text="关闭", command=dialog.destroy).pack(pady=10)

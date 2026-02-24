@@ -5,17 +5,21 @@ import com.heibai.clawworld.domain.character.Enemy;
 import com.heibai.clawworld.domain.character.Npc;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.map.Campfire;
+import com.heibai.clawworld.domain.map.Chest;
 import com.heibai.clawworld.domain.map.MapEntity;
 import com.heibai.clawworld.domain.map.Waypoint;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.infrastructure.config.data.character.EnemyConfig;
 import com.heibai.clawworld.infrastructure.config.data.character.NpcConfig;
+import com.heibai.clawworld.infrastructure.config.data.map.ChestConfig;
 import com.heibai.clawworld.infrastructure.config.data.map.MapEntityConfig;
 import com.heibai.clawworld.infrastructure.config.data.map.WaypointConfig;
+import com.heibai.clawworld.infrastructure.persistence.entity.ChestInstanceEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.EnemyInstanceEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.NpcShopInstanceEntity;
 import com.heibai.clawworld.infrastructure.persistence.entity.PlayerEntity;
 import com.heibai.clawworld.infrastructure.persistence.mapper.PlayerMapper;
+import com.heibai.clawworld.infrastructure.persistence.repository.ChestInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.EnemyInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.NpcShopInstanceRepository;
 import com.heibai.clawworld.infrastructure.persistence.repository.PlayerRepository;
@@ -38,6 +42,7 @@ public class MapEntityQueryServiceImpl implements MapEntityQueryService {
     private final PlayerMapper playerMapper;
     private final EnemyInstanceRepository enemyInstanceRepository;
     private final NpcShopInstanceRepository npcShopInstanceRepository;
+    private final ChestInstanceRepository chestInstanceRepository;
     private final ConfigDataManager configDataManager;
 
     @Override
@@ -81,6 +86,12 @@ public class MapEntityQueryServiceImpl implements MapEntityQueryService {
             if ("CAMPFIRE".equals(config.getEntityType())) {
                 entities.add(convertToCampfire(config));
             }
+        }
+
+        // 6. 获取地图上的宝箱
+        List<ChestInstanceEntity> chests = chestInstanceRepository.findByMapId(mapId);
+        for (ChestInstanceEntity chest : chests) {
+            entities.add(convertToChest(chest));
         }
 
         return entities;
@@ -140,6 +151,11 @@ public class MapEntityQueryServiceImpl implements MapEntityQueryService {
                 .filter(e -> "CAMPFIRE".equals(e.getEntityType()))
                 .filter(e -> isInRange(px, py, e.getX(), e.getY()))
                 .forEach(e -> entities.add(convertToCampfire(e)));
+
+        // 6. 周围宝箱
+        chestInstanceRepository.findByMapId(mapId).stream()
+                .filter(c -> isInRange(px, py, c.getX(), c.getY()))
+                .forEach(c -> entities.add(convertToChest(c, playerId)));
 
         return entities;
     }
@@ -303,6 +319,48 @@ public class MapEntityQueryServiceImpl implements MapEntityQueryService {
         campfire.setX(config.getX());
         campfire.setY(config.getY());
         return campfire;
+    }
+
+    /**
+     * 将宝箱实例转换为领域对象
+     */
+    private Chest convertToChest(ChestInstanceEntity entity) {
+        return convertToChest(entity, null);
+    }
+
+    /**
+     * 将宝箱实例转换为领域对象（带玩家ID，用于判断小宝箱是否已被当前玩家开启）
+     */
+    private Chest convertToChest(ChestInstanceEntity entity, String playerId) {
+        ChestConfig config = configDataManager.getChest(entity.getTemplateId());
+
+        Chest chest = new Chest();
+        chest.setId(entity.getInstanceId());
+        chest.setMapId(entity.getMapId());
+        chest.setX(entity.getX());
+        chest.setY(entity.getY());
+        chest.setChestConfigId(entity.getTemplateId());
+
+        if (config != null) {
+            chest.setName(config.getName());
+            chest.setDescription(config.getDescription());
+            chest.setChestType("SMALL".equals(config.getType()) ? Chest.ChestType.SMALL : Chest.ChestType.LARGE);
+            chest.setRespawnSeconds(config.getRespawnSeconds());
+        } else {
+            chest.setName(entity.getDisplayName());
+            chest.setDescription("一个宝箱");
+            chest.setChestType("SMALL".equals(entity.getChestType()) ? Chest.ChestType.SMALL : Chest.ChestType.LARGE);
+        }
+
+        chest.setOpened(entity.isOpened());
+        chest.setLastOpenTime(entity.getLastOpenTime() != null ? entity.getLastOpenTime() : 0);
+
+        // 设置当前玩家是否已开启（小宝箱）
+        if (playerId != null && "SMALL".equals(entity.getChestType())) {
+            chest.setOpenedByCurrentPlayer(entity.hasPlayerOpened(playerId));
+        }
+
+        return chest;
     }
 
     /**

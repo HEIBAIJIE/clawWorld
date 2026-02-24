@@ -27,6 +27,9 @@
     <!-- 右键菜单 -->
     <ContextMenu />
 
+    <!-- 宝箱奖励弹窗 -->
+    <ChestRewardModal />
+
     <!-- Toast提示 -->
     <div v-if="uiStore.toast.visible" class="toast" :class="uiStore.toast.type">
       {{ uiStore.toast.message }}
@@ -44,6 +47,7 @@ import InspectCharacterModal from '../components/modals/InspectCharacterModal.vu
 import InspectItemModal from '../components/modals/InspectItemModal.vue'
 import InfoModal from '../components/modals/InfoModal.vue'
 import ContextMenu from '../components/modals/ContextMenu.vue'
+import ChestRewardModal from '../components/modals/ChestRewardModal.vue'
 
 const uiStore = useUIStore()
 </script>

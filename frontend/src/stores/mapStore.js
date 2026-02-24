@@ -34,7 +34,9 @@ export const useMapStore = defineStore('map', () => {
       ENEMY_WORLD_BOSS: [],
       NPC: [],
       WAYPOINT: [],
-      CAMPFIRE: []
+      CAMPFIRE: [],
+      CHEST_SMALL: [],
+      CHEST_LARGE: []
     }
     entities.value.forEach(entity => {
       if (grouped[entity.type]) {
@@ -42,6 +44,13 @@ export const useMapStore = defineStore('map', () => {
       } else if (entity.type && entity.type.startsWith('ENEMY')) {
         // 所有敌人类型都归入 ENEMY
         grouped.ENEMY.push(entity)
+      } else if (entity.type && entity.type.startsWith('CHEST')) {
+        // 宝箱类型
+        if (entity.type === 'CHEST_SMALL') {
+          grouped.CHEST_SMALL.push(entity)
+        } else {
+          grouped.CHEST_LARGE.push(entity)
+        }
       }
     })
     return grouped
@@ -64,7 +73,7 @@ export const useMapStore = defineStore('map', () => {
 
   /**
    * 获取实体的显示优先级
-   * 优先级：当前玩家(100) > 传送点(90) > 敌人(80) > 其他玩家(70) > 篝火(60) > NPC(50) > 其他实体(10)
+   * 优先级：当前玩家(100) > 传送点(90) > 敌人(80) > 其他玩家(70) > 篝火(60) > 宝箱(55) > NPC(50) > 其他实体(10)
    */
   function getEntityDisplayPriority(entity) {
     const type = entity.type || entity.entityType
@@ -81,6 +90,8 @@ export const useMapStore = defineStore('map', () => {
       case 'ENEMY_WORLD_BOSS': return 80
       case 'PLAYER': return 70
       case 'CAMPFIRE': return 60
+      case 'CHEST_SMALL':
+      case 'CHEST_LARGE': return 55
       case 'NPC': return 50
       default: return 10
     }

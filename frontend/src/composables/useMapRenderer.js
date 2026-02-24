@@ -68,7 +68,9 @@ export function useMapRenderer(canvasRef) {
     ENEMY_WORLD_BOSS: '#9c27b0',
     NPC: '#2196F3',
     WAYPOINT: '#9c27b0',
-    CAMPFIRE: '#ff9800'
+    CAMPFIRE: '#ff9800',
+    CHEST_SMALL: '#8B4513',
+    CHEST_LARGE: '#DAA520'
   }
 
   const ENTITY_ICONS = {
@@ -79,7 +81,9 @@ export function useMapRenderer(canvasRef) {
     ENEMY_WORLD_BOSS: '🐉',
     NPC: '🧙',
     WAYPOINT: '🌀',
-    CAMPFIRE: '🔥'
+    CAMPFIRE: '🔥',
+    CHEST_SMALL: '📦',
+    CHEST_LARGE: '🎁'
   }
 
   /**
@@ -247,9 +251,10 @@ export function useMapRenderer(canvasRef) {
         continue
       }
 
-      // 检查敌人是否死亡，设置透明度
+      // 检查敌人是否死亡或宝箱是否已开启，设置透明度
       const isDead = entity.isDead === true
-      if (isDead) {
+      const isChestOpened = entity.isOpened === true
+      if (isDead || isChestOpened) {
         ctx.globalAlpha = 0.4
       }
 
@@ -280,7 +285,7 @@ export function useMapRenderer(canvasRef) {
       }
 
       // 恢复透明度
-      if (isDead) {
+      if (isDead || isChestOpened) {
         ctx.globalAlpha = 1.0
       }
     }
@@ -288,7 +293,7 @@ export function useMapRenderer(canvasRef) {
 
   /**
    * 获取实体的渲染优先级
-   * 优先级：传送点(90) > 敌人(80) > 其他玩家(70) > 篝火(60) > NPC(50) > 其他实体(10)
+   * 优先级：传送点(90) > 敌人(80) > 其他玩家(70) > 篝火(60) > 宝箱(55) > NPC(50) > 其他实体(10)
    */
   function getEntityRenderPriority(entity) {
     const type = entity.type
@@ -302,6 +307,8 @@ export function useMapRenderer(canvasRef) {
       case 'ENEMY_WORLD_BOSS': return 80
       case 'PLAYER': return 70
       case 'CAMPFIRE': return 60
+      case 'CHEST_SMALL':
+      case 'CHEST_LARGE': return 55
       case 'NPC': return 50
       default: return 10
     }

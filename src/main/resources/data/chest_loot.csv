@@ -1,0 +1,17 @@
+chestId,itemId,rarity,dropRate,minQuantity,maxQuantity
+small_chest_common,mana_potion_small,COMMON,0.5,1,1
+small_chest_common,iron_ore,COMMON,0.3,1,3
+small_chest_rare,health_potion_medium,EXCELLENT,0.7,1,2
+small_chest_rare,mana_potion_medium,EXCELLENT,0.5,1,1
+small_chest_rare,leather,COMMON,0.4,2,5
+small_chest_rare,iron_sword,COMMON,0.1,1,1
+large_chest_common,health_potion_medium,EXCELLENT,1.0,2,3
+large_chest_common,mana_potion_medium,EXCELLENT,0.8,1,2
+large_chest_common,iron_ore,COMMON,0.6,3,5
+large_chest_common,leather,COMMON,0.5,2,4
+large_chest_common,steel_sword,EXCELLENT,0.15,1,1
+large_chest_rare,health_potion_medium,EXCELLENT,1.0,3,5
+large_chest_rare,reset_potion,RARE,0.3,1,1
+large_chest_rare,silver_ring,RARE,0.2,1,1
+large_chest_rare,skill_book_fireball,RARE,0.1,1,1
+small_chest_common,health_potion_small,COMMON,1,1,2

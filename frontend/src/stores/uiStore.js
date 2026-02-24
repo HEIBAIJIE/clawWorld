@@ -40,6 +40,14 @@ export const useUIStore = defineStore('ui', () => {
     type: 'info' // 'info' | 'success' | 'warning' | 'error'
   })
 
+  // 宝箱奖励弹窗
+  const chestReward = ref({
+    visible: false,
+    chestName: '',
+    items: [],  // [{name, quantity}]
+    fadeOut: false
+  })
+
   // 切换面板
   function togglePanel(panelName) {
     console.log('[UIStore] 切换面板:', panelName, '->', activePanel.value === panelName ? null : panelName)
@@ -144,6 +152,32 @@ export const useUIStore = defineStore('ui', () => {
     }, duration)
   }
 
+  // 显示宝箱奖励弹窗
+  function showChestReward(chestName, items) {
+    console.log('[UIStore] 显示宝箱奖励:', chestName, items)
+    chestReward.value = {
+      visible: true,
+      chestName,
+      items,
+      fadeOut: false
+    }
+    // 2秒后开始淡出
+    setTimeout(() => {
+      chestReward.value.fadeOut = true
+    }, 2000)
+    // 3秒后完全关闭
+    setTimeout(() => {
+      chestReward.value.visible = false
+      chestReward.value.fadeOut = false
+    }, 3000)
+  }
+
+  // 关闭宝箱奖励弹窗
+  function closeChestReward() {
+    chestReward.value.visible = false
+    chestReward.value.fadeOut = false
+  }
+
   return {
     // 状态
     activePanel,
@@ -153,6 +187,7 @@ export const useUIStore = defineStore('ui', () => {
     infoModal,
     contextMenu,
     toast,
+    chestReward,
     // 方法
     togglePanel, closePanel,
     openInteraction, closeInteraction,
@@ -160,6 +195,7 @@ export const useUIStore = defineStore('ui', () => {
     openInspectItem, closeInspectItem,
     openInfoModal, closeInfoModal,
     showContextMenu, hideContextMenu,
-    showToast
+    showToast,
+    showChestReward, closeChestReward
   }
 })

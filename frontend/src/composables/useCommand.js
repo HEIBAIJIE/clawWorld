@@ -733,6 +733,17 @@ export function useCommand() {
           else if (content.includes('=== 物品详情 ===')) {
             uiStore.openInfoModal('查看物品', content.replace('=== 物品详情 ===', '').trim())
           }
+          // 宝箱信息
+          else if (content.includes('=== 宝箱信息 ===')) {
+            uiStore.openInfoModal('查看宝箱', content.replace('=== 宝箱信息 ===', '').trim())
+          }
+          // 宝箱开启奖励
+          else if (content.includes('你打开了') && content.includes('获得了')) {
+            const chestReward = parseChestReward(content)
+            if (chestReward) {
+              uiStore.showChestReward(chestReward.chestName, chestReward.items)
+            }
+          }
         }
 
         // 处理战斗中的指令响应（包含战斗结果）
@@ -1050,6 +1061,34 @@ export function useCommand() {
         gold: result.combatEnd.gold || 0
       })
     }
+  }
+
+  /**
+   * 解析宝箱奖励
+   * 格式：你打开了普通小宝箱，获得了：
+   *   - 铁矿石 x2
+   *   - 小型生命药水
+   */
+  function parseChestReward(content) {
+    const chestMatch = content.match(/你打开了(.+?)，获得了/)
+    if (!chestMatch) return null
+
+    const chestName = chestMatch[1]
+    const items = []
+
+    // 解析物品列表
+    const lines = content.split('\n')
+    for (const line of lines) {
+      const itemMatch = line.match(/^\s*-\s*(.+?)(?:\s+x(\d+))?$/)
+      if (itemMatch) {
+        items.push({
+          name: itemMatch[1].trim(),
+          quantity: itemMatch[2] ? parseInt(itemMatch[2]) : 1
+        })
+      }
+    }
+
+    return { chestName, items }
   }
 
   /**

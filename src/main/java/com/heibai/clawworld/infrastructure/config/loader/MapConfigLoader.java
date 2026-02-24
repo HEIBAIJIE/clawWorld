@@ -28,8 +28,10 @@ public class MapConfigLoader {
 
     private final Map<String, MapConfig> mapConfigs = new ConcurrentHashMap<>();
     private final Map<String, WaypointConfig> waypointConfigs = new ConcurrentHashMap<>();
+    private final Map<String, ChestConfig> chestConfigs = new ConcurrentHashMap<>();
     private final List<MapTerrainConfig> mapTerrainConfigs = new ArrayList<>();
     private final List<MapEntityConfig> mapEntityConfigs = new ArrayList<>();
+    private final List<ChestLootConfig> chestLootConfigs = new ArrayList<>();
 
     public void loadMaps() {
         try {
@@ -154,6 +156,59 @@ public class MapConfigLoader {
         }
     }
 
+    public void loadChests() {
+        try {
+            Resource resource = resourceLoader.getResource("classpath:data/chests.csv");
+            if (!resource.exists()) {
+                log.warn("chests.csv not found, skipping");
+                return;
+            }
+
+            List<ChestConfig> chests = csvReader.readCsv(resource.getInputStream(), record -> {
+                ChestConfig chest = new ChestConfig();
+                chest.setId(csvReader.getString(record, "id"));
+                chest.setName(csvReader.getString(record, "name"));
+                chest.setDescription(csvReader.getString(record, "description"));
+                chest.setType(csvReader.getString(record, "type"));
+                chest.setRespawnSeconds(csvReader.getInt(record, "respawnSeconds"));
+                return chest;
+            });
+
+            chestConfigs.clear();
+            chests.forEach(chest -> chestConfigs.put(chest.getId(), chest));
+            log.info("Loaded {} chests", chests.size());
+        } catch (IOException e) {
+            log.error("Error loading chests.csv", e);
+        }
+    }
+
+    public void loadChestLoot() {
+        try {
+            Resource resource = resourceLoader.getResource("classpath:data/chest_loot.csv");
+            if (!resource.exists()) {
+                log.warn("chest_loot.csv not found, skipping");
+                return;
+            }
+
+            List<ChestLootConfig> loots = csvReader.readCsv(resource.getInputStream(), record -> {
+                ChestLootConfig loot = new ChestLootConfig();
+                loot.setChestId(csvReader.getString(record, "chestId"));
+                loot.setItemId(csvReader.getString(record, "itemId"));
+                loot.setRarity(csvReader.getString(record, "rarity"));
+                loot.setDropRate(csvReader.getDouble(record, "dropRate"));
+                loot.setMinQuantity(csvReader.getInt(record, "minQuantity"));
+                loot.setMaxQuantity(csvReader.getInt(record, "maxQuantity"));
+                return loot;
+            });
+
+            chestLootConfigs.clear();
+            chestLootConfigs.addAll(loots);
+            log.info("Loaded {} chest loot entries", loots.size());
+        } catch (IOException e) {
+            log.error("Error loading chest_loot.csv", e);
+        }
+    }
+
     public MapConfig getMap(String id) {
         return mapConfigs.get(id);
     }
@@ -162,12 +217,20 @@ public class MapConfigLoader {
         return waypointConfigs.get(id);
     }
 
+    public ChestConfig getChest(String id) {
+        return chestConfigs.get(id);
+    }
+
     public Map<String, MapConfig> getAllMaps() {
         return mapConfigs;
     }
 
     public Map<String, WaypointConfig> getAllWaypoints() {
         return waypointConfigs;
+    }
+
+    public Map<String, ChestConfig> getAllChests() {
+        return chestConfigs;
     }
 
     public List<MapTerrainConfig> getMapTerrain(String mapId) {
@@ -179,6 +242,12 @@ public class MapConfigLoader {
     public List<MapEntityConfig> getMapEntities(String mapId) {
         return mapEntityConfigs.stream()
                 .filter(entity -> entity.getMapId().equals(mapId))
+                .toList();
+    }
+
+    public List<ChestLootConfig> getChestLoot(String chestId) {
+        return chestLootConfigs.stream()
+                .filter(loot -> loot.getChestId().equals(chestId))
                 .toList();
     }
 }

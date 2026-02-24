@@ -1,6 +1,7 @@
 package com.heibai.clawworld.infrastructure.factory;
 
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
+import com.heibai.clawworld.infrastructure.config.data.map.ChestConfig;
 import com.heibai.clawworld.infrastructure.config.data.map.MapConfig;
 import com.heibai.clawworld.infrastructure.config.data.map.MapEntityConfig;
 import com.heibai.clawworld.infrastructure.config.data.map.MapTerrainConfig;
@@ -9,6 +10,7 @@ import com.heibai.clawworld.domain.character.Npc;
 import com.heibai.clawworld.domain.map.GameMap;
 import com.heibai.clawworld.domain.map.MapEntity;
 import com.heibai.clawworld.domain.map.Waypoint;
+import com.heibai.clawworld.infrastructure.persistence.entity.ChestInstanceEntity;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,7 @@ public class MapInitializationService {
     private final EntityFactory entityFactory;
     private final com.heibai.clawworld.infrastructure.persistence.repository.EnemyInstanceRepository enemyInstanceRepository;
     private final com.heibai.clawworld.infrastructure.persistence.repository.NpcShopInstanceRepository npcShopInstanceRepository;
+    private final com.heibai.clawworld.infrastructure.persistence.repository.ChestInstanceRepository chestInstanceRepository;
 
     // 运行时地图缓存 - 实际游戏中应该存储在数据库或分布式缓存中
     private final Map<String, GameMap> runtimeMaps = new HashMap<>();
@@ -50,6 +53,9 @@ public class MapInitializationService {
 
                 // 同步NPC实例到数据库
                 syncNpcsToDatabase(mapConfig.getId(), gameMap.getEntities());
+
+                // 同步宝箱实例到数据库
+                syncChestsToDatabase(mapConfig.getId());
 
                 log.info("Initialized map: {} with {} entities",
                         gameMap.getName(), gameMap.getEntities().size());
@@ -144,6 +150,51 @@ public class MapInitializationService {
                         log.debug("Created NPC shop instance in database: {} on map {}", npc.getName(), mapId);
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * 同步宝箱实例到数据库
+     */
+    private void syncChestsToDatabase(String mapId) {
+        List<MapEntityConfig> mapEntities = configDataManager.getMapEntities(mapId);
+
+        for (MapEntityConfig entity : mapEntities) {
+            if ("CHEST_SMALL".equals(entity.getEntityType()) || "CHEST_LARGE".equals(entity.getEntityType())) {
+                String instanceId = entity.getInstanceId();
+                if (instanceId == null || instanceId.isEmpty()) {
+                    instanceId = entity.getEntityId() + "_" + entity.getX() + "_" + entity.getY();
+                }
+
+                // 检查是否已存在
+                var existing = chestInstanceRepository.findByMapIdAndInstanceId(mapId, instanceId);
+                if (existing.isPresent()) {
+                    continue;
+                }
+
+                // 获取宝箱配置
+                ChestConfig chestConfig = configDataManager.getChest(entity.getEntityId());
+                if (chestConfig == null) {
+                    log.warn("宝箱配置不存在: {}", entity.getEntityId());
+                    continue;
+                }
+
+                // 创建宝箱实例
+                ChestInstanceEntity chest = new ChestInstanceEntity();
+                chest.setMapId(mapId);
+                chest.setInstanceId(instanceId);
+                chest.setTemplateId(entity.getEntityId());
+                chest.setDisplayName(chestConfig.getName());
+                chest.setX(entity.getX());
+                chest.setY(entity.getY());
+                chest.setChestType(chestConfig.getType());
+                chest.setOpened(false);
+                chest.setOpenedByPlayers(new HashSet<>());
+
+                chestInstanceRepository.save(chest);
+                log.debug("Created chest instance in database: {} on map {} at ({}, {})",
+                        chestConfig.getName(), mapId, entity.getX(), entity.getY());
             }
         }
     }

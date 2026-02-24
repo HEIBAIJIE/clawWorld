@@ -113,6 +113,40 @@
         </div>
       </div>
 
+      <!-- 宝箱 -->
+      <div v-if="chests.length > 0" class="entity-category">
+        <div class="category-header">
+          <span class="category-icon">📦</span>
+          <span class="category-title">宝箱</span>
+          <span class="category-count">({{ chests.length }})</span>
+        </div>
+        <div
+          v-for="entity in chests"
+          :key="entity.name"
+          class="entity-item"
+          :class="{ 'entity-opened': entity.isOpened }"
+          @click="handleEntityClick(entity)"
+        >
+          <div class="entity-icon chest" :class="{ 'icon-opened': entity.isOpened }">
+            {{ entity.type === 'CHEST_LARGE' ? '🎁' : '📦' }}
+          </div>
+          <div class="entity-details">
+            <div class="entity-name">
+              {{ entity.name }}
+              <span v-if="entity.type === 'CHEST_LARGE'" class="chest-type">[大]</span>
+            </div>
+            <div class="entity-meta">
+              <span v-if="entity.isOpened && entity.remainingRespawnSeconds > 0" class="entity-respawn">
+                {{ entity.remainingRespawnSeconds }}秒后刷新
+              </span>
+              <span v-else class="entity-distance" :class="{ 'in-range': entity.isInRange }">
+                {{ entity.isInRange ? '可交互' : `距离 ${entity.distance}` }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 空状态 -->
       <div v-if="totalCount === 0" class="empty-list">
         当前地图没有实体
@@ -157,8 +191,16 @@ const waypoints = computed(() =>
   mapStore.entitiesByType.WAYPOINT.sort((a, b) => a.distance - b.distance)
 )
 
+const chests = computed(() => {
+  const allChests = [
+    ...mapStore.entitiesByType.CHEST_SMALL,
+    ...mapStore.entitiesByType.CHEST_LARGE
+  ]
+  return allChests.sort((a, b) => a.distance - b.distance)
+})
+
 const totalCount = computed(() =>
-  enemies.value.length + players.value.length + npcs.value.length + waypoints.value.length
+  enemies.value.length + players.value.length + npcs.value.length + waypoints.value.length + chests.value.length
 )
 
 // 点击实体
@@ -194,6 +236,25 @@ function handleEntityClick(entity) {
 }
 
 .entity-dead-status {
+  color: #888;
+  font-size: 11px;
+}
+
+.entity-opened {
+  opacity: 0.6;
+}
+
+.icon-opened {
+  filter: grayscale(80%);
+}
+
+.chest-type {
+  color: #ffd700;
+  font-size: 10px;
+  margin-left: 4px;
+}
+
+.entity-respawn {
   color: #888;
   font-size: 11px;
 }
