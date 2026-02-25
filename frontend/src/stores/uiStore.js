@@ -165,17 +165,15 @@ export const useUIStore = defineStore('ui', () => {
     setTimeout(() => {
       chestReward.value.fadeOut = true
     }, 2000)
-    // 3秒后完全关闭
+    // 3秒后完全关闭（不重置 fadeOut，让 visible 变化时保持淡出状态）
     setTimeout(() => {
       chestReward.value.visible = false
-      chestReward.value.fadeOut = false
     }, 3000)
   }
 
   // 关闭宝箱奖励弹窗
   function closeChestReward() {
     chestReward.value.visible = false
-    chestReward.value.fadeOut = false
   }
 
   return {

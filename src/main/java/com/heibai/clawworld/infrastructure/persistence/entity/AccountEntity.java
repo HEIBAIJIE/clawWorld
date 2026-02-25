@@ -70,6 +70,7 @@ public class AccountEntity {
         private int y;
         private java.util.List<String> interactionOptions;
         private Boolean isDead; // 敌人死亡状态（仅对敌人有效）
+        private Boolean isOpened; // 宝箱开启状态（仅对宝箱有效）
         private String entityType; // 实体类型
     }
 

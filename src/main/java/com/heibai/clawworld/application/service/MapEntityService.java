@@ -52,6 +52,14 @@ public interface MapEntityService {
     List<MapEntity> getMapEntities(String mapId);
 
     /**
+     * 获取地图上的所有实体（带玩家ID，用于判断小宝箱是否已被当前玩家开启）
+     * @param mapId 地图ID
+     * @param playerId 当前玩家ID
+     * @return 实体列表
+     */
+    List<MapEntity> getMapEntities(String mapId, String playerId);
+
+    /**
      * 检查指定位置是否可通行
      * @param mapId 地图ID
      * @param x X坐标

@@ -172,12 +172,13 @@ const uiStore = useUIStore()
   padding: 12px;
 }
 
-/* 进入/离开动画 */
+/* 进入动画 */
 .chest-reward-enter-active {
   animation: chest-open 0.5s ease-out;
 }
 
+/* 离开时不需要动画，因为已经通过 fade-out 类淡出了 */
 .chest-reward-leave-active {
-  animation: chest-open 0.3s ease-in reverse;
+  transition: none;
 }
 </style>

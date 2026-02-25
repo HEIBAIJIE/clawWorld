@@ -47,6 +47,11 @@ public class MapEntityQueryServiceImpl implements MapEntityQueryService {
 
     @Override
     public List<MapEntity> getMapEntities(String mapId) {
+        return getMapEntities(mapId, null);
+    }
+
+    @Override
+    public List<MapEntity> getMapEntities(String mapId, String playerId) {
         List<MapEntity> entities = new ArrayList<>();
 
         // 1. 获取地图上的所有玩家
@@ -91,7 +96,7 @@ public class MapEntityQueryServiceImpl implements MapEntityQueryService {
         // 6. 获取地图上的宝箱
         List<ChestInstanceEntity> chests = chestInstanceRepository.findByMapId(mapId);
         for (ChestInstanceEntity chest : chests) {
-            entities.add(convertToChest(chest));
+            entities.add(convertToChest(chest, playerId));
         }
 
         return entities;

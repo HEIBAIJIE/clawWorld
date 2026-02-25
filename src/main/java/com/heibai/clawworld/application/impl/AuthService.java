@@ -110,7 +110,7 @@ public class AuthService {
                 GameMap map = mapInitializationService.getMap(player.getMapId());
                 if (map != null) {
                     // 使用 MapEntityService 获取所有实体（已包含玩家、敌人、NPC、传送点、篝火等）
-                    List<MapEntity> allEntities = mapEntityService.getMapEntities(player.getMapId());
+                    List<MapEntity> allEntities = mapEntityService.getMapEntities(player.getMapId(), player.getId());
                     List<ChatMessage> chatHistory = chatService.getChatHistory(player.getId());
                     mapWindowLogGenerator.generateMapWindowLogs(windowBuilder, player, map, allEntities, chatHistory);
                 } else {

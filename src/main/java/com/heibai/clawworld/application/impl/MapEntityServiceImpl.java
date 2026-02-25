@@ -395,6 +395,11 @@ public class MapEntityServiceImpl implements MapEntityService {
     }
 
     @Override
+    public List<MapEntity> getMapEntities(String mapId, String playerId) {
+        return mapEntityQueryService.getMapEntities(mapId, playerId);
+    }
+
+    @Override
     public boolean isPositionPassable(String mapId, int x, int y) {
         return pathfindingService.isPositionPassable(mapId, x, y);
     }

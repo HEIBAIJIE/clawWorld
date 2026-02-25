@@ -63,7 +63,7 @@ public class StateLogGenerator {
             String lastMapId = account.getLastMapId();
             boolean isMapChanged = lastMapId != null && !lastMapId.equals(currentMapId);
 
-            List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(currentMapId);
+            List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(currentMapId, playerId);
 
             // 构建当前实体快照
             Map<String, AccountEntity.EntitySnapshot> currentSnapshot = new HashMap<>();
@@ -85,6 +85,18 @@ public class StateLogGenerator {
                 if (entity instanceof com.heibai.clawworld.domain.character.Enemy) {
                     com.heibai.clawworld.domain.character.Enemy enemy = (com.heibai.clawworld.domain.character.Enemy) entity;
                     snapshot.setIsDead(enemy.isDead());
+                }
+
+                // 记录宝箱的开启状态
+                if (entity instanceof com.heibai.clawworld.domain.map.Chest) {
+                    com.heibai.clawworld.domain.map.Chest chest = (com.heibai.clawworld.domain.map.Chest) entity;
+                    // 小宝箱：检查当前玩家是否已开启
+                    // 大宝箱：检查是否已被开启且未刷新
+                    if (chest.getChestType() == com.heibai.clawworld.domain.map.Chest.ChestType.SMALL) {
+                        snapshot.setIsOpened(chest.isOpenedByCurrentPlayer());
+                    } else {
+                        snapshot.setIsOpened(chest.isOpened() && !chest.canOpen());
+                    }
                 }
 
                 if (entity.isInteractable()) {
@@ -213,6 +225,29 @@ public class StateLogGenerator {
                             entityName, currentSnap.getX(), currentSnap.getY()));
                     builder.addState("环境变化",
                         String.format("%s 的交互选项：[%s]", entityName, optionsStr));
+                }
+            }
+        }
+
+        // 检测宝箱状态变化（从未开启变为已开启）
+        for (Map.Entry<String, AccountEntity.EntitySnapshot> entry : currentSnapshot.entrySet()) {
+            String entityName = entry.getKey();
+            AccountEntity.EntitySnapshot currentSnap = entry.getValue();
+            AccountEntity.EntitySnapshot lastSnap = lastSnapshot.get(entityName);
+
+            String entityType = currentSnap.getEntityType();
+            if (lastSnap != null && (entityType != null && entityType.startsWith("CHEST"))) {
+                Boolean lastIsOpened = lastSnap.getIsOpened();
+                Boolean currentIsOpened = currentSnap.getIsOpened();
+                // 从未开启变为已开启
+                if (Boolean.FALSE.equals(lastIsOpened) && Boolean.TRUE.equals(currentIsOpened)) {
+                    builder.addState("环境变化",
+                        String.format("%s 已被打开", entityName));
+                }
+                // 从已开启变为未开启（大宝箱刷新）
+                else if (Boolean.TRUE.equals(lastIsOpened) && Boolean.FALSE.equals(currentIsOpened)) {
+                    builder.addState("环境变化",
+                        String.format("%s 已刷新", entityName));
                 }
             }
         }
@@ -401,7 +436,7 @@ public class StateLogGenerator {
         // 收集所有发给当前玩家的待处理邀请
         Map<String, Long> pendingInvitations = new HashMap<>();
         // 遍历所有可能的邀请者（地图上的其他玩家）
-        List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(player.getMapId());
+        List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(player.getMapId(), player.getId());
         for (MapEntity entity : entitiesOnMap) {
             if ("PLAYER".equals(entity.getEntityType()) && !entity.getName().equals(player.getName())) {
                 // 获取这个玩家的完整信息

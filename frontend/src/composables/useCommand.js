@@ -1066,6 +1066,21 @@ export function useCommand() {
       return
     }
 
+    // 宝箱状态变化: "普通小宝箱 已被打开" 或 "普通大宝箱 已刷新"
+    const chestOpenedMatch = content.match(/(.+?)\s+已被打开$/)
+    if (chestOpenedMatch) {
+      const entityName = chestOpenedMatch[1]
+      mapStore.updateEntity(entityName, { isOpened: true })
+      return
+    }
+
+    const chestRefreshedMatch = content.match(/(.+?)\s+已刷新$/)
+    if (chestRefreshedMatch) {
+      const entityName = chestRefreshedMatch[1]
+      mapStore.updateEntity(entityName, { isOpened: false })
+      return
+    }
+
     // 实体移动（非玩家）: "史莱姆#1 移动到 (5,6)"
     const entityMoveMatch = content.match(/(.+?)\s+移动到\s+\((\d+),(\d+)\)/)
     if (entityMoveMatch) {

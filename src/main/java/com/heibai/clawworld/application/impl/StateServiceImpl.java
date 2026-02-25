@@ -78,7 +78,7 @@ public class StateServiceImpl implements StateService {
         // 6.1 实体变化（精确追踪：新加入、离开、位置变化、交互选项变化）
         Player currentPlayer = playerSessionService.getPlayerState(playerId);
         if (currentPlayer != null && currentPlayer.getMapId() != null) {
-            List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(currentPlayer.getMapId());
+            List<MapEntity> entitiesOnMap = mapEntityService.getMapEntities(currentPlayer.getMapId(), playerId);
 
             // 构建当前实体快照
             java.util.Map<String, AccountEntity.EntitySnapshot> currentSnapshot = new java.util.HashMap<>();
