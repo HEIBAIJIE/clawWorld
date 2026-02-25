@@ -122,13 +122,16 @@ public class StateLogGenerator {
         // 3. 队伍状态变化
         generatePartyChangeLogs(builder, account, currentPlayer);
 
-        // 4. 聊天消息变化
+        // 4. 交易邀请变化
+        generateTradeInvitationChangeLogs(builder, account, currentPlayer);
+
+        // 5. 聊天消息变化
         generateChatChangeLogs(builder, playerId, lastTimestamp);
 
-        // 5. 指令响应（放在最后）
+        // 6. 指令响应（放在最后）
         builder.addState("指令响应", commandResult);
 
-        // 6. 更新状态时间戳
+        // 7. 更新状态时间戳
         account.setLastStateTimestamp(System.currentTimeMillis());
         accountRepository.save(account);
     }
@@ -459,6 +462,56 @@ public class StateLogGenerator {
         }
         snapshot.setPendingInvitationsReceived(pendingInvitations);
 
+        return snapshot;
+    }
+
+    /**
+     * 生成交易邀请变化日志
+     */
+    private void generateTradeInvitationChangeLogs(GameLogBuilder builder, AccountEntity account, Player currentPlayer) {
+        if (currentPlayer == null) {
+            return;
+        }
+
+        AccountEntity.TradeInvitationSnapshot lastSnapshot = account.getLastTradeInvitationSnapshot();
+        AccountEntity.TradeInvitationSnapshot currentSnapshot = buildCurrentTradeInvitationSnapshot(currentPlayer);
+
+        Map<String, Long> lastInvitations = lastSnapshot != null && lastSnapshot.getPendingTradeInvitations() != null
+            ? lastSnapshot.getPendingTradeInvitations() : new HashMap<>();
+        Map<String, Long> currentInvitations = currentSnapshot.getPendingTradeInvitations() != null
+            ? currentSnapshot.getPendingTradeInvitations() : new HashMap<>();
+
+        // 检测新收到的交易邀请
+        for (String inviterName : currentInvitations.keySet()) {
+            if (!lastInvitations.containsKey(inviterName)) {
+                builder.addState("交易变化", String.format("%s 邀请你进行交易", inviterName));
+            }
+        }
+
+        // 保存当前快照
+        account.setLastTradeInvitationSnapshot(currentSnapshot);
+    }
+
+    /**
+     * 构建当前交易邀请状态快照
+     */
+    private AccountEntity.TradeInvitationSnapshot buildCurrentTradeInvitationSnapshot(Player player) {
+        AccountEntity.TradeInvitationSnapshot snapshot = new AccountEntity.TradeInvitationSnapshot();
+        Map<String, Long> pendingInvitations = new HashMap<>();
+
+        // 查找所有发给当前玩家的待处理交易请求
+        List<TradeEntity> pendingTrades = tradeRepository.findByStatusAndReceiverId(
+            TradeEntity.TradeStatus.PENDING, player.getId());
+
+        for (TradeEntity trade : pendingTrades) {
+            // 获取发起者的名字
+            Player initiator = playerSessionService.getPlayerState(trade.getInitiatorId());
+            if (initiator != null) {
+                pendingInvitations.put(initiator.getName(), trade.getCreateTime());
+            }
+        }
+
+        snapshot.setPendingTradeInvitations(pendingInvitations);
         return snapshot;
     }
 

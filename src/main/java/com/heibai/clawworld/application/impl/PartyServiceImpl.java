@@ -193,6 +193,14 @@ public class PartyServiceImpl implements PartyService {
             return PartyResult.error("未找到邀请记录");
         }
 
+        // 清理所有过期的邀请
+        party.getPendingInvitations().removeIf(inv -> isExpired(inv.getInviteTime()));
+
+        // 如果是单人队伍且没有待处理的邀请了，解散队伍
+        if (party.isSolo() && party.getPendingInvitations().isEmpty()) {
+            return disbandPartyInternal(party);
+        }
+
         partyRepository.save(party);
         return PartyResult.success("已拒绝邀请");
     }
@@ -543,13 +551,13 @@ public class PartyServiceImpl implements PartyService {
     }
 
     /**
-     * 检查时间是否过期（5分钟）
+     * 检查时间是否过期（1分钟）
      */
     private boolean isExpired(Long timestamp) {
         if (timestamp == null) {
             return true; // 没有时间戳视为已过期
         }
-        return System.currentTimeMillis() - timestamp > 5 * 60 * 1000;
+        return System.currentTimeMillis() - timestamp > 60 * 1000;
     }
 
     /**

@@ -33,4 +33,9 @@ public interface TradeRepository extends MongoRepository<TradeEntity, String> {
      * 查找超时的交易（创建时间早于指定时间且状态为待处理或进行中）
      */
     List<TradeEntity> findByStatusInAndCreateTimeBefore(List<TradeEntity.TradeStatus> statuses, Long time);
+
+    /**
+     * 根据状态查找所有交易
+     */
+    List<TradeEntity> findByStatus(TradeEntity.TradeStatus status);
 }

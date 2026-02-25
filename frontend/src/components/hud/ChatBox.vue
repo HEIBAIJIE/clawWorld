@@ -1,19 +1,5 @@
 <template>
   <div class="chat-box">
-    <!-- 聊天标签栏 -->
-    <div class="chat-tabs">
-      <button
-        v-for="(name, key) in chatStore.channelNames"
-        :key="key"
-        class="chat-tab"
-        :class="{ active: chatStore.activeChannel === key }"
-        @click="chatStore.setActiveChannel(key)"
-      >
-        {{ name }}
-        <span class="unread-dot" v-if="hasUnread(key)"></span>
-      </button>
-    </div>
-
     <!-- 聊天消息区 -->
     <div class="chat-messages sci-scrollbar" ref="messagesRef">
       <div
@@ -26,6 +12,19 @@
         <span class="msg-channel">[{{ chatStore.channelNames[msg.channel] }}]</span>
         <span class="msg-sender">{{ msg.sender }}:</span>
         <span class="msg-content">{{ msg.content }}</span>
+        <!-- 系统消息的操作按钮 -->
+        <span v-if="msg.actionType" class="msg-actions">
+          <button
+            class="action-btn accept"
+            @click="handleAccept(msg)"
+            :disabled="sessionStore.isWaiting"
+          >接受</button>
+          <button
+            class="action-btn reject"
+            @click="handleReject(msg)"
+            :disabled="sessionStore.isWaiting"
+          >拒绝</button>
+        </span>
       </div>
       <div v-if="displayMessages.length === 0" class="chat-empty">
         暂无聊天消息
@@ -61,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useChatStore } from '../../stores/chatStore'
 import { useLogStore } from '../../stores/logStore'
 import { useSessionStore } from '../../stores/sessionStore'
@@ -75,21 +74,11 @@ const { sendCommand } = useCommand()
 const inputText = ref('')
 const sendChannel = ref('world')
 const messagesRef = ref(null)
-const lastReadTime = ref({})
 
-// 显示的消息（当前频道或全部）
+// 显示所有消息（最近50条）
 const displayMessages = computed(() => {
-  return chatStore.filteredMessages.slice(-50)
+  return chatStore.messages.slice(-50)
 })
-
-// 检查是否有未读消息
-function hasUnread(channel) {
-  if (chatStore.activeChannel === channel) return false
-  const lastRead = lastReadTime.value[channel] || 0
-  return chatStore.messages.some(msg =>
-    msg.channel === channel && msg.timestamp > lastRead
-  )
-}
 
 // 发送消息
 async function sendMessage() {
@@ -106,6 +95,42 @@ async function sendMessage() {
   await sendCommand(command)
 }
 
+// 处理接受操作
+async function handleAccept(msg) {
+  if (sessionStore.isWaiting) return
+
+  let command = ''
+  if (msg.actionType === 'party_invite') {
+    command = `interact ${msg.actionTarget} 接受组队邀请`
+  } else if (msg.actionType === 'trade_invite') {
+    command = `interact ${msg.actionTarget} 接受交易请求`
+  }
+
+  if (command) {
+    // 移除该系统消息
+    chatStore.removeSystemMessage(msg.actionType, msg.actionTarget)
+    await sendCommand(command)
+  }
+}
+
+// 处理拒绝操作
+async function handleReject(msg) {
+  if (sessionStore.isWaiting) return
+
+  let command = ''
+  if (msg.actionType === 'party_invite') {
+    command = `interact ${msg.actionTarget} 拒绝组队邀请`
+  } else if (msg.actionType === 'trade_invite') {
+    command = `interact ${msg.actionTarget} 拒绝交易请求`
+  }
+
+  if (command) {
+    // 移除该系统消息
+    chatStore.removeSystemMessage(msg.actionType, msg.actionTarget)
+    await sendCommand(command)
+  }
+}
+
 // 监听日志变化，解析聊天消息
 watch(() => logStore.rawText, (newText) => {
   chatStore.parseFromLog(newText)
@@ -118,18 +143,6 @@ watch(() => chatStore.messages.length, async () => {
     messagesRef.value.scrollTop = messagesRef.value.scrollHeight
   }
 })
-
-// 切换频道时更新已读时间
-watch(() => chatStore.activeChannel, (channel) => {
-  lastReadTime.value[channel] = Date.now()
-})
-
-onMounted(() => {
-  // 初始化已读时间
-  Object.keys(chatStore.channelNames).forEach(key => {
-    lastReadTime.value[key] = Date.now()
-  })
-})
 </script>
 
 <style scoped>
@@ -138,8 +151,8 @@ onMounted(() => {
   bottom: 40px;
   left: 12px;
   z-index: 50;
-  width: 320px;
-  height: 220px;
+  width: 360px;
+  height: 200px;
   background: linear-gradient(135deg, rgba(20, 20, 25, 0.92) 0%, rgba(30, 30, 40, 0.88) 100%);
   border: 1px solid rgba(76, 175, 80, 0.25);
   border-radius: 8px;
@@ -150,52 +163,6 @@ onMounted(() => {
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(8px);
   overflow: hidden;
-}
-
-.chat-tabs {
-  display: flex;
-  background: rgba(0, 0, 0, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
-}
-
-.chat-tab {
-  flex: 1;
-  padding: 6px 8px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-}
-
-.chat-tab:hover {
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.chat-tab.active {
-  color: #4CAF50;
-  background: rgba(76, 175, 80, 0.1);
-  border-bottom: 2px solid #4CAF50;
-}
-
-.unread-dot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 6px;
-  height: 6px;
-  background: #ef5350;
-  border-radius: 50%;
-  animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(0.8); }
 }
 
 .chat-messages {
@@ -209,6 +176,10 @@ onMounted(() => {
 .chat-message {
   margin-bottom: 4px;
   word-break: break-all;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
 }
 
 .msg-time {
@@ -243,6 +214,11 @@ onMounted(() => {
   background: rgba(244, 143, 177, 0.15);
 }
 
+.chat-message.system .msg-channel {
+  color: #ffd54f;
+  background: rgba(255, 213, 79, 0.2);
+}
+
 .msg-sender {
   color: rgba(255, 255, 255, 0.8);
   font-weight: 500;
@@ -251,6 +227,48 @@ onMounted(() => {
 
 .msg-content {
   color: rgba(255, 255, 255, 0.9);
+}
+
+.msg-actions {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.action-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.action-btn.accept {
+  background: rgba(76, 175, 80, 0.4);
+  color: #81c784;
+  border: 1px solid rgba(76, 175, 80, 0.5);
+}
+
+.action-btn.accept:hover:not(:disabled) {
+  background: rgba(76, 175, 80, 0.6);
+  color: #fff;
+}
+
+.action-btn.reject {
+  background: rgba(239, 83, 80, 0.3);
+  color: #ef9a9a;
+  border: 1px solid rgba(239, 83, 80, 0.4);
+}
+
+.action-btn.reject:hover:not(:disabled) {
+  background: rgba(239, 83, 80, 0.5);
+  color: #fff;
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .chat-empty {

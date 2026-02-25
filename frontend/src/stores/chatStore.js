@@ -1,31 +1,21 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 export const useChatStore = defineStore('chat', () => {
   // 聊天消息列表（已去重）
   const messages = ref([])
-
-  // 当前选中的聊天频道
-  const activeChannel = ref('world') // world, map, party
 
   // 频道名称映射
   const channelNames = {
     world: '世界',
     map: '地图',
     party: '队伍',
-    private: '私聊'
+    private: '私聊',
+    system: '系统'
   }
 
-  // 按频道过滤的消息
-  const filteredMessages = computed(() => {
-    if (activeChannel.value === 'all') {
-      return messages.value
-    }
-    return messages.value.filter(msg => msg.channel === activeChannel.value)
-  })
-
   // 添加聊天消息（自动去重）
-  function addMessage(channel, sender, content, timestamp) {
+  function addMessage(channel, sender, content, timestamp, actionType = null, actionTarget = null) {
     // 生成唯一ID用于去重（不包含时间戳，因为窗口消息每次都是新时间戳）
     const msgId = `${channel}-${sender}-${content}`
 
@@ -44,7 +34,9 @@ export const useChatStore = defineStore('chat', () => {
       time: new Date(timestamp).toLocaleTimeString('zh-CN', {
         hour: '2-digit',
         minute: '2-digit'
-      })
+      }),
+      actionType,  // 'party_invite' | 'trade_invite' | null
+      actionTarget // 邀请者名称
     })
 
     // 保留最近200条消息
@@ -53,6 +45,11 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     return true
+  }
+
+  // 添加系统消息（带操作按钮）
+  function addSystemMessage(content, actionType = null, actionTarget = null) {
+    return addMessage('system', '系统', content, Date.now(), actionType, actionTarget)
   }
 
   // 从日志文本解析聊天消息
@@ -79,6 +76,23 @@ export const useChatStore = defineStore('chat', () => {
         const channel = getChannelKey(channelCn)
         // 使用当前时间作为时间戳
         addMessage(channel, sender.trim(), content.trim(), Date.now())
+        continue
+      }
+
+      // 解析组队邀请: [服务端][时间][状态][队伍变化]XXX 邀请你加入队伍
+      const partyInviteMatch = line.match(/\[服务端\]\[([^\]]+)\]\[状态\]\[队伍变化\](.+)\s+邀请你加入队伍/)
+      if (partyInviteMatch) {
+        const [, , inviterName] = partyInviteMatch
+        addSystemMessage(`${inviterName.trim()} 邀请你加入队伍`, 'party_invite', inviterName.trim())
+        continue
+      }
+
+      // 解析交易邀请: [服务端][时间][状态][交易变化]XXX 邀请你进行交易
+      const tradeInviteMatch = line.match(/\[服务端\]\[([^\]]+)\]\[状态\]\[交易变化\](.+)\s+邀请你进行交易/)
+      if (tradeInviteMatch) {
+        const [, , inviterName] = tradeInviteMatch
+        addSystemMessage(`${inviterName.trim()} 邀请你进行交易`, 'trade_invite', inviterName.trim())
+        continue
       }
     }
   }
@@ -89,7 +103,8 @@ export const useChatStore = defineStore('chat', () => {
       '世界': 'world',
       '地图': 'map',
       '队伍': 'party',
-      '私聊': 'private'
+      '私聊': 'private',
+      '系统': 'system'
     }
     return map[channelCn] || 'world'
   }
@@ -108,9 +123,14 @@ export const useChatStore = defineStore('chat', () => {
     return Date.now()
   }
 
-  // 设置当前频道
-  function setActiveChannel(channel) {
-    activeChannel.value = channel
+  // 移除特定的系统消息（当邀请被处理后）
+  function removeSystemMessage(actionType, actionTarget) {
+    const index = messages.value.findIndex(
+      msg => msg.actionType === actionType && msg.actionTarget === actionTarget
+    )
+    if (index !== -1) {
+      messages.value.splice(index, 1)
+    }
   }
 
   // 清空消息
@@ -120,12 +140,11 @@ export const useChatStore = defineStore('chat', () => {
 
   return {
     messages,
-    activeChannel,
     channelNames,
-    filteredMessages,
     addMessage,
+    addSystemMessage,
     parseFromLog,
-    setActiveChannel,
+    removeSystemMessage,
     clear
   }
 })

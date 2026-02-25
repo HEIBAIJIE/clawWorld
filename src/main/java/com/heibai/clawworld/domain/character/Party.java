@@ -99,10 +99,10 @@ public class Party {
         private Long inviteTime;
 
         /**
-         * 邀请是否过期（5分钟）
+         * 邀请是否过期（1分钟）
          */
         public boolean isExpired() {
-            return System.currentTimeMillis() - inviteTime > 5 * 60 * 1000;
+            return System.currentTimeMillis() - inviteTime > 60 * 1000;
         }
     }
 
@@ -127,10 +127,10 @@ public class Party {
         private Long requestTime;
 
         /**
-         * 请求是否过期（5分钟）
+         * 请求是否过期（1分钟）
          */
         public boolean isExpired() {
-            return System.currentTimeMillis() - requestTime > 5 * 60 * 1000;
+            return System.currentTimeMillis() - requestTime > 60 * 1000;
         }
     }
 }

@@ -64,6 +64,9 @@ public class AccountEntity {
     // 上次的队伍状态快照（用于追踪队伍变化）
     private PartySnapshot lastPartySnapshot;
 
+    // 上次的交易邀请快照（用于追踪交易邀请变化）
+    private TradeInvitationSnapshot lastTradeInvitationSnapshot;
+
     @Data
     public static class EntitySnapshot {
         private int x;
@@ -82,5 +85,11 @@ public class AccountEntity {
         private java.util.List<String> memberNames;
         // 收到的待处理邀请（inviterName -> inviteTime）
         private java.util.Map<String, Long> pendingInvitationsReceived;
+    }
+
+    @Data
+    public static class TradeInvitationSnapshot {
+        // 收到的待处理交易邀请（inviterName -> inviteTime）
+        private java.util.Map<String, Long> pendingTradeInvitations;
     }
 }
