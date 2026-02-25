@@ -33,7 +33,7 @@
                     class="info-line"
                     :class="getLineClass(line)"
                   >
-                    <template v-if="line.includes(':') || line.includes('：')">
+                    <template v-if="isKeyValueLine(line)">
                       <span class="line-label">{{ getLabel(line) }}</span>
                       <span class="line-value" :class="getValueClass(line)">{{ getValue(line) }}</span>
                     </template>
@@ -109,9 +109,20 @@ function getValue(line) {
   return colonIndex !== -1 ? line.substring(colonIndex + 1).trim() : line
 }
 
+// 判断是否是真正的 key:value 格式行
+// 技能行（以 - 开头）不应该被拆分
+function isKeyValueLine(line) {
+  const trimmed = line.trim()
+  // 以 - 开头的是列表项（如技能），不拆分
+  if (trimmed.startsWith('-')) return false
+  // 必须包含冒号
+  return trimmed.includes(':') || trimmed.includes('：')
+}
+
 function getLineClass(line) {
   if (line.includes('生命') || line.includes('法力')) return 'stat-line'
-  if (line.includes('攻击') || line.includes('防御')) return 'combat-line'
+  // 只匹配属性行（如 "物攻:" "物理攻击:" "物防:" 等），不匹配技能描述中的"攻击"
+  if (/^(物攻|物理攻击|法攻|魔法攻击|物防|物理防御|法防|魔法防御)[：:]/.test(line.trim())) return 'combat-line'
   if (line.includes('经验') || line.includes('金')) return 'reward-line'
   return ''
 }
