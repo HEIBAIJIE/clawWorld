@@ -42,19 +42,14 @@ public class ShopWindowLogGenerator {
         buyInfo.append("商店收购物品\n");
         builder.addWindow("商店窗口", buyInfo.toString());
 
-        // 4. 玩家资产
-        StringBuilder playerAssets = new StringBuilder();
-        playerAssets.append("你的资产：\n");
-        playerAssets.append(String.format("金币: %d\n", player.getGold()));
-        playerAssets.append(String.format("背包空间: %d/50\n",
-            player.getInventory() != null ? player.getInventory().size() : 0));
-        builder.addWindow("商店窗口", playerAssets.toString());
+        // 4. 商店资金（替代原来的"你的资产"）
+        builder.addWindow("商店窗口", String.format("商店资金: %d 金币", shop.getGold()));
 
         // 注意：可用指令已移至系统上下文，不再在每次窗口刷新时输出
     }
 
     /**
-     * 生成商店状态日志
+     * 生成商店状态日志（买卖后的状态更新）
      */
     public void generateShopStateLogs(GameLogBuilder builder,
                                      com.heibai.clawworld.application.service.ShopService.ShopInfo shop,
@@ -74,12 +69,27 @@ public class ShopWindowLogGenerator {
             builder.addState("库存变化", stockChanges.toString());
         }
 
-        // 2. 玩家资产变化
-        builder.addState("你的资产", String.format("金币: %d  背包: %d/50",
-            player.getGold(),
-            player.getInventory() != null ? player.getInventory().size() : 0));
+        // 2. 商店资金变化
+        builder.addState("商店资金", String.format("%d 金币", shop.getGold()));
 
-        // 3. 指令响应
+        // 3. 玩家资产变化（包含金币和完整背包）
+        StringBuilder playerAssets = new StringBuilder();
+        playerAssets.append(String.format("金币: %d\n", player.getGold()));
+        playerAssets.append("背包物品：\n");
+        if (player.getInventory() != null && !player.getInventory().isEmpty()) {
+            for (Player.InventorySlot slot : player.getInventory()) {
+                if (slot.isItem()) {
+                    playerAssets.append(String.format("- %s x%d\n", slot.getItem().getName(), slot.getQuantity()));
+                } else if (slot.isEquipment()) {
+                    playerAssets.append(String.format("- %s\n", slot.getEquipment().getDisplayName()));
+                }
+            }
+        } else {
+            playerAssets.append("(空)");
+        }
+        builder.addState("你的资产", playerAssets.toString());
+
+        // 4. 指令响应
         builder.addState("指令响应", commandResult);
     }
 }

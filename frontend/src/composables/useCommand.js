@@ -5,6 +5,7 @@ import { useMapStore } from '../stores/mapStore'
 import { usePartyStore } from '../stores/partyStore'
 import { useCombatStore } from '../stores/combatStore'
 import { useTradeStore } from '../stores/tradeStore'
+import { useShopStore } from '../stores/shopStore'
 import { useUIStore } from '../stores/uiStore'
 import { useAgentStore } from '../stores/agentStore'
 import { gameApi } from '../api/game'
@@ -27,6 +28,7 @@ export function useCommand() {
   const partyStore = usePartyStore()
   const combatStore = useCombatStore()
   const tradeStore = useTradeStore()
+  const shopStore = useShopStore()
   const uiStore = useUIStore()
   const agentStore = useAgentStore()
 
@@ -264,6 +266,12 @@ export function useCommand() {
         processTradeWindowContent(content)
         break
 
+      // ===== 商店窗口相关 =====
+      case '商店窗口':
+        mapStore.setWindowType('shop')
+        processShopWindowContent(content)
+        break
+
       default:
         // 未知的 subType，尝试用旧的内容匹配方式处理
         processMapWindowContent(content)
@@ -479,6 +487,108 @@ export function useCommand() {
   }
 
   /**
+   * 处理商店窗口内容
+   * 解析商店窗口的信息：商店名称、商品列表、收购信息、商店资金
+   */
+  function processShopWindowContent(content) {
+    console.log('[Command] 处理商店窗口内容:', content)
+
+    // 解析商店名称: "商店：商人约翰"
+    const shopNameMatch = content.match(/商店[：:]\s*(.+)/)
+    if (shopNameMatch) {
+      const name = shopNameMatch[1].trim()
+      if (!shopStore.isInShop) {
+        shopStore.openShop(name)
+      }
+    }
+
+    // 解析出售商品列表
+    if (content.includes('出售商品')) {
+      const items = parseShopItems(content)
+      if (items.length > 0) {
+        shopStore.updateShopItems(items)
+      }
+    }
+
+    // 解析收购信息
+    if (content.includes('收购信息')) {
+      const purchaseMatch = content.match(/收购信息[：:]\s*\n?(.+?)(?:\n|$)/)
+      if (purchaseMatch) {
+        shopStore.updatePurchaseInfo(purchaseMatch[1].trim())
+      }
+    }
+
+    // 解析商店资金: "商店资金: 1000 金币"
+    const shopGoldMatch = content.match(/商店资金[：:]\s*(\d+)\s*金币/)
+    if (shopGoldMatch) {
+      shopStore.updateShopGold(parseInt(shopGoldMatch[1]))
+    }
+
+    // 初始化玩家资产（从 playerStore 获取）
+    if (shopStore.isInShop && shopStore.playerGold === 0) {
+      shopStore.updatePlayerAssets(playerStore.gold, playerStore.inventory, playerStore.inventory.length, 50)
+    }
+  }
+
+  /**
+   * 解析商店商品列表
+   * 格式: "- 小型生命药水 (恢复50点生命值)  价格:10  库存:50"
+   * 或: "商店库存：\n- 小型生命药水 (恢复50点生命值)  价格:10  库存:49"
+   */
+  function parseShopItems(content) {
+    const items = []
+    const lines = content.split('\n')
+
+    for (const line of lines) {
+      // 匹配格式: "- 物品名 (描述)  价格:XX  库存:XX"
+      const itemMatch = line.match(/^-\s+(.+?)\s+\((.+?)\)\s+价格[：:]\s*(\d+)\s+库存[：:]\s*(\d+)/)
+      if (itemMatch) {
+        items.push({
+          name: itemMatch[1].trim(),
+          description: itemMatch[2].trim(),
+          price: parseInt(itemMatch[3]),
+          stock: parseInt(itemMatch[4])
+        })
+      }
+    }
+
+    return items
+  }
+
+  /**
+   * 解析商店中玩家背包物品
+   * 格式:
+   * 背包物品：
+   * - 小型生命药水 x3
+   * - 铁矿石 x2
+   */
+  function parseShopPlayerInventory(content) {
+    const inventory = []
+    const lines = content.split('\n')
+
+    let inInventorySection = false
+    for (const line of lines) {
+      if (line.includes('背包物品')) {
+        inInventorySection = true
+        continue
+      }
+
+      if (inInventorySection && line.trim().startsWith('-')) {
+        // 格式: "- 小型生命药水 x3" 或 "- 铁剑#1"
+        const itemMatch = line.match(/-\s+(.+?)(?:\s+x(\d+))?$/)
+        if (itemMatch) {
+          const name = itemMatch[1].trim()
+          const quantity = itemMatch[2] ? parseInt(itemMatch[2]) : 1
+          const isEquipment = name.includes('#')
+          inventory.push({ name, quantity, isEquipment })
+        }
+      }
+    }
+
+    return inventory
+  }
+
+  /**
    * 解析交易状态
    * 格式：
    * 交易状态：
@@ -590,6 +700,9 @@ export function useCommand() {
         } else if (content.includes('切换到交易窗口')) {
           mapStore.setWindowType('trade')
           // 交易窗口的详细信息会在后续的交易窗口日志中处理
+        } else if (content.includes('切换到商店窗口')) {
+          mapStore.setWindowType('shop')
+          // 商店窗口的详细信息会在后续的商店窗口日志中处理
         } else if (content.includes('切换到地图窗口')) {
           // 如果正在显示战斗结果，不要切换窗口类型，让战斗窗口继续显示
           if (!combatStore.showResult) {
@@ -599,6 +712,10 @@ export function useCommand() {
           // 如果从交易窗口切换回来，结束交易
           if (tradeStore.isInTrade) {
             tradeStore.endTrade()
+          }
+          // 如果从商店窗口切换回来，关闭商店
+          if (shopStore.isInShop) {
+            shopStore.closeShop()
           }
         }
         break
@@ -761,6 +878,55 @@ export function useCommand() {
           // 交易取消/终止
           else if (content.includes('交易已取消') || content.includes('交易终止') || content.includes('交易已终止')) {
             tradeStore.endTrade()
+          }
+        }
+
+        // 处理商店相关的指令响应
+        if (shopStore.isInShop) {
+          // 离开商店
+          if (content.includes('离开商店')) {
+            shopStore.closeShop()
+          }
+        }
+        break
+
+      case '库存变化':
+        // 商店库存变化
+        if (shopStore.isInShop) {
+          const items = parseShopItems(content)
+          if (items.length > 0) {
+            shopStore.updateShopItems(items)
+          }
+        }
+        break
+
+      case '商店资金':
+        // 商店资金变化
+        if (shopStore.isInShop) {
+          const shopGoldMatch = content.match(/(\d+)\s*金币/)
+          if (shopGoldMatch) {
+            shopStore.updateShopGold(parseInt(shopGoldMatch[1]))
+          }
+        }
+        break
+
+      case '你的资产':
+        // 商店中的玩家资产更新（包含金币和完整背包）
+        if (shopStore.isInShop) {
+          const goldMatch = content.match(/金币[：:]\s*(\d+)/)
+          const gold = goldMatch ? parseInt(goldMatch[1]) : shopStore.playerGold
+
+          // 解析背包物品
+          const inventory = parseShopPlayerInventory(content)
+
+          shopStore.updatePlayerAssets(gold, inventory.length > 0 ? inventory : null, inventory.length, 50)
+
+          // 同时更新 playerStore
+          if (goldMatch) {
+            playerStore.updateFromParsed({ gold: parseInt(goldMatch[1]) })
+          }
+          if (inventory.length > 0) {
+            playerStore.updateFromParsed({ inventory })
           }
         }
         break

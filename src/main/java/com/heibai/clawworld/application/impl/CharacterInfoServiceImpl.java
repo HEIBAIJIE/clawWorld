@@ -129,6 +129,9 @@ public class CharacterInfoServiceImpl implements CharacterInfoService {
     @Override
     public String generateInventory(Player player) {
         StringBuilder sb = new StringBuilder();
+        // 先显示金币
+        sb.append(String.format("金币: %d\n", player.getGold()));
+        // 再显示背包物品
         if (player.getInventory() != null && !player.getInventory().isEmpty()) {
             for (Player.InventorySlot slot : player.getInventory()) {
                 if (slot.isItem()) {

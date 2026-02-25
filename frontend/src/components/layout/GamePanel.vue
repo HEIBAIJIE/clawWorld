@@ -26,6 +26,9 @@
 
       <!-- 交易窗口（覆盖在地图上） -->
       <TradeWindow v-if="tradeStore.isInTrade" />
+
+      <!-- 商店窗口（覆盖在地图上） -->
+      <ShopWindow v-if="shopStore.isInShop" />
     </div>
 
     <!-- 功能按钮栏 -->
@@ -44,6 +47,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useMapStore } from '../../stores/mapStore'
 import { useCombatStore } from '../../stores/combatStore'
 import { useTradeStore } from '../../stores/tradeStore'
+import { useShopStore } from '../../stores/shopStore'
 import MapView from '../map/MapView.vue'
 import ActionBar from '../panels/ActionBar.vue'
 import CharacterPanel from '../panels/CharacterPanel.vue'
@@ -52,6 +56,7 @@ import PartyPanel from '../panels/PartyPanel.vue'
 import EntityListPanel from '../panels/EntityListPanel.vue'
 import CombatWindow from '../combat/CombatWindow.vue'
 import TradeWindow from '../trade/TradeWindow.vue'
+import ShopWindow from '../shop/ShopWindow.vue'
 import PlayerStatusHUD from '../hud/PlayerStatusHUD.vue'
 import ChatBox from '../hud/ChatBox.vue'
 
@@ -59,6 +64,7 @@ const uiStore = useUIStore()
 const mapStore = useMapStore()
 const combatStore = useCombatStore()
 const tradeStore = useTradeStore()
+const shopStore = useShopStore()
 </script>
 
 <style scoped>
