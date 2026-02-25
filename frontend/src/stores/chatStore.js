@@ -123,13 +123,15 @@ export const useChatStore = defineStore('chat', () => {
     return Date.now()
   }
 
-  // 移除特定的系统消息（当邀请被处理后）
+  // 清除特定系统消息的操作按钮（当邀请被处理后）
   function removeSystemMessage(actionType, actionTarget) {
-    const index = messages.value.findIndex(
+    const msg = messages.value.find(
       msg => msg.actionType === actionType && msg.actionTarget === actionTarget
     )
-    if (index !== -1) {
-      messages.value.splice(index, 1)
+    if (msg) {
+      // 只清除 actionType，保留消息本身，这样按钮会消失但消息还在
+      msg.actionType = null
+      msg.actionTarget = null
     }
   }
 

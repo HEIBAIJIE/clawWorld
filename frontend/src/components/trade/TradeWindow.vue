@@ -10,7 +10,7 @@
       <!-- 交易主区域 -->
       <div class="trade-main">
         <!-- 左侧：对方交易区 -->
-        <div class="trade-side partner-side">
+        <div class="trade-side partner-side" :class="{ locked: tradeStore.partnerLocked }">
           <div class="trade-side-header">
             <span class="side-title">{{ tradeStore.partnerName }} 的提供</span>
             <span class="lock-status" :class="{ locked: tradeStore.partnerLocked }">
@@ -45,7 +45,7 @@
         <div class="trade-divider"></div>
 
         <!-- 右侧：我方交易区 -->
-        <div class="trade-side my-side">
+        <div class="trade-side my-side" :class="{ locked: tradeStore.myLocked }">
           <div class="trade-side-header">
             <span class="side-title">我的提供</span>
             <span class="lock-status" :class="{ locked: tradeStore.myLocked }">
@@ -137,10 +137,12 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useTradeStore } from '../../stores/tradeStore'
 import { useAgentStore } from '../../stores/agentStore'
+import { useSessionStore } from '../../stores/sessionStore'
 import { useCommand } from '../../composables/useCommand'
 
 const tradeStore = useTradeStore()
 const agentStore = useAgentStore()
+const sessionStore = useSessionStore()
 const { sendCommand } = useCommand()
 
 // 金额输入值
@@ -184,12 +186,13 @@ onUnmounted(() => {
 function startAutoRefresh() {
   stopAutoRefresh() // 先清理已有的定时器
   autoRefreshTimer = setInterval(() => {
-    // 只有在锁定状态且交易进行中时才刷新
-    if (tradeStore.myLocked && tradeStore.isInTrade && !agentStore.isEnabled) {
+    // 只有在锁定状态且交易进行中时才刷新，且不在等待响应时
+    if (tradeStore.myLocked && tradeStore.isInTrade && !agentStore.isEnabled && !sessionStore.isWaiting) {
       sendCommand('trade wait 1')
-    } else {
+    } else if (!tradeStore.myLocked || !tradeStore.isInTrade) {
       stopAutoRefresh()
     }
+    // 如果只是 isWaiting，跳过本次刷新但不停止定时器
   }, 3000) // 每3秒刷新一次
 }
 
@@ -268,9 +271,11 @@ function handleLockChange() {
 }
 
 // 处理确认交易
-function handleConfirm() {
+async function handleConfirm() {
   if (!tradeStore.bothLocked) return
-  sendCommand('trade confirm')
+  // 停止自动刷新，避免冲突
+  stopAutoRefresh()
+  await sendCommand('trade confirm')
 }
 
 // 处理结束交易
@@ -338,6 +343,15 @@ function handleEndTrade() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  transition: border-color 0.3s ease;
+}
+
+.trade-side.locked {
+  border-color: #f44336;
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.3);
 }
 
 .trade-side-header {
