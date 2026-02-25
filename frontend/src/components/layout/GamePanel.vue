@@ -1,6 +1,6 @@
 <template>
   <div class="game-panel">
-    <!-- 地图子标题栏 -->
+    <!-- 标题栏 -->
     <div class="map-header" v-if="mapStore.name">
       <span class="map-name">{{ mapStore.name }}</span>
       <span class="map-type" :class="{ safe: mapStore.isSafe, danger: !mapStore.isSafe }">
@@ -29,6 +29,9 @@
 
       <!-- 商店窗口（覆盖在地图上） -->
       <ShopWindow v-if="shopStore.isInShop" />
+
+      <!-- 注册窗口（覆盖在地图上） -->
+      <RegisterWindow v-if="registerStore.isInRegister" />
     </div>
 
     <!-- 功能按钮栏 -->
@@ -48,6 +51,7 @@ import { useMapStore } from '../../stores/mapStore'
 import { useCombatStore } from '../../stores/combatStore'
 import { useTradeStore } from '../../stores/tradeStore'
 import { useShopStore } from '../../stores/shopStore'
+import { useRegisterStore } from '../../stores/registerStore'
 import MapView from '../map/MapView.vue'
 import ActionBar from '../panels/ActionBar.vue'
 import CharacterPanel from '../panels/CharacterPanel.vue'
@@ -57,6 +61,7 @@ import EntityListPanel from '../panels/EntityListPanel.vue'
 import CombatWindow from '../combat/CombatWindow.vue'
 import TradeWindow from '../trade/TradeWindow.vue'
 import ShopWindow from '../shop/ShopWindow.vue'
+import RegisterWindow from '../register/RegisterWindow.vue'
 import PlayerStatusHUD from '../hud/PlayerStatusHUD.vue'
 import ChatBox from '../hud/ChatBox.vue'
 
@@ -65,6 +70,7 @@ const mapStore = useMapStore()
 const combatStore = useCombatStore()
 const tradeStore = useTradeStore()
 const shopStore = useShopStore()
+const registerStore = useRegisterStore()
 </script>
 
 <style scoped>

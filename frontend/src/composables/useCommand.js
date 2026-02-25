@@ -6,6 +6,7 @@ import { usePartyStore } from '../stores/partyStore'
 import { useCombatStore } from '../stores/combatStore'
 import { useTradeStore } from '../stores/tradeStore'
 import { useShopStore } from '../stores/shopStore'
+import { useRegisterStore } from '../stores/registerStore'
 import { useUIStore } from '../stores/uiStore'
 import { useAgentStore } from '../stores/agentStore'
 import { gameApi } from '../api/game'
@@ -29,6 +30,7 @@ export function useCommand() {
   const combatStore = useCombatStore()
   const tradeStore = useTradeStore()
   const shopStore = useShopStore()
+  const registerStore = useRegisterStore()
   const uiStore = useUIStore()
   const agentStore = useAgentStore()
 
@@ -270,6 +272,20 @@ export function useCommand() {
       case '商店窗口':
         mapStore.setWindowType('shop')
         processShopWindowContent(content)
+        break
+
+      // ===== 注册窗口相关 =====
+      case '注册窗口':
+        mapStore.setWindowType('register')
+        registerStore.openRegister()
+        break
+
+      case '职业选择':
+        // 解析职业列表
+        const roles = parseRoleSelection(content)
+        if (roles.length > 0) {
+          registerStore.updateRoles(roles)
+        }
         break
 
       default:
@@ -589,6 +605,70 @@ export function useCommand() {
   }
 
   /**
+   * 解析职业选择列表
+   * 格式：
+   * 可选职业：
+   * 游侠 - 敏捷的远程射手
+   *   生命100 法力60 物攻20 物防10 法攻8 法防6 速度110
+   * 战士 - 强壮的近战战士
+   *   生命120 法力50 物攻25 物防15 法攻5 法防8 速度100
+   */
+  function parseRoleSelection(content) {
+    const roles = []
+    const lines = content.split('\n')
+
+    let currentRole = null
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('可选职业')) continue
+
+      // 匹配职业行: "游侠 - 敏捷的远程射手"
+      const roleMatch = trimmed.match(/^(.+?)\s+-\s+(.+)$/)
+      if (roleMatch) {
+        // 保存上一个职业
+        if (currentRole) {
+          roles.push(currentRole)
+        }
+        currentRole = {
+          name: roleMatch[1].trim(),
+          description: roleMatch[2].trim(),
+          stats: {}
+        }
+        continue
+      }
+
+      // 匹配属性行: "生命100 法力60 物攻20 物防10 法攻8 法防6 速度110"
+      if (currentRole && trimmed.includes('生命')) {
+        const statPatterns = [
+          { pattern: /生命(\d+)/, key: 'health' },
+          { pattern: /法力(\d+)/, key: 'mana' },
+          { pattern: /物攻(\d+)/, key: 'physicalAttack' },
+          { pattern: /物防(\d+)/, key: 'physicalDefense' },
+          { pattern: /法攻(\d+)/, key: 'magicAttack' },
+          { pattern: /法防(\d+)/, key: 'magicDefense' },
+          { pattern: /速度(\d+)/, key: 'speed' }
+        ]
+
+        for (const { pattern, key } of statPatterns) {
+          const match = trimmed.match(pattern)
+          if (match) {
+            currentRole.stats[key] = parseInt(match[1])
+          }
+        }
+      }
+    }
+
+    // 添加最后一个职业
+    if (currentRole) {
+      roles.push(currentRole)
+    }
+
+    console.log('[Command] 解析职业列表:', roles)
+    return roles
+  }
+
+  /**
    * 解析交易状态
    * 格式：
    * 交易状态：
@@ -716,6 +796,10 @@ export function useCommand() {
           // 如果从商店窗口切换回来，关闭商店
           if (shopStore.isInShop) {
             shopStore.closeShop()
+          }
+          // 如果从注册窗口切换回来，关闭注册
+          if (registerStore.isInRegister) {
+            registerStore.closeRegister()
           }
         }
         break
