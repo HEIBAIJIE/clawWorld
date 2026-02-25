@@ -112,21 +112,23 @@
 
       <!-- 底部操作区 -->
       <div class="trade-actions">
-        <label class="lock-checkbox">
+        <label class="lock-checkbox" :class="{ disabled: tradeStore.myConfirmed }">
           <input
             type="checkbox"
             v-model="lockChecked"
             @change="handleLockChange"
+            :disabled="tradeStore.myConfirmed"
           />
           <span class="checkbox-label">{{ tradeStore.myLocked ? '已锁定（点击解锁）' : '锁定交易' }}</span>
         </label>
 
         <button
           class="sci-button primary confirm-btn"
-          :disabled="!tradeStore.bothLocked"
+          :class="{ confirmed: tradeStore.myConfirmed }"
+          :disabled="!tradeStore.bothLocked || tradeStore.myConfirmed"
           @click="handleConfirm"
         >
-          确认交易
+          {{ tradeStore.myConfirmed ? '等待对方确认...' : '确认交易' }}
         </button>
       </div>
     </div>
@@ -162,11 +164,18 @@ watch(() => tradeStore.myOfferGold, (newVal) => {
 // 监听 store 中的锁定状态，启动/停止自动刷新
 watch(() => tradeStore.myLocked, (newVal) => {
   lockChecked.value = newVal
-  // 非AI代理模式下，锁定后启动自动刷新
-  if (newVal && !agentStore.isEnabled) {
+  // 非AI代理模式下，锁定后启动自动刷新（如果还没确认交易）
+  if (newVal && !agentStore.isEnabled && !tradeStore.myConfirmed) {
     startAutoRefresh()
-  } else {
+  } else if (!newVal) {
     stopAutoRefresh()
+  }
+}, { immediate: true })
+
+// 监听确认状态，确认后也需要轮询等待对方确认
+watch(() => tradeStore.myConfirmed, (newVal) => {
+  if (newVal && tradeStore.isInTrade && !agentStore.isEnabled) {
+    startAutoRefresh()
   }
 }, { immediate: true })
 
@@ -186,10 +195,14 @@ onUnmounted(() => {
 function startAutoRefresh() {
   stopAutoRefresh() // 先清理已有的定时器
   autoRefreshTimer = setInterval(() => {
-    // 只有在锁定状态且交易进行中时才刷新，且不在等待响应时
-    if (tradeStore.myLocked && tradeStore.isInTrade && !agentStore.isEnabled && !sessionStore.isWaiting) {
+    // 锁定状态或已确认状态下，交易进行中时刷新，且不在等待响应时
+    const shouldRefresh = (tradeStore.myLocked || tradeStore.myConfirmed) &&
+                          tradeStore.isInTrade &&
+                          !agentStore.isEnabled &&
+                          !sessionStore.isWaiting
+    if (shouldRefresh) {
       sendCommand('trade wait 1')
-    } else if (!tradeStore.myLocked || !tradeStore.isInTrade) {
+    } else if (!tradeStore.isInTrade) {
       stopAutoRefresh()
     }
     // 如果只是 isWaiting，跳过本次刷新但不停止定时器
@@ -273,9 +286,25 @@ function handleLockChange() {
 // 处理确认交易
 async function handleConfirm() {
   if (!tradeStore.bothLocked) return
-  // 停止自动刷新，避免冲突
+
+  // 先停止自动刷新
   stopAutoRefresh()
+
+  // 等待当前请求完成
+  while (sessionStore.isWaiting) {
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  // 标记已确认
+  tradeStore.setMyConfirmed(true)
+
+  // 发送确认命令
   await sendCommand('trade confirm')
+
+  // 确认后启动自动刷新，等待对方确认
+  if (tradeStore.isInTrade && !agentStore.isEnabled) {
+    startAutoRefresh()
+  }
 }
 
 // 处理结束交易
@@ -587,10 +616,19 @@ function handleEndTrade() {
   user-select: none;
 }
 
+.lock-checkbox.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .lock-checkbox input {
   width: 16px;
   height: 16px;
   cursor: pointer;
+}
+
+.lock-checkbox input:disabled {
+  cursor: not-allowed;
 }
 
 .checkbox-label {
@@ -606,5 +644,11 @@ function handleEndTrade() {
 .confirm-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.confirm-btn.confirmed {
+  background: rgba(255, 193, 7, 0.3);
+  border-color: rgba(255, 193, 7, 0.5);
+  color: #ffc107;
 }
 </style>

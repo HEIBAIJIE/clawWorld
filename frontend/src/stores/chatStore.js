@@ -5,6 +5,9 @@ export const useChatStore = defineStore('chat', () => {
   // 聊天消息列表（已去重）
   const messages = ref([])
 
+  // 已处理的邀请（避免删除后被重新添加），key 包含时间戳
+  const handledInvites = ref(new Set())
+
   // 频道名称映射
   const channelNames = {
     world: '世界',
@@ -16,8 +19,8 @@ export const useChatStore = defineStore('chat', () => {
 
   // 添加聊天消息（自动去重）
   function addMessage(channel, sender, content, timestamp, actionType = null, actionTarget = null) {
-    // 生成唯一ID用于去重（不包含时间戳，因为窗口消息每次都是新时间戳）
-    const msgId = `${channel}-${sender}-${content}`
+    // 生成唯一ID用于去重，包含时间戳
+    const msgId = `${channel}-${sender}-${content}-${timestamp}`
 
     // 检查是否已存在相同内容的消息
     const exists = messages.value.some(msg => msg.id === msgId)
@@ -47,9 +50,9 @@ export const useChatStore = defineStore('chat', () => {
     return true
   }
 
-  // 添加系统消息（带操作按钮）
-  function addSystemMessage(content, actionType = null, actionTarget = null) {
-    return addMessage('system', '系统', content, Date.now(), actionType, actionTarget)
+  // 添加系统消息（带操作按钮），需要传入时间戳用于去重
+  function addSystemMessage(content, actionType = null, actionTarget = null, timestamp = null) {
+    return addMessage('system', '系统', content, timestamp || Date.now(), actionType, actionTarget)
   }
 
   // 从日志文本解析聊天消息
@@ -82,16 +85,26 @@ export const useChatStore = defineStore('chat', () => {
       // 解析组队邀请: [服务端][时间][状态][队伍变化]XXX 邀请你加入队伍
       const partyInviteMatch = line.match(/\[服务端\]\[([^\]]+)\]\[状态\]\[队伍变化\](.+)\s+邀请你加入队伍/)
       if (partyInviteMatch) {
-        const [, , inviterName] = partyInviteMatch
-        addSystemMessage(`${inviterName.trim()} 邀请你加入队伍`, 'party_invite', inviterName.trim())
+        const [, timeStr, inviterName] = partyInviteMatch
+        const timestamp = parseTimeStr(timeStr)
+        const inviteKey = `party_invite-${inviterName.trim()}-${timestamp}`
+        // 跳过已处理的邀请
+        if (!handledInvites.value.has(inviteKey)) {
+          addSystemMessage(`${inviterName.trim()} 邀请你加入队伍`, 'party_invite', inviterName.trim(), timestamp)
+        }
         continue
       }
 
       // 解析交易邀请: [服务端][时间][状态][交易变化]XXX 邀请你进行交易
       const tradeInviteMatch = line.match(/\[服务端\]\[([^\]]+)\]\[状态\]\[交易变化\](.+)\s+邀请你进行交易/)
       if (tradeInviteMatch) {
-        const [, , inviterName] = tradeInviteMatch
-        addSystemMessage(`${inviterName.trim()} 邀请你进行交易`, 'trade_invite', inviterName.trim())
+        const [, timeStr, inviterName] = tradeInviteMatch
+        const timestamp = parseTimeStr(timeStr)
+        const inviteKey = `trade_invite-${inviterName.trim()}-${timestamp}`
+        // 跳过已处理的邀请
+        if (!handledInvites.value.has(inviteKey)) {
+          addSystemMessage(`${inviterName.trim()} 邀请你进行交易`, 'trade_invite', inviterName.trim(), timestamp)
+        }
         continue
       }
     }
@@ -123,15 +136,18 @@ export const useChatStore = defineStore('chat', () => {
     return Date.now()
   }
 
-  // 清除特定系统消息的操作按钮（当邀请被处理后）
+  // 删除特定的系统消息（当邀请被处理后）
   function removeSystemMessage(actionType, actionTarget) {
-    const msg = messages.value.find(
+    const index = messages.value.findIndex(
       msg => msg.actionType === actionType && msg.actionTarget === actionTarget
     )
-    if (msg) {
-      // 只清除 actionType，保留消息本身，这样按钮会消失但消息还在
-      msg.actionType = null
-      msg.actionTarget = null
+    if (index !== -1) {
+      // 标记为已处理，使用消息的时间戳
+      const msg = messages.value[index]
+      const inviteKey = `${actionType}-${actionTarget}-${msg.timestamp}`
+      handledInvites.value.add(inviteKey)
+
+      messages.value.splice(index, 1)
     }
   }
 

@@ -14,6 +14,7 @@ export const useTradeStore = defineStore('trade', () => {
   const myOfferGold = ref(0)
   const myOfferItems = ref([])
   const myLocked = ref(false)
+  const myConfirmed = ref(false)  // 我方是否已确认交易
 
   // 对方交易提供
   const partnerOfferGold = ref(0)
@@ -38,6 +39,7 @@ export const useTradeStore = defineStore('trade', () => {
     myOfferGold.value = 0
     myOfferItems.value = []
     myLocked.value = false
+    myConfirmed.value = false
     partnerOfferGold.value = 0
     partnerOfferItems.value = []
     partnerLocked.value = false
@@ -84,6 +86,11 @@ export const useTradeStore = defineStore('trade', () => {
     myLocked.value = locked
   }
 
+  // 设置我方已确认
+  function setMyConfirmed(confirmed) {
+    myConfirmed.value = confirmed
+  }
+
   // 结束交易
   function endTrade() {
     isInTrade.value = false
@@ -93,6 +100,7 @@ export const useTradeStore = defineStore('trade', () => {
     myOfferGold.value = 0
     myOfferItems.value = []
     myLocked.value = false
+    myConfirmed.value = false
     partnerOfferGold.value = 0
     partnerOfferItems.value = []
     partnerLocked.value = false
@@ -112,6 +120,7 @@ export const useTradeStore = defineStore('trade', () => {
     myOfferGold,
     myOfferItems,
     myLocked,
+    myConfirmed,
     partnerOfferGold,
     partnerOfferItems,
     partnerLocked,
@@ -126,6 +135,7 @@ export const useTradeStore = defineStore('trade', () => {
     removeItemFromOffer,
     setMyOfferGold,
     setMyLocked,
+    setMyConfirmed,
     endTrade,
     reset
   }
