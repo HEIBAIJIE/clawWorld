@@ -2,6 +2,7 @@ package com.heibai.clawworld.application.impl;
 
 import com.heibai.clawworld.application.service.WindowStateService;
 import com.heibai.clawworld.domain.character.Player;
+import com.heibai.clawworld.domain.item.Equipment;
 import com.heibai.clawworld.domain.trade.Trade;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.infrastructure.config.data.item.EquipmentConfig;
@@ -249,18 +250,33 @@ public class TradeServiceImpl implements TradeService {
             return OperationResult.error("玩家不存在");
         }
 
-        // 查找物品
-        Player.InventorySlot targetSlot = player.getInventory().stream()
-            .filter(slot -> {
-                if (slot.isItem()) {
-                    return slot.getItem().getName().equals(itemName);
-                } else if (slot.isEquipment()) {
-                    return slot.getEquipment().getDisplayName().equals(itemName);
+        // 查找物品，支持多种匹配方式
+        Player.InventorySlot targetSlot = null;
+        for (Player.InventorySlot slot : player.getInventory()) {
+            if (slot.isItem()) {
+                if (slot.getItem().getName().equals(itemName)) {
+                    targetSlot = slot;
+                    break;
                 }
-                return false;
-            })
-            .findFirst()
-            .orElse(null);
+            } else if (slot.isEquipment()) {
+                Equipment eq = slot.getEquipment();
+                // 完整显示名称匹配（包含槽位前缀）
+                if (eq.getDisplayName().equals(itemName)) {
+                    targetSlot = slot;
+                    break;
+                }
+                // 不带槽位前缀的名称匹配（装备名#编号）
+                String nameWithInstance = eq.getName() + (eq.getInstanceNumber() != null ? "#" + eq.getInstanceNumber() : "");
+                if (nameWithInstance.equals(itemName)) {
+                    targetSlot = slot;
+                    break;
+                }
+                // 只有基础名称匹配（取第一个匹配的）
+                if (eq.getName().equals(itemName) && targetSlot == null) {
+                    targetSlot = slot;
+                }
+            }
+        }
 
         if (targetSlot == null) {
             return OperationResult.error("物品不存在");

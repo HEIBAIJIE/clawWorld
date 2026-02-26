@@ -1,5 +1,6 @@
 package com.heibai.clawworld.infrastructure.persistence.mapper;
 
+import com.heibai.clawworld.application.service.EquipmentInstanceService;
 import com.heibai.clawworld.domain.character.Role;
 import com.heibai.clawworld.domain.item.Equipment;
 import com.heibai.clawworld.domain.item.Item;
@@ -7,6 +8,7 @@ import com.heibai.clawworld.domain.item.Rarity;
 import com.heibai.clawworld.infrastructure.config.data.character.RoleConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.EquipmentConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.ItemConfig;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
@@ -14,7 +16,10 @@ import org.springframework.stereotype.Component;
  * 集中处理所有Config到Domain的转换逻辑
  */
 @Component
+@RequiredArgsConstructor
 public class ConfigMapper {
+
+    private final EquipmentInstanceService equipmentInstanceService;
 
     /**
      * 将RoleConfig转换为Role领域对象
@@ -75,6 +80,7 @@ public class ConfigMapper {
 
     /**
      * 将EquipmentConfig转换为Equipment领域对象
+     * 自动生成唯一的实例编号
      */
     public Equipment toDomain(EquipmentConfig config) {
         if (config == null) {
@@ -103,6 +109,11 @@ public class ConfigMapper {
         equipment.setCritDamage(config.getCritDamage());
         equipment.setHitRate(config.getHitRate());
         equipment.setDodgeRate(config.getDodgeRate());
+
+        // 生成唯一的实例编号
+        Long instanceNumber = equipmentInstanceService.getNextInstanceNumber(config.getId());
+        equipment.setInstanceNumber(instanceNumber);
+
         return equipment;
     }
 }

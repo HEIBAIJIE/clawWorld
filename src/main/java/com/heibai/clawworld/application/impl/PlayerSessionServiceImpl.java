@@ -391,12 +391,30 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
             return OperationResult.error("玩家不存在");
         }
 
-        // 查找装备
+        // 查找装备，支持多种匹配方式：
+        // 1. 完整显示名称（带槽位前缀）：[右手]新手剑#1
+        // 2. 不带槽位前缀但带编号：新手剑#1
+        // 3. 只有基础名称：新手剑（匹配第一个找到的同名装备）
         Player.InventorySlot targetSlot = null;
         for (Player.InventorySlot slot : player.getInventory()) {
-            if (slot.isEquipment() && slot.getEquipment().getDisplayName().equals(itemName)) {
-                targetSlot = slot;
-                break;
+            if (slot.isEquipment()) {
+                Equipment eq = slot.getEquipment();
+                // 完整显示名称匹配（包含槽位前缀）
+                if (eq.getDisplayName().equals(itemName)) {
+                    targetSlot = slot;
+                    break;
+                }
+                // 不带槽位前缀的名称匹配（装备名#编号）
+                String nameWithInstance = eq.getName() + (eq.getInstanceNumber() != null ? "#" + eq.getInstanceNumber() : "");
+                if (nameWithInstance.equals(itemName)) {
+                    targetSlot = slot;
+                    break;
+                }
+                // 只有基础名称匹配（取第一个匹配的）
+                if (eq.getName().equals(itemName) && targetSlot == null) {
+                    targetSlot = slot;
+                    // 不break，继续查找是否有更精确的匹配
+                }
             }
         }
 
@@ -424,7 +442,7 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         PlayerEntity entity = playerMapper.toEntity(player);
         playerRepository.save(entity);
 
-        return OperationResult.success("装备成功: " + itemName);
+        return OperationResult.success("装备成功: " + equipment.getDisplayName());
     }
 
     @Override
