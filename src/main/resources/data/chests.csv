@@ -3,3 +3,4 @@ small_chest_common,普通小宝箱,一个普通的小宝箱,SMALL,0
 small_chest_rare,稀有小宝箱,一个稀有的小宝箱,SMALL,0
 large_chest_common,普通大宝箱,一个普通的大宝箱,LARGE,3
 large_chest_rare,稀有大宝箱,一个稀有的大宝箱,LARGE,600
+small_chest_gift,新手宝箱,包含新手礼包的宝箱,SMALL,0

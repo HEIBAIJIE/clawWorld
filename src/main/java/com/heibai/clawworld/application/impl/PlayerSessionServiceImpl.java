@@ -2,6 +2,7 @@ package com.heibai.clawworld.application.impl;
 
 import com.heibai.clawworld.infrastructure.config.data.character.RoleConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.EquipmentConfig;
+import com.heibai.clawworld.infrastructure.config.data.item.GiftLootConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.ItemConfig;
 import com.heibai.clawworld.domain.character.Player;
 import com.heibai.clawworld.domain.character.Role;
@@ -288,6 +289,72 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
                 playerStatsService.recalculateStats(player);
                 resultMessage = String.format("重置属性点成功，获得 %d 个可分配属性点", totalPoints);
                 break;
+            case "OPEN_GIFT":
+                // 打开礼包
+                String giftId = item.getEffectValue() != null ? String.valueOf(item.getEffectValue()) : item.getId();
+                // 如果 effectValue 是字符串形式的礼包ID，需要从 item 配置中获取
+                ItemConfig itemConfig = configDataManager.getItem(item.getId());
+                if (itemConfig != null && itemConfig.getEffect() != null && itemConfig.getEffect().equals("OPEN_GIFT")) {
+                    // effectValue 字段存储的是礼包ID字符串，但由于是 Integer 类型，我们用 item.getId() 作为 giftId
+                    // 实际上礼包ID应该和物品ID一致，或者从描述中解析
+                    giftId = item.getId();
+                }
+
+                List<GiftLootConfig> giftLoots = configDataManager.getGiftLoot(giftId);
+                if (giftLoots == null || giftLoots.isEmpty()) {
+                    return OperationResult.error("礼包内容为空");
+                }
+
+                // 检查背包空间
+                int requiredSlots = 0;
+                for (GiftLootConfig loot : giftLoots) {
+                    if (configDataManager.getEquipment(loot.getItemId()) != null) {
+                        requiredSlots += loot.getQuantity();
+                    } else {
+                        // 普通物品检查是否可堆叠
+                        boolean canStack = false;
+                        for (Player.InventorySlot slot : player.getInventory()) {
+                            if (slot.isItem() && slot.getItem().getId().equals(loot.getItemId())) {
+                                canStack = true;
+                                break;
+                            }
+                        }
+                        if (!canStack) {
+                            requiredSlots++;
+                        }
+                    }
+                }
+
+                int availableSlots = 50 - player.getInventory().size();
+                if (availableSlots < requiredSlots) {
+                    return OperationResult.error("背包空间不足，需要 " + requiredSlots + " 个空位");
+                }
+
+                // 添加礼包物品到背包
+                StringBuilder giftMessage = new StringBuilder();
+                giftMessage.append("你打开了").append(itemName).append("，获得了：\n");
+
+                for (GiftLootConfig loot : giftLoots) {
+                    addItemToPlayer(player, loot.getItemId(), loot.getQuantity());
+                    String lootItemName = loot.getItemId();
+                    var lootItemConfig = configDataManager.getItem(loot.getItemId());
+                    if (lootItemConfig != null) {
+                        lootItemName = lootItemConfig.getName();
+                    } else {
+                        var lootEqConfig = configDataManager.getEquipment(loot.getItemId());
+                        if (lootEqConfig != null) {
+                            lootItemName = lootEqConfig.getName();
+                        }
+                    }
+                    giftMessage.append("  - ").append(lootItemName);
+                    if (loot.getQuantity() > 1) {
+                        giftMessage.append(" x").append(loot.getQuantity());
+                    }
+                    giftMessage.append("\n");
+                }
+
+                resultMessage = giftMessage.toString().trim();
+                break;
             default:
                 return OperationResult.error("未知的物品效果");
         }
@@ -477,5 +544,43 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         }
 
         return OperationResult.success("等待 " + seconds + " 秒完成");
+    }
+
+    /**
+     * 将物品添加到玩家背包
+     */
+    private void addItemToPlayer(Player player, String itemId, int quantity) {
+        // 检查是否已有该物品（只对普通物品堆叠）
+        boolean found = false;
+        if (configDataManager.getEquipment(itemId) == null) {
+            // 普通物品可以堆叠
+            for (Player.InventorySlot slot : player.getInventory()) {
+                if (slot.isItem() && slot.getItem().getId().equals(itemId)) {
+                    slot.setQuantity(slot.getQuantity() + quantity);
+                    found = true;
+                    break;
+                }
+            }
+        }
+
+        // 如果没有找到或是装备，添加新的物品槽
+        if (!found && player.getInventory().size() < 50) {
+            var eqConfig = configDataManager.getEquipment(itemId);
+            if (eqConfig != null) {
+                // 装备需要生成实例编号，每件装备单独添加
+                for (int i = 0; i < quantity; i++) {
+                    if (player.getInventory().size() < 50) {
+                        player.getInventory().add(Player.InventorySlot.forEquipment(
+                            configMapper.toDomain(eqConfig)));
+                    }
+                }
+            } else {
+                var itemConfig = configDataManager.getItem(itemId);
+                if (itemConfig != null) {
+                    player.getInventory().add(Player.InventorySlot.forItem(
+                        configMapper.toDomain(itemConfig), quantity));
+                }
+            }
+        }
     }
 }

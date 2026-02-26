@@ -22,6 +22,7 @@ public class Item {
         QUEST,
         SKILL_BOOK,
         EQUIPMENT,
+        GIFT,
         OTHER
     }
 }

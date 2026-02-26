@@ -70,7 +70,8 @@ public class ConfigDataManager {
                hasFileChanged("classpath:data/npc_shop_items.csv") ||
                hasFileChanged("classpath:data/role_skills.csv") ||
                hasFileChanged("classpath:data/chests.csv") ||
-               hasFileChanged("classpath:data/chest_loot.csv");
+               hasFileChanged("classpath:data/chest_loot.csv") ||
+               hasFileChanged("classpath:data/gift_loot.csv");
     }
 
     private boolean hasFileChanged(String path) throws Exception {
@@ -108,6 +109,7 @@ public class ConfigDataManager {
         // 物品和装备
         itemConfigLoader.loadItems();
         itemConfigLoader.loadEquipment();
+        itemConfigLoader.loadGiftLoot();
 
         // 技能
         skillConfigLoader.loadSkills();
@@ -266,5 +268,10 @@ public class ConfigDataManager {
 
     public List<ChestLootConfig> getChestLoot(String chestId) {
         return mapConfigLoader.getChestLoot(chestId);
+    }
+
+    // ========== 礼包相关 ==========
+    public List<GiftLootConfig> getGiftLoot(String giftId) {
+        return itemConfigLoader.getGiftLoot(giftId);
     }
 }

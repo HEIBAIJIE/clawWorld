@@ -15,3 +15,4 @@ large_chest_rare,reset_potion,RARE,0.3,1,1
 large_chest_rare,silver_ring,RARE,0.2,1,1
 large_chest_rare,skill_book_fireball,RARE,0.1,1,1
 small_chest_common,health_potion_small,COMMON,1,1,2
+small_chest_gift,starter_gift,EXCELLENT,1,1,1

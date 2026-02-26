@@ -2,6 +2,7 @@ package com.heibai.clawworld.infrastructure.config.loader;
 
 import com.heibai.clawworld.infrastructure.config.data.item.ItemConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.EquipmentConfig;
+import com.heibai.clawworld.infrastructure.config.data.item.GiftLootConfig;
 import com.heibai.clawworld.infrastructure.util.CsvReader;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,6 +30,7 @@ public class ItemConfigLoader {
 
     private final Map<String, ItemConfig> itemConfigs = new ConcurrentHashMap<>();
     private final Map<String, EquipmentConfig> equipmentConfigs = new ConcurrentHashMap<>();
+    private final List<GiftLootConfig> giftLootConfigs = new ArrayList<>();
 
     public void loadItems() {
         try {
@@ -112,5 +115,36 @@ public class ItemConfigLoader {
 
     public Map<String, EquipmentConfig> getAllEquipment() {
         return equipmentConfigs;
+    }
+
+    public void loadGiftLoot() {
+        try {
+            Resource resource = resourceLoader.getResource("classpath:data/gift_loot.csv");
+            if (!resource.exists()) {
+                log.warn("gift_loot.csv not found, skipping");
+                return;
+            }
+
+            List<GiftLootConfig> loots = csvReader.readCsv(resource.getInputStream(), record -> {
+                GiftLootConfig loot = new GiftLootConfig();
+                loot.setGiftId(csvReader.getString(record, "giftId"));
+                loot.setItemId(csvReader.getString(record, "itemId"));
+                loot.setRarity(csvReader.getString(record, "rarity"));
+                loot.setQuantity(csvReader.getInt(record, "quantity"));
+                return loot;
+            });
+
+            giftLootConfigs.clear();
+            giftLootConfigs.addAll(loots);
+            log.info("Loaded {} gift loot entries", loots.size());
+        } catch (IOException e) {
+            log.error("Error loading gift_loot.csv", e);
+        }
+    }
+
+    public List<GiftLootConfig> getGiftLoot(String giftId) {
+        return giftLootConfigs.stream()
+                .filter(loot -> loot.getGiftId().equals(giftId))
+                .toList();
     }
 }

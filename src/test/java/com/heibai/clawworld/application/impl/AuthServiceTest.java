@@ -115,7 +115,7 @@ class AuthServiceTest {
         mockMap.setId("starter_village");
         mockMap.setName("新手村");
         when(mapInitializationService.getMap("starter_village")).thenReturn(mockMap);
-        when(mapEntityService.getMapEntities(anyString())).thenReturn(new ArrayList<>());
+        when(mapEntityService.getMapEntities(anyString(), anyString())).thenReturn(new ArrayList<>());
         when(chatService.getChatHistory(anyString())).thenReturn(new ArrayList<>());
 
         // Act

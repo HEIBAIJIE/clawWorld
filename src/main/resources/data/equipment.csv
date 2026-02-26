@@ -9,3 +9,11 @@ steel_sword,钢剑,锋利的钢制长剑,200,RIGHT_HAND,EXCELLENT,5,0,0,0,35,0,0
 magic_staff,魔法杖,蕴含魔力的法杖,250,RIGHT_HAND,EXCELLENT,0,0,8,0,0,0,30,0,0,0.0,0.0,0.01,0.0
 silver_ring,银戒指,精致的银戒指,500,ACCESSORY1,RARE,1,1,1,1,5,5,5,5,1,0.01,0.05,0.01,0.01
 dragon_blade,龙之刃,传说中的龙族武器,5000,RIGHT_HAND,LEGENDARY,10,5,0,0,80,0,0,0,5,0.05,0.2,0.03,0.0
+novice_sword,新手剑,新手专用的木剑,0,RIGHT_HAND,COMMON,3,0,0,0,10,0,0,0,0,0.0,0.0,0.0,0.0
+novice_shield,新手盾,新手专用的木盾,0,LEFT_HAND,COMMON,0,0,0,3,0,8,0,4,0,0.0,0.0,0.0,0.0
+novice_helmet,新手头盔,新手专用的布帽,0,HEAD,COMMON,0,2,0,0,0,3,0,2,1,0.0,0.0,0.0,0.01
+novice_armor,新手护甲,新手专用的布甲,0,CHEST,COMMON,0,0,0,4,0,6,0,4,0,0.0,0.0,0.0,0.0
+novice_pants,新手护腿,新手专用的布裤,0,LEGS,COMMON,0,0,2,0,0,4,2,2,0,0.0,0.0,0.0,0.0
+novice_boots,新手靴子,新手专用的布靴,0,FEET,COMMON,0,3,0,0,0,2,0,1,3,0.0,0.0,0.0,0.02
+novice_ring,新手戒指,新手专用的铜戒指,0,ACCESSORY1,COMMON,0,0,3,0,0,0,5,3,0,0.01,0.0,0.0,0.0
+novice_necklace,新手项链,新手专用的铜项链,0,ACCESSORY2,COMMON,2,0,0,2,3,3,0,0,0,0.0,0.05,0.01,0.0
