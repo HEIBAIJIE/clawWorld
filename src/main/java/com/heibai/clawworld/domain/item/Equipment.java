@@ -51,14 +51,38 @@ public class Equipment extends Item {
     }
 
     /**
-     * 获取装备的完整显示名称（包含实例编号）
-     * 例如：铁剑#1
+     * 获取装备的完整显示名称（包含槽位前缀和实例编号）
+     * 例如：[右手]铁剑#1
      */
     public String getDisplayName() {
-        if (instanceNumber != null) {
-            return getName() + "#" + instanceNumber;
+        StringBuilder sb = new StringBuilder();
+        // 添加槽位前缀
+        if (slot != null) {
+            sb.append("[").append(getSlotDisplayName()).append("]");
         }
-        return getName();
+        sb.append(getName());
+        // 添加实例编号
+        if (instanceNumber != null) {
+            sb.append("#").append(instanceNumber);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 获取槽位的中文显示名称
+     */
+    private String getSlotDisplayName() {
+        if (slot == null) return "未知";
+        return switch (slot) {
+            case HEAD -> "头部";
+            case CHEST -> "上装";
+            case LEGS -> "下装";
+            case FEET -> "鞋子";
+            case LEFT_HAND -> "左手";
+            case RIGHT_HAND -> "右手";
+            case ACCESSORY1 -> "饰品1";
+            case ACCESSORY2 -> "饰品2";
+        };
     }
 
     public enum EquipmentSlot {

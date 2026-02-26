@@ -137,7 +137,10 @@ public class CharacterInfoServiceImpl implements CharacterInfoService {
                 if (slot.isItem()) {
                     sb.append(String.format("%s x%d\n", slot.getItem().getName(), slot.getQuantity()));
                 } else if (slot.isEquipment()) {
-                    sb.append(String.format("%s\n", slot.getEquipment().getDisplayName()));
+                    // 装备显示格式: [槽位]装备名#编号
+                    Equipment eq = slot.getEquipment();
+                    String slotName = getSlotName(eq.getSlot());
+                    sb.append(String.format("[%s]%s\n", slotName, eq.getDisplayName()));
                 }
             }
         } else {

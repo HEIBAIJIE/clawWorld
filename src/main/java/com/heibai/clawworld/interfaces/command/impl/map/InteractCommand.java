@@ -35,6 +35,8 @@ public class InteractCommand extends Command {
                         CommandContext.WindowType.valueOf(result.getNewWindowType()),
                         result.getNewWindowId()
                 );
+            } else if (result.isInventoryChanged()) {
+                return CommandResult.successWithInventoryChange(result.getMessage());
             } else {
                 return CommandResult.success(result.getMessage());
             }

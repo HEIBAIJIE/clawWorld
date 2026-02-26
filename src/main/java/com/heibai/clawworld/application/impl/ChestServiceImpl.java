@@ -3,6 +3,8 @@ package com.heibai.clawworld.application.impl;
 import com.heibai.clawworld.application.service.ChestService;
 import com.heibai.clawworld.application.service.PlayerSessionService;
 import com.heibai.clawworld.domain.character.Player;
+import com.heibai.clawworld.domain.item.Equipment;
+import com.heibai.clawworld.domain.item.Item;
 import com.heibai.clawworld.infrastructure.config.ConfigDataManager;
 import com.heibai.clawworld.infrastructure.config.data.map.ChestConfig;
 import com.heibai.clawworld.infrastructure.config.data.map.ChestLootConfig;
@@ -96,9 +98,11 @@ public class ChestServiceImpl implements ChestService {
             return OpenChestResult.error("无法获取玩家状态");
         }
 
-        // 添加物品到玩家背包
+        // 添加物品到玩家背包并收集显示名称
+        List<String> allAddedItems = new ArrayList<>();
         for (LootItem loot : lootItems) {
-            addItemToPlayer(player, loot.getItemId(), loot.getQuantity());
+            List<String> addedItems = addItemToPlayer(player, loot.getItemId(), loot.getQuantity());
+            allAddedItems.addAll(addedItems);
         }
 
         // 保存玩家状态
@@ -116,19 +120,15 @@ public class ChestServiceImpl implements ChestService {
         // 构建消息
         StringBuilder message = new StringBuilder();
         message.append("你打开了").append(chestConfig.getName()).append("，获得了：\n");
-        if (lootItems.isEmpty()) {
+        if (allAddedItems.isEmpty()) {
             message.append("  （空空如也）");
         } else {
-            for (LootItem loot : lootItems) {
-                message.append("  - ").append(loot.getItemName());
-                if (loot.getQuantity() > 1) {
-                    message.append(" x").append(loot.getQuantity());
-                }
-                message.append("\n");
+            for (String itemName : allAddedItems) {
+                message.append("  - ").append(itemName).append("\n");
             }
         }
 
-        log.info("玩家 {} 打开宝箱 {}，获得 {} 件物品", player.getName(), chestName, lootItems.size());
+        log.info("玩家 {} 打开宝箱 {}，获得 {} 件物品", player.getName(), chestName, allAddedItems.size());
 
         return OpenChestResult.success(message.toString().trim(), 0, lootItems);
     }
@@ -273,8 +273,11 @@ public class ChestServiceImpl implements ChestService {
 
     /**
      * 将物品添加到玩家背包
+     * @return 添加的物品显示名称列表
      */
-    private void addItemToPlayer(Player player, String itemId, int quantity) {
+    private List<String> addItemToPlayer(Player player, String itemId, int quantity) {
+        List<String> addedItems = new ArrayList<>();
+
         // 检查是否已有该物品（只对普通物品堆叠）
         boolean found = false;
         if (configDataManager.getEquipment(itemId) == null) {
@@ -283,6 +286,11 @@ public class ChestServiceImpl implements ChestService {
                 if (slot.isItem() && slot.getItem().getId().equals(itemId)) {
                     slot.setQuantity(slot.getQuantity() + quantity);
                     found = true;
+                    if (quantity > 1) {
+                        addedItems.add(slot.getItem().getName() + " x" + quantity);
+                    } else {
+                        addedItems.add(slot.getItem().getName());
+                    }
                     break;
                 }
             }
@@ -295,17 +303,25 @@ public class ChestServiceImpl implements ChestService {
                 // 装备需要生成实例编号，每件装备单独添加
                 for (int i = 0; i < quantity; i++) {
                     if (player.getInventory().size() < 50) {
-                        player.getInventory().add(Player.InventorySlot.forEquipment(
-                            configMapper.toDomain(eqConfig)));
+                        Equipment equipment = configMapper.toDomain(eqConfig);
+                        player.getInventory().add(Player.InventorySlot.forEquipment(equipment));
+                        addedItems.add(equipment.getDisplayName());
                     }
                 }
             } else {
                 var itemConfig = configDataManager.getItem(itemId);
                 if (itemConfig != null) {
-                    player.getInventory().add(Player.InventorySlot.forItem(
-                        configMapper.toDomain(itemConfig), quantity));
+                    Item item = configMapper.toDomain(itemConfig);
+                    player.getInventory().add(Player.InventorySlot.forItem(item, quantity));
+                    if (quantity > 1) {
+                        addedItems.add(item.getName() + " x" + quantity);
+                    } else {
+                        addedItems.add(item.getName());
+                    }
                 }
             }
         }
+
+        return addedItems;
     }
 }

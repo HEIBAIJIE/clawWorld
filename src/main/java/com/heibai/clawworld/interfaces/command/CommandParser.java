@@ -533,11 +533,18 @@ public class CommandParser {
 
     /**
      * 提取物品名称（支持带空格的物品名）
+     * 同时兼容带槽位前缀的装备名称，如 "[头部]新手头盔#1" -> "新手头盔#1"
      */
     private String extractItemName(String rawCommand, String prefix) {
         int startIndex = rawCommand.indexOf(prefix) + prefix.length();
         if (startIndex < rawCommand.length()) {
-            return rawCommand.substring(startIndex).trim();
+            String itemName = rawCommand.substring(startIndex).trim();
+            // 移除槽位前缀，如 "[头部]新手头盔#1" -> "新手头盔#1"
+            if (itemName.startsWith("[") && itemName.contains("]")) {
+                int bracketEnd = itemName.indexOf("]");
+                itemName = itemName.substring(bracketEnd + 1);
+            }
+            return itemName;
         }
         return "";
     }

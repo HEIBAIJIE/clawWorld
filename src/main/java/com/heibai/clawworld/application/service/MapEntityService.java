@@ -188,11 +188,20 @@ public interface MapEntityService {
         private boolean windowChanged;
         private String newWindowId;
         private String newWindowType;
+        private boolean inventoryChanged;
 
         public static InteractionResult success(String message) {
             InteractionResult result = new InteractionResult();
             result.success = true;
             result.message = message;
+            return result;
+        }
+
+        public static InteractionResult successWithInventoryChange(String message) {
+            InteractionResult result = new InteractionResult();
+            result.success = true;
+            result.message = message;
+            result.inventoryChanged = true;
             return result;
         }
 
@@ -231,6 +240,10 @@ public interface MapEntityService {
 
         public String getNewWindowType() {
             return newWindowType;
+        }
+
+        public boolean isInventoryChanged() {
+            return inventoryChanged;
         }
     }
 }

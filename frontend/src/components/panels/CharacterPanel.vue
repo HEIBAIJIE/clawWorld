@@ -146,6 +146,30 @@
 
       <div class="sci-divider"></div>
 
+      <!-- 装备栏 -->
+      <div class="attributes-section">
+        <div class="section-title">装备</div>
+        <div class="equipment-grid">
+          <div
+            v-for="(slot, key) in equipmentSlots"
+            :key="key"
+            class="equipment-slot"
+            :class="{ empty: !playerStore.equipment[key] }"
+            @click="inspectEquipment(key)"
+          >
+            <span class="slot-icon">{{ slot.icon }}</span>
+            <div class="slot-info">
+              <span class="slot-label">{{ slot.label }}</span>
+              <span class="slot-value" :class="{ equipped: playerStore.equipment[key] }">
+                {{ playerStore.equipment[key]?.name || '无' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sci-divider"></div>
+
       <!-- 技能列表 -->
       <div class="attributes-section">
         <div class="section-title">技能</div>
@@ -169,14 +193,38 @@
 <script setup>
 import { useUIStore } from '../../stores/uiStore'
 import { usePlayerStore } from '../../stores/playerStore'
+import { useAgentStore } from '../../stores/agentStore'
 import { useCommand } from '../../composables/useCommand'
 
 const uiStore = useUIStore()
 const playerStore = usePlayerStore()
-const { addAttribute: addAttr } = useCommand()
+const agentStore = useAgentStore()
+const { addAttribute: addAttr, sendCommand } = useCommand()
+
+// 装备槽位配置
+const equipmentSlots = {
+  HEAD: { label: '头部', icon: '🪖' },
+  CHEST: { label: '上装', icon: '👕' },
+  LEGS: { label: '下装', icon: '👖' },
+  FEET: { label: '鞋子', icon: '👟' },
+  RIGHT_HAND: { label: '右手', icon: '⚔️' },
+  LEFT_HAND: { label: '左手', icon: '🛡️' },
+  ACCESSORY1: { label: '饰品1', icon: '💍' },
+  ACCESSORY2: { label: '饰品2', icon: '📿' }
+}
 
 function addAttribute(attr) {
   addAttr(attr, 1)
+}
+
+function inspectEquipment(slotKey) {
+  const equipment = playerStore.equipment[slotKey]
+  if (equipment && equipment.name) {
+    // 非AI代理模式下，发送inspect命令查看装备详情
+    if (!agentStore.isAgentMode) {
+      sendCommand(`inspect ${equipment.name}`)
+    }
+  }
 }
 </script>
 
@@ -211,6 +259,64 @@ function addAttribute(attr) {
 }
 
 .stat-row span:last-child {
+  color: var(--text-primary);
+}
+
+/* 装备栏样式 */
+.equipment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.equipment-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-dark);
+  border-radius: var(--button-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.equipment-slot:hover:not(.empty) {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+}
+
+.equipment-slot.empty {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.slot-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.slot-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.slot-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.slot-value {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot-value.equipped {
   color: var(--text-primary);
 }
 

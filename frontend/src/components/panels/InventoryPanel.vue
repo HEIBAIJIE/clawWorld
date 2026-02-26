@@ -56,31 +56,56 @@ const inventorySlots = computed(() => {
 // 获取物品图标
 function getItemIcon(item) {
   if (!item) return ''
-  if (item.isEquipment) return '⚔️'
+  if (item.isEquipment) {
+    // 根据槽位显示不同图标
+    const slotIcons = {
+      '头部': '🪖',
+      '上装': '👕',
+      '下装': '👖',
+      '鞋子': '👟',
+      '左手': '🛡️',
+      '右手': '⚔️',
+      '饰品1': '💍',
+      '饰品2': '📿'
+    }
+    return slotIcons[item.slotName] || '⚔️'
+  }
   if (item.name.includes('药水') || item.name.includes('药剂')) return '🧪'
   if (item.name.includes('技能书')) return '📖'
+  if (item.name.includes('礼包')) return '🎁'
   return '📦'
+}
+
+// 获取用于命令的物品名称
+function getCommandName(item) {
+  if (!item) return ''
+  // 装备使用displayName（不含槽位前缀）
+  if (item.isEquipment && item.displayName) {
+    return item.displayName
+  }
+  return item.name
 }
 
 // 点击槽位
 function handleSlotClick(slot, event) {
   if (!slot) return
   // 单击显示物品信息
-  sendCommand(`inspect ${slot.name}`)
+  sendCommand(`inspect ${getCommandName(slot)}`)
 }
 
 // 右键槽位
 function handleSlotRightClick(slot, event) {
   if (!slot) return
 
+  const commandName = getCommandName(slot)
   const items = [
-    { label: '查看', action: () => sendCommand(`inspect ${slot.name}`) }
+    { label: '查看', action: () => sendCommand(`inspect ${commandName}`) }
   ]
 
   if (slot.isEquipment) {
-    items.push({ label: '装备', action: () => equip(slot.name) })
+    items.push({ label: '装备', action: () => equip(commandName) })
   } else {
-    items.push({ label: '使用', action: () => useItem(slot.name) })
+    items.push({ label: '使用', action: () => useItem(commandName) })
   }
 
   uiStore.showContextMenu(event.clientX, event.clientY, items, slot)

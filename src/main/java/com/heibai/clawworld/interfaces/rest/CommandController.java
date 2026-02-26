@@ -95,7 +95,8 @@ public class CommandController {
                 request.getCommand(),
                 result.getMessage(),
                 windowType,
-                result.getNewWindowType()
+                result.getNewWindowType(),
+                result.isInventoryChanged()
             );
 
             // 返回结果

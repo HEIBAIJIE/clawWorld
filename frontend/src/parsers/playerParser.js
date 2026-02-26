@@ -166,7 +166,7 @@ export function parseEquipment(content) {
  * 解析背包
  * 输入格式:
  * "小型生命药水 x1"
- * "铁剑#1"
+ * "[头部]新手头盔#1"
  * @param {string} content - 背包文本
  * @returns {array} 背包物品数组
  */
@@ -179,6 +179,8 @@ export function parseInventory(content) {
     if (!trimmed || trimmed === '背包为空') continue
     // 跳过标题行
     if (trimmed.includes('你的背包') || trimmed.startsWith('背包')) continue
+    // 跳过金币行
+    if (trimmed.match(/^金币[：:]\s*\d+$/)) continue
 
     // 带数量的物品: "小型生命药水 x1"
     const stackMatch = trimmed.match(/^(.+?)\s+x(\d+)$/)
@@ -191,10 +193,36 @@ export function parseInventory(content) {
       continue
     }
 
-    // 装备（带#编号）: "铁剑#1"
-    if (trimmed.includes('#')) {
+    // 装备（带槽位前缀）: "[头部]新手头盔" 或 "[头部]新手头盔#1"
+    const slotEquipMatch = trimmed.match(/^\[(.+?)\](.+)$/)
+    if (slotEquipMatch) {
+      const slotName = slotEquipMatch[1]
+      const equipName = slotEquipMatch[2].trim()
+      // 检查是否有实例编号
+      const instanceMatch = equipName.match(/^(.+)#(\d+)$/)
+      const baseName = instanceMatch ? instanceMatch[1].trim() : equipName
+      const displayName = equipName  // 不含槽位前缀的完整名称
+      inventory.push({
+        name: trimmed,  // 保留完整名称用于显示
+        baseName: baseName,  // 基础名称（不含槽位和编号）
+        displayName: displayName,  // 显示名称（不含槽位）
+        slotName: slotName,  // 槽位名称
+        quantity: 1,
+        isEquipment: true
+      })
+      continue
+    }
+
+    // 装备（无槽位前缀但有#编号）: "新手头盔#1"
+    const equipMatch = trimmed.match(/^(.+)#(\d+)$/)
+    if (equipMatch) {
+      const baseName = equipMatch[1].trim()
+      const instanceNumber = equipMatch[2]
       inventory.push({
         name: trimmed,
+        baseName: baseName,
+        displayName: trimmed,
+        slotName: null,
         quantity: 1,
         isEquipment: true
       })

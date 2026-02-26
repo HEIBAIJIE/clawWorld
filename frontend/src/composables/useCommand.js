@@ -335,8 +335,19 @@ export function useCommand() {
     }
 
     // 背包
-    if (content.includes('你的背包') || content.includes('背包为空') || content.match(/x\d+/)) {
-      const inventory = parseInventory(content)
+    if (content.includes('你的背包') || content.includes('=== 背包 ===') || content.includes('背包为空')) {
+      // 提取背包部分内容
+      let inventoryContent = content
+      if (content.includes('=== 背包 ===')) {
+        const startIndex = content.indexOf('=== 背包 ===')
+        const endIndex = content.indexOf('===', startIndex + 10)
+        if (endIndex > startIndex) {
+          inventoryContent = content.substring(startIndex, endIndex)
+        } else {
+          inventoryContent = content.substring(startIndex)
+        }
+      }
+      const inventory = parseInventory(inventoryContent)
       playerStore.updateFromParsed({ inventory })
     }
 
@@ -387,11 +398,17 @@ export function useCommand() {
     const result = { rawText: content }
     const lines = content.split('\n')
 
-    // 第一行通常是物品名称
-    if (lines.length > 0) {
-      const firstLine = lines[0].trim()
-      if (firstLine && !firstLine.includes(':') && !firstLine.includes('：')) {
-        result.name = firstLine
+    // 解析名称: "名称: xxx"
+    const nameMatch = content.match(/名称[：:]\s*(.+)/)
+    if (nameMatch) {
+      result.name = nameMatch[1].trim()
+    } else {
+      // 兼容旧格式：第一行是物品名称
+      if (lines.length > 0) {
+        const firstLine = lines[0].trim()
+        if (firstLine && !firstLine.includes(':') && !firstLine.includes('：') && !firstLine.includes('===')) {
+          result.name = firstLine
+        }
       }
     }
 
@@ -401,32 +418,85 @@ export function useCommand() {
       result.type = typeMatch[1].trim()
     }
 
+    // 解析装备位置（装备特有）
+    const slotMatch = content.match(/装备位置[：:]\s*(.+)/)
+    if (slotMatch) {
+      result.slot = slotMatch[1].trim()
+      result.type = result.slot  // 用装备位置作为类型显示
+    }
+
+    // 解析稀有度
+    const rarityMatch = content.match(/稀有度[：:]\s*(.+)/)
+    if (rarityMatch) {
+      const rarityName = rarityMatch[1].trim()
+      // 转换为英文稀有度用于样式
+      const rarityMap = {
+        '普通': 'common',
+        '优秀': 'uncommon',
+        '稀有': 'rare',
+        '史诗': 'epic',
+        '传说': 'legendary',
+        '神话': 'mythic'
+      }
+      result.rarity = rarityMap[rarityName] || 'common'
+      result.rarityName = rarityName
+    }
+
     // 解析描述
     const descMatch = content.match(/描述[：:]\s*(.+)/)
     if (descMatch) {
       result.description = descMatch[1].trim()
     }
 
-    // 解析属性
+    // 解析价格
+    const priceMatch = content.match(/价格[：:]\s*(\d+)\s*金币/)
+    if (priceMatch) {
+      result.price = parseInt(priceMatch[1])
+    }
+
+    // 解析属性加成（装备详情格式: "力量 +3"）
     result.stats = {}
     const statPatterns = [
-      { pattern: /物理攻击[：:]\s*\+?(\d+)/, key: 'physicalAttack' },
-      { pattern: /物理防御[：:]\s*\+?(\d+)/, key: 'physicalDefense' },
-      { pattern: /魔法攻击[：:]\s*\+?(\d+)/, key: 'magicAttack' },
-      { pattern: /魔法防御[：:]\s*\+?(\d+)/, key: 'magicDefense' },
-      { pattern: /生命[：:]\s*\+?(\d+)/, key: 'health' },
-      { pattern: /法力[：:]\s*\+?(\d+)/, key: 'mana' },
-      { pattern: /力量[：:]\s*\+?(\d+)/, key: 'strength' },
-      { pattern: /敏捷[：:]\s*\+?(\d+)/, key: 'agility' },
-      { pattern: /智力[：:]\s*\+?(\d+)/, key: 'intelligence' },
-      { pattern: /体力[：:]\s*\+?(\d+)/, key: 'vitality' },
-      { pattern: /速度[：:]\s*\+?(\d+)/, key: 'speed' }
+      { pattern: /物理攻击\s*\+(\d+)/, key: 'physicalAttack' },
+      { pattern: /物理防御\s*\+(\d+)/, key: 'physicalDefense' },
+      { pattern: /法术攻击\s*\+(\d+)/, key: 'magicAttack' },
+      { pattern: /法术防御\s*\+(\d+)/, key: 'magicDefense' },
+      { pattern: /力量\s*\+(\d+)/, key: 'strength' },
+      { pattern: /敏捷\s*\+(\d+)/, key: 'agility' },
+      { pattern: /智力\s*\+(\d+)/, key: 'intelligence' },
+      { pattern: /体力\s*\+(\d+)/, key: 'vitality' },
+      { pattern: /速度\s*\+(\d+)/, key: 'speed' },
+      { pattern: /暴击率\s*\+([\d.]+)%/, key: 'critRate' },
+      { pattern: /暴击伤害\s*\+([\d.]+)%/, key: 'critDamage' },
+      { pattern: /命中率\s*\+([\d.]+)%/, key: 'hitRate' },
+      { pattern: /闪避率\s*\+([\d.]+)%/, key: 'dodgeRate' }
     ]
 
     for (const { pattern, key } of statPatterns) {
       const match = content.match(pattern)
       if (match) {
-        result.stats[key] = parseInt(match[1])
+        result.stats[key] = key.includes('Rate') || key.includes('Damage')
+          ? parseFloat(match[1])
+          : parseInt(match[1])
+      }
+    }
+
+    // 兼容旧格式的属性解析（"物理攻击: +10"）
+    const oldStatPatterns = [
+      { pattern: /物理攻击[：:]\s*\+?(\d+)/, key: 'physicalAttack' },
+      { pattern: /物理防御[：:]\s*\+?(\d+)/, key: 'physicalDefense' },
+      { pattern: /魔法攻击[：:]\s*\+?(\d+)/, key: 'magicAttack' },
+      { pattern: /魔法防御[：:]\s*\+?(\d+)/, key: 'magicDefense' },
+      { pattern: /生命[：:]\s*\+?(\d+)/, key: 'health' },
+      { pattern: /法力[：:]\s*\+?(\d+)/, key: 'mana' }
+    ]
+
+    for (const { pattern, key } of oldStatPatterns) {
+      if (!result.stats[key]) {
+        const match = content.match(pattern)
+        if (match) {
+          result.stats[key] = parseInt(match[1])
+        }
       }
     }
 
@@ -435,6 +505,12 @@ export function useCommand() {
     if (levelReqMatch) {
       result.requirements = result.requirements || {}
       result.requirements.level = parseInt(levelReqMatch[1])
+    }
+
+    // 解析效果（消耗品）
+    const effectMatch = content.match(/效果[：:]\s*(.+)/)
+    if (effectMatch) {
+      result.effect = effectMatch[1].trim()
     }
 
     return result

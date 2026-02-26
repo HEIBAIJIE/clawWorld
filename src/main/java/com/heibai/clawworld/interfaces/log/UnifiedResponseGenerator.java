@@ -1,5 +1,6 @@
 package com.heibai.clawworld.interfaces.log;
 
+import com.heibai.clawworld.application.service.CharacterInfoService;
 import com.heibai.clawworld.application.service.ChatService;
 import com.heibai.clawworld.application.service.MapEntityService;
 import com.heibai.clawworld.application.service.PlayerSessionService;
@@ -39,6 +40,7 @@ public class UnifiedResponseGenerator {
     private final com.heibai.clawworld.application.service.CombatService combatService;
     private final com.heibai.clawworld.application.service.TradeService tradeService;
     private final com.heibai.clawworld.application.service.ShopService shopService;
+    private final CharacterInfoService characterInfoService;
 
     /**
      * 生成完整的响应（包含客户端指令日志 + 状态日志 + 可选的窗口日志）
@@ -46,6 +48,17 @@ public class UnifiedResponseGenerator {
     public String generateResponse(String playerId, String command, String commandResult,
                                    CommandContext.WindowType currentWindowType,
                                    CommandContext.WindowType newWindowType) {
+        return generateResponse(playerId, command, commandResult, currentWindowType, newWindowType, false);
+    }
+
+    /**
+     * 生成完整的响应（包含客户端指令日志 + 状态日志 + 可选的窗口日志）
+     * @param inventoryChanged 是否需要刷新背包
+     */
+    public String generateResponse(String playerId, String command, String commandResult,
+                                   CommandContext.WindowType currentWindowType,
+                                   CommandContext.WindowType newWindowType,
+                                   boolean inventoryChanged) {
         GameLogBuilder builder = new GameLogBuilder();
 
         // 只有当 playerId 不为 null 时才查询账号信息
@@ -187,6 +200,14 @@ public class UnifiedResponseGenerator {
             // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
             if (playerId != null) {
                 generateNewWindowContent(builder, playerId, newWindowType);
+            }
+        }
+
+        // 3.5 如果背包发生变化，发送背包窗口更新
+        if (inventoryChanged && playerId != null && newWindowType == null) {
+            Player player = playerSessionService.getPlayerState(playerId);
+            if (player != null) {
+                builder.addWindow("背包", "你的背包：\n" + characterInfoService.generateInventory(player));
             }
         }
 

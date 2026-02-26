@@ -515,7 +515,7 @@ public class MapEntityServiceImpl implements MapEntityService {
     private InteractionResult handleOpenChest(String playerId, String targetName) {
         ChestService.OpenChestResult result = chestService.openChest(playerId, targetName);
         return result.isSuccess() ?
-                InteractionResult.success(result.getMessage()) :
+                InteractionResult.successWithInventoryChange(result.getMessage()) :
                 InteractionResult.error(result.getMessage());
     }
 }

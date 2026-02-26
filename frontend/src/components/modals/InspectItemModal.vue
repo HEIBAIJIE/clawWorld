@@ -172,6 +172,11 @@ const itemRarityClass = computed(() => {
   color: #ff9800;
 }
 
+.item-name.mythic {
+  color: #e91e63;
+  text-shadow: 0 0 8px rgba(233, 30, 99, 0.5);
+}
+
 .item-type {
   font-size: 12px;
   color: var(--text-muted);

@@ -34,11 +34,26 @@ public class CommandResult {
      */
     private String windowContent;
 
+    /**
+     * 是否需要刷新背包
+     */
+    private boolean inventoryChanged;
+
     public static CommandResult success(String message) {
         return CommandResult.builder()
                 .success(true)
                 .message(message)
                 .windowChanged(false)
+                .inventoryChanged(false)
+                .build();
+    }
+
+    public static CommandResult successWithInventoryChange(String message) {
+        return CommandResult.builder()
+                .success(true)
+                .message(message)
+                .windowChanged(false)
+                .inventoryChanged(true)
                 .build();
     }
 
@@ -47,6 +62,7 @@ public class CommandResult {
                 .success(false)
                 .message(message)
                 .windowChanged(false)
+                .inventoryChanged(false)
                 .build();
     }
 
@@ -57,6 +73,7 @@ public class CommandResult {
                 .windowChanged(true)
                 .newWindowType(newWindowType)
                 .windowContent(windowContent)
+                .inventoryChanged(false)
                 .build();
     }
 }

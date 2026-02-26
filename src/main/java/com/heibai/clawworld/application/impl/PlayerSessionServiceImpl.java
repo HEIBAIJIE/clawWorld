@@ -335,22 +335,10 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
                 giftMessage.append("你打开了").append(itemName).append("，获得了：\n");
 
                 for (GiftLootConfig loot : giftLoots) {
-                    addItemToPlayer(player, loot.getItemId(), loot.getQuantity());
-                    String lootItemName = loot.getItemId();
-                    var lootItemConfig = configDataManager.getItem(loot.getItemId());
-                    if (lootItemConfig != null) {
-                        lootItemName = lootItemConfig.getName();
-                    } else {
-                        var lootEqConfig = configDataManager.getEquipment(loot.getItemId());
-                        if (lootEqConfig != null) {
-                            lootItemName = lootEqConfig.getName();
-                        }
+                    List<String> addedItems = addItemToPlayer(player, loot.getItemId(), loot.getQuantity());
+                    for (String addedItem : addedItems) {
+                        giftMessage.append("  - ").append(addedItem).append("\n");
                     }
-                    giftMessage.append("  - ").append(lootItemName);
-                    if (loot.getQuantity() > 1) {
-                        giftMessage.append(" x").append(loot.getQuantity());
-                    }
-                    giftMessage.append("\n");
                 }
 
                 resultMessage = giftMessage.toString().trim();
@@ -548,8 +536,11 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
 
     /**
      * 将物品添加到玩家背包
+     * @return 添加的物品显示名称列表
      */
-    private void addItemToPlayer(Player player, String itemId, int quantity) {
+    private List<String> addItemToPlayer(Player player, String itemId, int quantity) {
+        List<String> addedItems = new ArrayList<>();
+
         // 检查是否已有该物品（只对普通物品堆叠）
         boolean found = false;
         if (configDataManager.getEquipment(itemId) == null) {
@@ -558,6 +549,12 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
                 if (slot.isItem() && slot.getItem().getId().equals(itemId)) {
                     slot.setQuantity(slot.getQuantity() + quantity);
                     found = true;
+                    // 返回物品名称和数量
+                    if (quantity > 1) {
+                        addedItems.add(slot.getItem().getName() + " x" + quantity);
+                    } else {
+                        addedItems.add(slot.getItem().getName());
+                    }
                     break;
                 }
             }
@@ -570,17 +567,25 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
                 // 装备需要生成实例编号，每件装备单独添加
                 for (int i = 0; i < quantity; i++) {
                     if (player.getInventory().size() < 50) {
-                        player.getInventory().add(Player.InventorySlot.forEquipment(
-                            configMapper.toDomain(eqConfig)));
+                        Equipment equipment = configMapper.toDomain(eqConfig);
+                        player.getInventory().add(Player.InventorySlot.forEquipment(equipment));
+                        addedItems.add(equipment.getDisplayName());
                     }
                 }
             } else {
                 var itemConfig = configDataManager.getItem(itemId);
                 if (itemConfig != null) {
-                    player.getInventory().add(Player.InventorySlot.forItem(
-                        configMapper.toDomain(itemConfig), quantity));
+                    Item item = configMapper.toDomain(itemConfig);
+                    player.getInventory().add(Player.InventorySlot.forItem(item, quantity));
+                    if (quantity > 1) {
+                        addedItems.add(item.getName() + " x" + quantity);
+                    } else {
+                        addedItems.add(item.getName());
+                    }
                 }
             }
         }
+
+        return addedItems;
     }
 }
