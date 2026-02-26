@@ -1,5 +1,6 @@
 package com.heibai.clawworld.application.impl;
 
+import com.heibai.clawworld.application.service.CharacterInfoService;
 import com.heibai.clawworld.infrastructure.config.data.character.RoleConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.EquipmentConfig;
 import com.heibai.clawworld.infrastructure.config.data.item.GiftLootConfig;
@@ -39,6 +40,7 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
     private final ConfigMapper configMapper;
     private final ConfigDataManager configDataManager;
     private final PlayerStatsService playerStatsService;
+    private final CharacterInfoService characterInfoService;
     private final com.heibai.clawworld.infrastructure.factory.MapInitializationService mapInitializationService;
 
     @Override
@@ -426,8 +428,9 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         Equipment.EquipmentSlot slot = equipment.getSlot();
 
         // 如果该槽位已有装备，卸下并放回背包
+        Equipment oldEquipment = null;
         if (player.getEquipment().containsKey(slot)) {
-            Equipment oldEquipment = player.getEquipment().get(slot);
+            oldEquipment = player.getEquipment().get(slot);
             player.getInventory().add(Player.InventorySlot.forEquipment(oldEquipment));
         }
 
@@ -442,7 +445,87 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         PlayerEntity entity = playerMapper.toEntity(player);
         playerRepository.save(entity);
 
-        return OperationResult.success("装备成功: " + equipment.getDisplayName());
+        // 生成详细的响应信息，包含更新后的装备栏、背包和角色属性
+        StringBuilder response = new StringBuilder();
+        response.append("装备成功: ").append(equipment.getDisplayName());
+        if (oldEquipment != null) {
+            response.append("（替换了 ").append(oldEquipment.getDisplayName()).append("）");
+        }
+        response.append("\n\n");
+        response.append("你的装备：\n").append(characterInfoService.generateEquipment(player));
+        response.append("\n");
+        response.append("你的背包：\n").append(characterInfoService.generateInventory(player));
+        response.append("\n");
+        response.append("角色状态：\n").append(characterInfoService.generatePlayerStatus(player));
+
+        return OperationResult.success(response.toString());
+    }
+
+    @Override
+    @Transactional
+    public OperationResult unequipItem(String playerId, String slotName) {
+        Player player = getPlayerState(playerId);
+        if (player == null) {
+            return OperationResult.error("玩家不存在");
+        }
+
+        // 检查背包是否已满
+        if (player.getInventory().size() >= 50) {
+            return OperationResult.error("背包已满，无法卸下装备");
+        }
+
+        // 解析槽位名称
+        Equipment.EquipmentSlot slot = parseSlotName(slotName);
+        if (slot == null) {
+            return OperationResult.error("无效的装备槽位: " + slotName);
+        }
+
+        // 检查该槽位是否有装备
+        Equipment equipment = player.getEquipment().get(slot);
+        if (equipment == null) {
+            return OperationResult.error("该槽位没有装备");
+        }
+
+        // 卸下装备：从装备栏移除，放入背包
+        player.getEquipment().remove(slot);
+        player.getInventory().add(Player.InventorySlot.forEquipment(equipment));
+
+        // 重新计算属性
+        playerStatsService.recalculateStats(player);
+
+        // 保存玩家状态
+        PlayerEntity entity = playerMapper.toEntity(player);
+        playerRepository.save(entity);
+
+        // 生成详细的响应信息
+        StringBuilder response = new StringBuilder();
+        response.append("卸下装备成功: ").append(equipment.getDisplayName());
+        response.append("\n\n");
+        response.append("你的装备：\n").append(characterInfoService.generateEquipment(player));
+        response.append("\n");
+        response.append("你的背包：\n").append(characterInfoService.generateInventory(player));
+        response.append("\n");
+        response.append("角色状态：\n").append(characterInfoService.generatePlayerStatus(player));
+
+        return OperationResult.success(response.toString());
+    }
+
+    /**
+     * 解析槽位名称
+     */
+    private Equipment.EquipmentSlot parseSlotName(String slotName) {
+        if (slotName == null) return null;
+        return switch (slotName.trim()) {
+            case "头部", "HEAD" -> Equipment.EquipmentSlot.HEAD;
+            case "上装", "CHEST" -> Equipment.EquipmentSlot.CHEST;
+            case "下装", "LEGS" -> Equipment.EquipmentSlot.LEGS;
+            case "鞋子", "FEET" -> Equipment.EquipmentSlot.FEET;
+            case "左手", "LEFT_HAND" -> Equipment.EquipmentSlot.LEFT_HAND;
+            case "右手", "RIGHT_HAND" -> Equipment.EquipmentSlot.RIGHT_HAND;
+            case "饰品1", "ACCESSORY1" -> Equipment.EquipmentSlot.ACCESSORY1;
+            case "饰品2", "ACCESSORY2" -> Equipment.EquipmentSlot.ACCESSORY2;
+            default -> null;
+        };
     }
 
     @Override

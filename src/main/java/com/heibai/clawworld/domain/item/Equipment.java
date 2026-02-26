@@ -69,6 +69,29 @@ public class Equipment extends Item {
     }
 
     /**
+     * 获取装备的简化显示名称（不含槽位前缀，只有名称和实例编号）
+     * 例如：铁剑#1
+     * 用于GUI角色信息面板等场景
+     */
+    public String getSimpleName() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(getName());
+        if (instanceNumber != null) {
+            sb.append("#").append(instanceNumber);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 获取装备的基础名称（不含槽位前缀和实例编号）
+     * 例如：铁剑
+     * 用于GUI角色信息面板显示
+     */
+    public String getBaseName() {
+        return getName();
+    }
+
+    /**
      * 获取槽位的中文显示名称
      */
     private String getSlotDisplayName() {

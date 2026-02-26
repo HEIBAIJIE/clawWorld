@@ -47,6 +47,14 @@ public interface PlayerSessionService {
     OperationResult equipItem(String playerId, String itemName);
 
     /**
+     * 卸下装备
+     * @param playerId 玩家ID
+     * @param slotName 装备槽位名称（头部/上装/下装/鞋子/左手/右手/饰品1/饰品2）
+     * @return 操作结果
+     */
+    OperationResult unequipItem(String playerId, String slotName);
+
+    /**
      * 添加属性点
      * @param playerId 玩家ID
      * @param attributeType 属性类型 (str/agi/int/vit)

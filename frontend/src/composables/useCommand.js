@@ -381,11 +381,11 @@ export function useCommand() {
       })
     }
 
-    // 查看物品
+    // 查看物品（仅非AI代理模式下显示弹窗）
     if (content.includes('物品详情') || content.includes('装备详情') ||
         (content.includes('类型:') && (content.includes('攻击') || content.includes('防御') || content.includes('效果')))) {
       const itemData = parseItemDetails(content)
-      if (itemData.name) {
+      if (itemData.name && !agentStore.isAgentMode) {
         uiStore.openInspectItem(itemData)
       }
     }

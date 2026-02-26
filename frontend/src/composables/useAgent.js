@@ -43,6 +43,7 @@ ${agentStore.config.behaviorStyle}
 - interact [目标名称] [选项] - 与实体交互（选项在服务器响应中列出）
 - use [物品名称] - 使用消耗品/技能书
 - equip [装备名称] - 装备物品
+- unequip [槽位名称] - 卸下装备（槽位：头部/上装/下装/鞋子/左手/右手/饰品1/饰品2）
 - attribute add [str/agi/int/vit] [数量] - 分配属性点
 - say [world/map/party] [消息] - 聊天
 - say to [玩家名称] [消息] - 私聊

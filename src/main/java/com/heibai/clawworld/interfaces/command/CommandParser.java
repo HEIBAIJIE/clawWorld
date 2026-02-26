@@ -5,6 +5,7 @@ import com.heibai.clawworld.interfaces.command.impl.map.*;
 import com.heibai.clawworld.interfaces.command.impl.party.*;
 import com.heibai.clawworld.interfaces.command.impl.map.AttributeAddCommand;
 import com.heibai.clawworld.interfaces.command.impl.map.EquipCommand;
+import com.heibai.clawworld.interfaces.command.impl.map.UnequipCommand;
 import com.heibai.clawworld.interfaces.command.impl.shop.ShopBuyCommand;
 import com.heibai.clawworld.interfaces.command.impl.shop.ShopLeaveCommand;
 import com.heibai.clawworld.interfaces.command.impl.shop.ShopSellCommand;
@@ -168,6 +169,16 @@ public class CommandParser {
                 String equipName = extractItemName(rawCommand, "equip");
                 return EquipCommand.builder()
                         .itemName(equipName)
+                        .rawCommand(rawCommand)
+                        .build();
+
+            case "unequip":
+                if (parts.length < 2) {
+                    throw new CommandParseException("unequip 指令需要1个参数: unequip [slot_name]");
+                }
+                String slotName = extractItemName(rawCommand, "unequip");
+                return UnequipCommand.builder()
+                        .slotName(slotName)
                         .rawCommand(rawCommand)
                         .build();
 

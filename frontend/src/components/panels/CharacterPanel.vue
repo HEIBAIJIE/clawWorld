@@ -156,12 +156,13 @@
             class="equipment-slot"
             :class="{ empty: !playerStore.equipment[key] }"
             @click="inspectEquipment(key)"
+            @contextmenu.prevent="handleEquipmentRightClick(key, $event)"
           >
             <span class="slot-icon">{{ slot.icon }}</span>
             <div class="slot-info">
               <span class="slot-label">{{ slot.label }}</span>
               <span class="slot-value" :class="{ equipped: playerStore.equipment[key] }">
-                {{ playerStore.equipment[key]?.name || '无' }}
+                {{ getEquipmentDisplayName(playerStore.equipment[key]) }}
               </span>
             </div>
           </div>
@@ -217,14 +218,42 @@ function addAttribute(attr) {
   addAttr(attr, 1)
 }
 
+// 获取装备显示名称（简化版，不含槽位前缀）
+function getEquipmentDisplayName(equipment) {
+  if (!equipment || !equipment.name) return '无'
+  // 如果名称包含槽位前缀如 [头部]，则移除
+  let name = equipment.name
+  if (name.startsWith('[') && name.includes(']')) {
+    name = name.substring(name.indexOf(']') + 1)
+  }
+  return name
+}
+
 function inspectEquipment(slotKey) {
   const equipment = playerStore.equipment[slotKey]
   if (equipment && equipment.name) {
     // 非AI代理模式下，发送inspect命令查看装备详情
     if (!agentStore.isAgentMode) {
-      sendCommand(`inspect ${equipment.name}`)
+      const displayName = getEquipmentDisplayName(equipment)
+      sendCommand(`inspect ${displayName}`)
     }
   }
+}
+
+// 装备槽位右键菜单
+function handleEquipmentRightClick(slotKey, event) {
+  const equipment = playerStore.equipment[slotKey]
+  if (!equipment || !equipment.name) return
+
+  const slotLabel = equipmentSlots[slotKey].label
+  const displayName = getEquipmentDisplayName(equipment)
+
+  const items = [
+    { label: '查看', action: () => sendCommand(`inspect ${displayName}`) },
+    { label: '卸下', action: () => sendCommand(`unequip ${slotLabel}`) }
+  ]
+
+  uiStore.showContextMenu(event.clientX, event.clientY, items, equipment)
 }
 </script>
 

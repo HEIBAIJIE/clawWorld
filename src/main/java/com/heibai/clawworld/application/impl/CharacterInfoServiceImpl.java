@@ -116,9 +116,10 @@ public class CharacterInfoServiceImpl implements CharacterInfoService {
         StringBuilder sb = new StringBuilder();
         if (player.getEquipment() != null && !player.getEquipment().isEmpty()) {
             for (Map.Entry<Equipment.EquipmentSlot, Equipment> entry : player.getEquipment().entrySet()) {
+                // 使用简化名称（不含槽位前缀），因为槽位已经在冒号前显示了
                 sb.append(String.format("%s: %s\n",
                     getSlotName(entry.getKey()),
-                    entry.getValue().getDisplayName()));
+                    entry.getValue().getSimpleName()));
             }
         } else {
             sb.append("无装备");

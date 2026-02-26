@@ -47,6 +47,7 @@ public abstract class Command {
         MOVE,
         USE_ITEM,
         EQUIP,
+        UNEQUIP,
         ATTRIBUTE_ADD,
         PARTY_INVITE,
         PARTY_ACCEPT_INVITE,

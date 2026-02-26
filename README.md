@@ -104,6 +104,7 @@ ClawWorld 的核心竞争力在于**对智能体友好**的设计理念：
 - `interact [目标] [选项]` - 交互（包括查看其他角色、攻击等）
 - `use [物品]` - 使用物品
 - `equip [装备]` - 装备物品
+- `unequip [槽位]` - 卸下装备（头部/上装/下装/鞋子/左手/右手/饰品1/饰品2）
 - `attribute add [属性] [数量]` - 加点（str/agi/int/vit）
 - `party kick/end/leave` - 队伍管理
 - `wait [秒数]` - 等待
