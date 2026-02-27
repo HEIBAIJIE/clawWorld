@@ -961,6 +961,126 @@ export function useCommand() {
           playerStore.updateFromParsed(playerState)
         }
 
+        // 处理装备/卸下装备响应 - 解析角色变化信息并更新
+        if (content.includes('装备成功') || content.includes('卸下装备成功')) {
+          // 解析装备栏角色变化: [角色变化]装备栏: 右手 装备了 新手剑#116 或 右手 已卸下
+          const equipSlotMatch = content.match(/\[角色变化\]装备栏:\s*(.+?)\s+(装备了|已卸下)\s*(.*)/)
+          if (equipSlotMatch) {
+            const slotName = equipSlotMatch[1].trim()
+            const action = equipSlotMatch[2]
+            const itemName = equipSlotMatch[3].trim()
+
+            // 槽位名称映射
+            const slotMap = {
+              '头部': 'HEAD',
+              '上装': 'CHEST',
+              '下装': 'LEGS',
+              '鞋子': 'FEET',
+              '左手': 'LEFT_HAND',
+              '右手': 'RIGHT_HAND',
+              '饰品1': 'ACCESSORY1',
+              '饰品2': 'ACCESSORY2'
+            }
+
+            const slot = slotMap[slotName]
+            if (slot) {
+              const equipment = { ...playerStore.equipment }
+              equipment[slot] = action === '已卸下' ? null : { name: itemName }
+              playerStore.updateFromParsed({ equipment })
+            }
+          }
+
+          // 解析背包角色变化: [角色变化]背包: 放入 新手剑#115, 取出 新手剑#116 或 取出 新手剑#116
+          const inventoryMatch = content.match(/\[角色变化\]背包:\s*(.+)/)
+          if (inventoryMatch) {
+            const changes = inventoryMatch[1].split(',')
+            const inventory = [...playerStore.inventory]
+
+            for (const change of changes) {
+              const trimmed = change.trim()
+              if (trimmed.startsWith('放入 ')) {
+                // 添加到背包
+                const itemName = trimmed.substring(3).trim()
+                const isEquipment = itemName.includes('#') || itemName.startsWith('[')
+                inventory.push({
+                  name: itemName,
+                  quantity: 1,
+                  isEquipment: isEquipment
+                })
+              } else if (trimmed.startsWith('取出 ')) {
+                // 从背包移除
+                const itemName = trimmed.substring(3).trim()
+                const index = inventory.findIndex(item => item.name === itemName)
+                if (index !== -1) {
+                  inventory.splice(index, 1)
+                }
+              }
+            }
+
+            playerStore.updateFromParsed({ inventory })
+          }
+
+          // 解析属性角色变化: [角色变化]属性: 力量0 敏捷0 智力0 体力0 生命100/145 法力60/60 物攻36 物防27 ...
+          const attrMatch = content.match(/\[角色变化\]当前属性:\s*(.+)/)
+          if (attrMatch) {
+            const attrStr = attrMatch[1]
+            const updates = {}
+
+            const strMatch = attrStr.match(/力量(\d+)/)
+            if (strMatch) updates.strength = parseInt(strMatch[1])
+
+            const agiMatch = attrStr.match(/敏捷(\d+)/)
+            if (agiMatch) updates.agility = parseInt(agiMatch[1])
+
+            const intMatch = attrStr.match(/智力(\d+)/)
+            if (intMatch) updates.intelligence = parseInt(intMatch[1])
+
+            const vitMatch = attrStr.match(/体力(\d+)/)
+            if (vitMatch) updates.vitality = parseInt(vitMatch[1])
+
+            const hpMatch = attrStr.match(/生命(\d+)\/(\d+)/)
+            if (hpMatch) {
+              updates.currentHealth = parseInt(hpMatch[1])
+              updates.maxHealth = parseInt(hpMatch[2])
+            }
+
+            const mpMatch = attrStr.match(/法力(\d+)\/(\d+)/)
+            if (mpMatch) {
+              updates.currentMana = parseInt(mpMatch[1])
+              updates.maxMana = parseInt(mpMatch[2])
+            }
+
+            const patkMatch = attrStr.match(/物攻(\d+)/)
+            if (patkMatch) updates.physicalAttack = parseInt(patkMatch[1])
+
+            const pdefMatch = attrStr.match(/物防(\d+)/)
+            if (pdefMatch) updates.physicalDefense = parseInt(pdefMatch[1])
+
+            const matkMatch = attrStr.match(/法攻(\d+)/)
+            if (matkMatch) updates.magicAttack = parseInt(matkMatch[1])
+
+            const mdefMatch = attrStr.match(/法防(\d+)/)
+            if (mdefMatch) updates.magicDefense = parseInt(mdefMatch[1])
+
+            const spdMatch = attrStr.match(/速度(\d+)/)
+            if (spdMatch) updates.speed = parseInt(spdMatch[1])
+
+            const critMatch = attrStr.match(/暴击率([\d.]+)%/)
+            if (critMatch) updates.critRate = parseFloat(critMatch[1])
+
+            const critDmgMatch = attrStr.match(/暴击伤害([\d.]+)%/)
+            if (critDmgMatch) updates.critDamage = parseFloat(critDmgMatch[1])
+
+            const hitMatch = attrStr.match(/命中率([\d.]+)%/)
+            if (hitMatch) updates.hitRate = parseFloat(hitMatch[1])
+
+            const dodgeMatch = attrStr.match(/闪避率([\d.]+)%/)
+            if (dodgeMatch) updates.dodgeRate = parseFloat(dodgeMatch[1])
+
+            playerStore.updateFromParsed(updates)
+          }
+        }
+
         // 处理背包更新响应
         if (content.includes('背包更新：')) {
           const inventoryStartIndex = content.indexOf('背包更新：')
@@ -1009,6 +1129,10 @@ export function useCommand() {
           // 物品详情
           else if (content.includes('=== 物品详情 ===')) {
             uiStore.openInfoModal('查看物品', content.replace('=== 物品详情 ===', '').trim())
+          }
+          // 装备详情
+          else if (content.includes('=== 装备详情 ===')) {
+            uiStore.openInfoModal('查看装备', content.replace('=== 装备详情 ===', '').trim())
           }
           // 宝箱信息
           else if (content.includes('=== 宝箱信息 ===')) {
@@ -1193,7 +1317,7 @@ export function useCommand() {
       return
     }
 
-    // 交互选项变化（增量）: "小小 的交互选项变化：新增[邀请组队]"
+    // 交互选项变化: "小小 的交互选项变化：新增[邀请组队]"
     const optionsChangeMatch = content.match(/(.+?)\s+的交互选项变化[：:](.+)/)
     if (optionsChangeMatch) {
       const entityName = optionsChangeMatch[1]

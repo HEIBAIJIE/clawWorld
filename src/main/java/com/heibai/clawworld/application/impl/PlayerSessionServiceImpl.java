@@ -164,7 +164,7 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
                 Equipment.EquipmentSlot slot = Equipment.EquipmentSlot.valueOf(entry.getKey());
                 EquipmentConfig config = configDataManager.getEquipment(entry.getValue().getEquipmentId());
                 if (config != null) {
-                    Equipment eq = configMapper.toDomain(config);
+                    Equipment eq = configMapper.toDomainWithoutInstanceNumber(config);
                     eq.setInstanceNumber(entry.getValue().getInstanceNumber());
                     equipment.put(slot, eq);
                 }
@@ -185,7 +185,7 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
                 } else if ("EQUIPMENT".equals(slotData.getType())) {
                     EquipmentConfig eqConfig = configDataManager.getEquipment(slotData.getItemId());
                     if (eqConfig != null) {
-                        Equipment eq = configMapper.toDomain(eqConfig);
+                        Equipment eq = configMapper.toDomainWithoutInstanceNumber(eqConfig);
                         eq.setInstanceNumber(slotData.getEquipmentInstanceNumber());
                         inventory.add(Player.InventorySlot.forEquipment(eq));
                     }
@@ -445,18 +445,52 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         PlayerEntity entity = playerMapper.toEntity(player);
         playerRepository.save(entity);
 
-        // 生成详细的响应信息，包含更新后的装备栏、背包和角色属性
+        // 生成简洁响应：成功消息 + 变化（用于前端更新）
         StringBuilder response = new StringBuilder();
-        response.append("装备成功: ").append(equipment.getDisplayName());
         if (oldEquipment != null) {
-            response.append("（替换了 ").append(oldEquipment.getDisplayName()).append("）");
+            response.append("装备成功: ").append(equipment.getDisplayName()).append("（替换了 ").append(oldEquipment.getDisplayName()).append("）\n");
+            response.append("[角色变化]装备栏: ").append(getSlotDisplayName(slot)).append(" 装备了 ").append(equipment.getDisplayName()).append("\n");
+            response.append("[角色变化]背包: 放入 ").append(oldEquipment.getDisplayName()).append(", 取出 ").append(equipment.getDisplayName()).append("\n");
+        } else {
+            response.append("装备成功: ").append(equipment.getDisplayName()).append("\n");
+            response.append("[角色变化]装备栏: ").append(getSlotDisplayName(slot)).append(" 装备了 ").append(equipment.getDisplayName()).append("\n");
+            response.append("[角色变化]背包: 取出 ").append(equipment.getDisplayName()).append("\n");
         }
-        response.append("\n\n");
-        response.append("你的装备：\n").append(characterInfoService.generateEquipment(player));
-        response.append("\n");
-        response.append("你的背包：\n").append(characterInfoService.generateInventory(player));
-        response.append("\n");
-        response.append("角色状态：\n").append(characterInfoService.generatePlayerStatus(player));
+
+        // 计算总四维（玩家自身 + 装备加成）
+        int totalStrength = player.getStrength();
+        int totalAgility = player.getAgility();
+        int totalIntelligence = player.getIntelligence();
+        int totalVitality = player.getVitality();
+
+        if (player.getEquipment() != null) {
+            for (Equipment eq : player.getEquipment().values()) {
+                if (eq != null) {
+                    totalStrength += eq.getStrength();
+                    totalAgility += eq.getAgility();
+                    totalIntelligence += eq.getIntelligence();
+                    totalVitality += eq.getVitality();
+                }
+            }
+        }
+
+        // 添加更新后的属性（前端无法自己计算）
+        response.append("[角色变化]当前属性: ");
+        response.append("力量").append(totalStrength).append(" ");
+        response.append("敏捷").append(totalAgility).append(" ");
+        response.append("智力").append(totalIntelligence).append(" ");
+        response.append("体力").append(totalVitality).append(" ");
+        response.append("生命").append(player.getCurrentHealth()).append("/").append(player.getMaxHealth()).append(" ");
+        response.append("法力").append(player.getCurrentMana()).append("/").append(player.getMaxMana()).append(" ");
+        response.append("物攻").append(player.getPhysicalAttack()).append(" ");
+        response.append("物防").append(player.getPhysicalDefense()).append(" ");
+        response.append("法攻").append(player.getMagicAttack()).append(" ");
+        response.append("法防").append(player.getMagicDefense()).append(" ");
+        response.append("速度").append(player.getSpeed()).append(" ");
+        response.append("暴击率").append(String.format("%.1f", player.getCritRate())).append("% ");
+        response.append("暴击伤害").append(String.format("%.1f", player.getCritDamage())).append("% ");
+        response.append("命中率").append(String.format("%.1f", player.getHitRate())).append("% ");
+        response.append("闪避率").append(String.format("%.1f", player.getDodgeRate())).append("%");
 
         return OperationResult.success(response.toString());
     }
@@ -497,15 +531,46 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         PlayerEntity entity = playerMapper.toEntity(player);
         playerRepository.save(entity);
 
-        // 生成详细的响应信息
+        // 生成简洁响应：成功消息 + 变化（用于前端更新）
         StringBuilder response = new StringBuilder();
-        response.append("卸下装备成功: ").append(equipment.getDisplayName());
-        response.append("\n\n");
-        response.append("你的装备：\n").append(characterInfoService.generateEquipment(player));
-        response.append("\n");
-        response.append("你的背包：\n").append(characterInfoService.generateInventory(player));
-        response.append("\n");
-        response.append("角色状态：\n").append(characterInfoService.generatePlayerStatus(player));
+        response.append("卸下装备成功: ").append(equipment.getDisplayName()).append("\n");
+        response.append("[角色变化]装备栏: ").append(getSlotDisplayName(slot)).append(" 已卸下\n");
+        response.append("[角色变化]背包: 放入 ").append(equipment.getDisplayName()).append("\n");
+
+        // 计算总四维（玩家自身 + 装备加成）
+        int totalStrength = player.getStrength();
+        int totalAgility = player.getAgility();
+        int totalIntelligence = player.getIntelligence();
+        int totalVitality = player.getVitality();
+
+        if (player.getEquipment() != null) {
+            for (Equipment eq : player.getEquipment().values()) {
+                if (eq != null) {
+                    totalStrength += eq.getStrength();
+                    totalAgility += eq.getAgility();
+                    totalIntelligence += eq.getIntelligence();
+                    totalVitality += eq.getVitality();
+                }
+            }
+        }
+
+        // 添加更新后的属性（前端无法自己计算）
+        response.append("[角色变化]当前属性: ");
+        response.append("力量").append(totalStrength).append(" ");
+        response.append("敏捷").append(totalAgility).append(" ");
+        response.append("智力").append(totalIntelligence).append(" ");
+        response.append("体力").append(totalVitality).append(" ");
+        response.append("生命").append(player.getCurrentHealth()).append("/").append(player.getMaxHealth()).append(" ");
+        response.append("法力").append(player.getCurrentMana()).append("/").append(player.getMaxMana()).append(" ");
+        response.append("物攻").append(player.getPhysicalAttack()).append(" ");
+        response.append("物防").append(player.getPhysicalDefense()).append(" ");
+        response.append("法攻").append(player.getMagicAttack()).append(" ");
+        response.append("法防").append(player.getMagicDefense()).append(" ");
+        response.append("速度").append(player.getSpeed()).append(" ");
+        response.append("暴击率").append(String.format("%.1f", player.getCritRate())).append("% ");
+        response.append("暴击伤害").append(String.format("%.1f", player.getCritDamage())).append("% ");
+        response.append("命中率").append(String.format("%.1f", player.getHitRate())).append("% ");
+        response.append("闪避率").append(String.format("%.1f", player.getDodgeRate())).append("%");
 
         return OperationResult.success(response.toString());
     }
@@ -525,6 +590,23 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
             case "饰品1", "ACCESSORY1" -> Equipment.EquipmentSlot.ACCESSORY1;
             case "饰品2", "ACCESSORY2" -> Equipment.EquipmentSlot.ACCESSORY2;
             default -> null;
+        };
+    }
+
+    /**
+     * 获取槽位的中文显示名称
+     */
+    private String getSlotDisplayName(Equipment.EquipmentSlot slot) {
+        if (slot == null) return "未知";
+        return switch (slot) {
+            case HEAD -> "头部";
+            case CHEST -> "上装";
+            case LEGS -> "下装";
+            case FEET -> "鞋子";
+            case LEFT_HAND -> "左手";
+            case RIGHT_HAND -> "右手";
+            case ACCESSORY1 -> "饰品1";
+            case ACCESSORY2 -> "饰品2";
         };
     }
 

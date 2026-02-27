@@ -87,6 +87,24 @@ public class ConfigMapper {
             return null;
         }
 
+        Equipment equipment = toDomainWithoutInstanceNumber(config);
+
+        // 生成唯一的实例编号
+        Long instanceNumber = equipmentInstanceService.getNextInstanceNumber(config.getId());
+        equipment.setInstanceNumber(instanceNumber);
+
+        return equipment;
+    }
+
+    /**
+     * 将EquipmentConfig转换为Equipment领域对象，但不生成实例编号
+     * 用于从数据库加载已有装备时使用，避免浪费编号
+     */
+    public Equipment toDomainWithoutInstanceNumber(EquipmentConfig config) {
+        if (config == null) {
+            return null;
+        }
+
         Equipment equipment = new Equipment();
         equipment.setId(config.getId());
         equipment.setName(config.getName());
@@ -109,10 +127,6 @@ public class ConfigMapper {
         equipment.setCritDamage(config.getCritDamage());
         equipment.setHitRate(config.getHitRate());
         equipment.setDodgeRate(config.getDodgeRate());
-
-        // 生成唯一的实例编号
-        Long instanceNumber = equipmentInstanceService.getNextInstanceNumber(config.getId());
-        equipment.setInstanceNumber(instanceNumber);
 
         return equipment;
     }
