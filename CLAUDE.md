@@ -63,3 +63,17 @@ python main.py   # Windows 下可运行 run_editor.bat
 
 ## 重要设计文档
 开发前务必参考 `设计文档/【重要，每次开发前务必参考】核心机制.md`，理解游戏背景。
+
+## 图片生成工具 (draw.py)
+使用 Gemini API 生成游戏图标，token 存放在 `D:/gemini_token.txt`（不提交到仓库）。
+
+```bash
+# 基本用法
+python draw.py "提示词" -o output.png
+
+# 完整参数
+python draw.py "提示词" -o output.png --ratio 1:1 --size 0.5K
+
+# 示例：生成游戏图标
+python draw.py "minimalist tech-style sword icon, clean geometric lines, blue cyan silver palette, dark background, game inventory icon" -o sword.png
+```
