@@ -183,6 +183,10 @@ public class CombatInstance {
 
         for (ActionBarEntry entry : aliveEntries) {
             double timeToReady = entry.getTimeToReady();
+            CombatCharacter character = findCharacter(entry.getCharacterId());
+            log.debug("[战斗 {}] getCurrentTurn - {} progress={} speed={} timeToReady={}",
+                combatId, character != null ? character.getName() : entry.getCharacterId(),
+                entry.getProgress(), entry.getSpeed(), timeToReady);
             if (timeToReady < minTime ||
                 (timeToReady == minTime && nextActor != null && entry.getSpeed() > nextActor.getSpeed())) {
                 minTime = timeToReady;
@@ -193,6 +197,10 @@ public class CombatInstance {
         if (nextActor == null) {
             return Optional.empty();
         }
+
+        CombatCharacter nextCharacter = findCharacter(nextActor.getCharacterId());
+        log.debug("[战斗 {}] getCurrentTurn - 选中: {} (timeToReady={})",
+            combatId, nextCharacter != null ? nextCharacter.getName() : nextActor.getCharacterId(), minTime);
 
         return Optional.of(nextActor.getCharacterId());
     }
@@ -221,10 +229,16 @@ public class CombatInstance {
 
         for (ActionBarEntry entry : aliveEntries) {
             double timeToReady = entry.getTimeToReady();
+            CombatCharacter character = findCharacter(entry.getCharacterId());
+            log.debug("[战斗 {}] advanceToNextTurn - {} progress={} speed={} timeToReady={}",
+                combatId, character != null ? character.getName() : entry.getCharacterId(),
+                entry.getProgress(), entry.getSpeed(), timeToReady);
             if (timeToReady < minTime) {
                 minTime = timeToReady;
             }
         }
+
+        log.debug("[战斗 {}] advanceToNextTurn - 推进时间: {}", combatId, minTime);
 
         // 所有存活角色的进度条按该时间推进
         for (ActionBarEntry entry : aliveEntries) {
@@ -238,7 +252,11 @@ public class CombatInstance {
     public void resetActionBar(String characterId) {
         ActionBarEntry entry = actionBar.get(characterId);
         if (entry != null) {
+            log.debug("[战斗 {}] resetActionBar - {} progress={} -> 重置后",
+                combatId, characterId, entry.getProgress());
             entry.reset();
+            log.debug("[战斗 {}] resetActionBar - {} progress={} (重置完成)",
+                combatId, characterId, entry.getProgress());
         }
 
         // 回合结束时减少该角色的技能冷却

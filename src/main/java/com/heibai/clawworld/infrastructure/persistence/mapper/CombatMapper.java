@@ -95,7 +95,7 @@ public class CombatMapper {
         // 解析敌人技能
         List<String> skillIds = new ArrayList<>();
         if (config.getSkills() != null && !config.getSkills().isEmpty()) {
-            String[] skills = config.getSkills().split(",");
+            String[] skills = config.getSkills().split(";");
             for (String skill : skills) {
                 skillIds.add(skill.trim());
             }

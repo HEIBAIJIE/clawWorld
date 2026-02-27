@@ -561,6 +561,9 @@ public class CombatEngine {
      * 执行技能（内部方法，不阻塞）
      */
     private CombatActionResult executeSkillInternal(CombatInstance combat, String casterId, String skillId, String targetId) {
+        log.debug("[战斗 {}] executeSkillInternal - 施法者={} 技能={} 目标={}",
+            combat.getCombatId(), casterId, skillId, targetId);
+
         CombatCharacter caster = combat.findCharacter(casterId);
         if (caster == null || !caster.isAlive()) {
             return CombatActionResult.error("施法者不存在或已死亡");
@@ -597,8 +600,10 @@ public class CombatEngine {
             caster.setSkillCooldown(skillId, skill.getCooldown());
         }
 
+        log.debug("[战斗 {}] executeSkillInternal - 准备重置行动条: {}", combat.getCombatId(), casterId);
         // 重置行动条（回合结束时才减少冷却）
         combat.resetActionBar(casterId);
+        log.debug("[战斗 {}] executeSkillInternal - 行动条重置完成", combat.getCombatId());
 
         // 检查战斗是否结束
         List<String> endLogs = settlementService.finishCombat(combat, turnTimeoutManager, turnWaiters, createRemover(combat.getCombatId()));
