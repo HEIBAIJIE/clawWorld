@@ -109,8 +109,10 @@ public class StateLogGenerator {
                 currentSnapshot.put(entity.getName(), snapshot);
             }
 
-            // 分析变化并生成日志（地图切换时跳过实体变化日志）
-            if (!isMapChanged) {
+            // 分析变化并生成日志
+            // 跳过条件：1. 地图切换时  2. 首次创建快照时（lastSnapshot为空表示初始化，不是真正的变化）
+            boolean isFirstSnapshot = lastSnapshot.isEmpty();
+            if (!isMapChanged && !isFirstSnapshot) {
                 generateEntityChangeLogs(builder, lastSnapshot, currentSnapshot, currentEntitiesMap);
             }
 
