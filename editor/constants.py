@@ -4,29 +4,24 @@
 游戏常量定义
 """
 
-# 地形类型
-TERRAIN_TYPES = [
-    'GRASS', 'SAND', 'SNOW', 'STONE', 'SHALLOW_WATER',
-    'TREE', 'ROCK', 'MOUNTAIN', 'RIVER', 'OCEAN', 'WALL'
-]
+# 地形类型 - 从 terrain_types.csv 动态加载
+def _load_terrain_types():
+    """从CSV加载地形类型配置"""
+    from csv_utils import read_csv
+    types = []
+    passable = []
+    colors = {}
+    rows = read_csv('terrain_types.csv')
+    for row in rows:
+        tid = row['id']
+        types.append(tid)
+        if row.get('passable', 'true').lower() == 'true':
+            passable.append(tid)
+        if row.get('color'):
+            colors[tid] = row['color']
+    return types, passable, colors
 
-# 可通过的地形
-PASSABLE_TERRAINS = ['GRASS', 'SAND', 'SNOW', 'STONE', 'SHALLOW_WATER']
-
-# 地形颜色映射
-TERRAIN_COLORS = {
-    'GRASS': '#90EE90',
-    'SAND': '#F4A460',
-    'SNOW': '#FFFAFA',
-    'STONE': '#808080',
-    'SHALLOW_WATER': '#87CEEB',
-    'TREE': '#228B22',
-    'ROCK': '#696969',
-    'MOUNTAIN': '#8B4513',
-    'RIVER': '#4169E1',
-    'OCEAN': '#000080',
-    'WALL': '#2F4F4F'
-}
+TERRAIN_TYPES, PASSABLE_TERRAINS, TERRAIN_COLORS = _load_terrain_types()
 
 # 实体类型
 ENTITY_TYPES = ['WAYPOINT', 'NPC', 'ENEMY', 'CAMPFIRE', 'CHEST_SMALL', 'CHEST_LARGE']

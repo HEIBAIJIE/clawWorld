@@ -12,4 +12,10 @@ public class TerrainTypeConfig {
 
     // GUI资源
     private String icon;
+
+    // 是否可通行
+    private boolean passable;
+
+    // 显示颜色（十六进制）
+    private String color;
 }

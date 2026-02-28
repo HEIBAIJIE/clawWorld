@@ -112,22 +112,12 @@ public class MapWindowLogGenerator {
      */
     private String getTerrainDisplayName(String terrainType) {
         if (terrainType == null) return "未知";
-        // 处理多地形（分号分隔）
         String firstTerrain = terrainType.split(";")[0].trim();
-        return switch (firstTerrain.toUpperCase()) {
-            case "GRASS" -> "草地";
-            case "SAND" -> "沙地";
-            case "SNOW" -> "雪地";
-            case "STONE" -> "石头地";
-            case "SHALLOW_WATER" -> "浅水";
-            case "TREE" -> "树";
-            case "ROCK" -> "岩石";
-            case "MOUNTAIN" -> "山脉";
-            case "RIVER" -> "河流";
-            case "OCEAN" -> "海洋";
-            case "WALL" -> "墙";
-            default -> firstTerrain;
-        };
+        var config = configDataManager.getTerrainType(firstTerrain.toUpperCase());
+        if (config != null) {
+            return config.getName();
+        }
+        return firstTerrain;
     }
 
     /**
@@ -136,10 +126,11 @@ public class MapWindowLogGenerator {
     private boolean isTerrainPassable(String terrainType) {
         if (terrainType == null) return true;
         String firstTerrain = terrainType.split(";")[0].trim().toUpperCase();
-        return switch (firstTerrain) {
-            case "TREE", "ROCK", "MOUNTAIN", "RIVER", "OCEAN", "WALL" -> false;
-            default -> true;
-        };
+        var config = configDataManager.getTerrainType(firstTerrain);
+        if (config != null) {
+            return config.isPassable();
+        }
+        return true;
     }
 
 

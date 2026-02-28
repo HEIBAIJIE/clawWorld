@@ -56,6 +56,7 @@ class GameEditor:
         from role_editor import RoleEditor
         from chest_editor import ChestEditor
         from gift_editor import GiftEditor
+        from terrain_editor import TerrainEditor
 
         # 创建各个编辑器标签页
         self.map_editor = MapEditor(self.notebook)
@@ -85,6 +86,9 @@ class GameEditor:
         self.role_editor = RoleEditor(self.notebook)
         self.notebook.add(self.role_editor.frame, text="职业编辑器")
 
+        self.terrain_editor = TerrainEditor(self.notebook)
+        self.notebook.add(self.terrain_editor.frame, text="地形编辑器")
+
     def refresh_all(self):
         """刷新所有数据"""
         self.map_editor.load_data()
@@ -96,6 +100,7 @@ class GameEditor:
         self.gift_editor.load_data()
         self.skill_editor.load_data()
         self.role_editor.load_data()
+        self.terrain_editor.load_data()
         messagebox.showinfo("提示", "所有数据已刷新")
 
     def show_about(self):

@@ -1,6 +1,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '../stores/playerStore'
 import { useMapStore } from '../stores/mapStore'
+import client from '../api/client'
 
 /**
  * 地图渲染的composable
@@ -32,32 +33,29 @@ export function useMapRenderer(canvasRef) {
   const dragOffsetX = ref(0)  // 像素级别的拖动偏移
   const dragOffsetY = ref(0)
 
-  // 颜色配置
-  const TERRAIN_COLORS = {
-    GRASS: '#2d5a27',
-    WATER: '#1a4a6e',
-    ROCK: '#4a4a4a',
-    SAND: '#c2b280',
-    SNOW: '#e8e8e8',
-    TREE: '#1b4d1b',
-    WALL: '#333333',
-    SHALLOW_WATER: '#3a7a9e',
-    MOUNTAIN: '#5a5a5a',
-    RIVER: '#1a5a8e',
-    OCEAN: '#0a3a5e',
-    STONE: '#5a5a5a',
-    '草地': '#2d5a27',
-    '水': '#1a4a6e',
-    '岩石': '#4a4a4a',
-    '沙地': '#c2b280',
-    '雪地': '#e8e8e8',
-    '树': '#1b4d1b',
-    '墙': '#333333',
-    '浅水': '#3a7a9e',
-    '山脉': '#5a5a5a',
-    '河流': '#1a5a8e',
-    '海洋': '#0a3a5e',
-    '石头地': '#5a5a5a'
+  // 地形颜色（从API动态加载，带默认回退）
+  const terrainColors = ref({
+    GRASS: '#2d5a27'
+  })
+  let terrainColorsLoaded = false
+
+  // 从后端加载地形颜色配置
+  async function loadTerrainColors() {
+    if (terrainColorsLoaded) return
+    try {
+      const res = await client.get('/config/terrain-types')
+      const colors = {}
+      for (const t of res.data) {
+        if (t.color) {
+          colors[t.id] = t.color
+          colors[t.name] = t.color
+        }
+      }
+      terrainColors.value = colors
+      terrainColorsLoaded = true
+    } catch (e) {
+      console.warn('[MapRenderer] 加载地形颜色失败，使用默认值', e)
+    }
   }
 
   const ENTITY_COLORS = {
@@ -182,7 +180,7 @@ export function useMapRenderer(canvasRef) {
 
         const cell = mapStore.grid[mapY]?.[mapX]
         const terrain = cell?.terrain || 'GRASS'
-        const color = TERRAIN_COLORS[terrain] || TERRAIN_COLORS.GRASS
+        const color = terrainColors.value[terrain] || terrainColors.value.GRASS || '#2d5a27'
 
         const screenX = vx * CELL_SIZE.value
         const screenY = vy * CELL_SIZE.value
@@ -521,6 +519,7 @@ export function useMapRenderer(canvasRef) {
 
   // 生命周期
   onMounted(() => {
+    loadTerrainColors()
     resizeCanvas()
     window.addEventListener('resize', resizeCanvas)
   })

@@ -19,12 +19,6 @@ public class PathfindingServiceImpl implements PathfindingService {
     private final ConfigDataManager configDataManager;
     private final EnemyInstanceRepository enemyInstanceRepository;
 
-    // 不可通行的地形类型
-    private static final Set<String> IMPASSABLE_TERRAINS = Set.of(
-            "树", "岩石", "山脉", "河流", "海洋", "墙",
-            "TREE", "ROCK", "MOUNTAIN", "RIVER", "OCEAN", "WALL"
-    );
-
     // 8方向移动
     private static final int[][] DIRECTIONS = {
             {-1, -1}, {0, -1}, {1, -1},
@@ -224,7 +218,8 @@ public class PathfindingServiceImpl implements PathfindingService {
 
         // 检查是否有不可通过的地形
         for (String terrain : terrainTypes) {
-            if (IMPASSABLE_TERRAINS.contains(terrain)) {
+            var terrainConfig = configDataManager.getTerrainType(terrain);
+            if (terrainConfig != null && !terrainConfig.isPassable()) {
                 return false;
             }
         }

@@ -78,10 +78,11 @@ export function buildMapGrid(width, height, defaultTerrain, specialTerrains) {
 
 /**
  * 判断地形是否可通行
+ * 默认地形一律视为可通行（不可通行地形不会被设为默认地形）
+ * 特殊地形的 passable 已由后端文本解析得到
  */
 function isPassableTerrain(terrain) {
-  const impassable = ['WATER', 'ROCK', 'TREE', 'WALL', '水', '岩石', '树', '墙', '河流', '海洋', '山脉', '浅水']
-  return !impassable.includes(terrain?.toUpperCase?.()) && !impassable.includes(terrain)
+  return true
 }
 
 /**

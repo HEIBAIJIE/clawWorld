@@ -266,6 +266,8 @@ public class MapConfigLoader {
                 tt.setId(csvReader.getString(record, "id"));
                 tt.setName(csvReader.getString(record, "name"));
                 tt.setIcon(csvReader.getStringOrNull(record, "icon"));
+                tt.setPassable(csvReader.getBoolean(record, "passable"));
+                tt.setColor(csvReader.getStringOrNull(record, "color"));
                 return tt;
             });
 
