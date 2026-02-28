@@ -58,9 +58,7 @@ public class MapWindowLogGenerator {
         }
 
         // 3. 玩家状态（包含当前位置）
-        builder.addWindow("玩家状态", String.format("你的位置：(%d,%d)\n%s",
-            player.getX(), player.getY(),
-            characterInfoService.generatePlayerStatus(player)));
+        builder.addWindow("玩家状态", characterInfoService.generatePlayerStatus(player));
 
         // 4. 技能
         builder.addWindow("技能列表", "你的技能：\n" + characterInfoService.generateSkills(player));

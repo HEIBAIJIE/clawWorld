@@ -71,7 +71,8 @@ public class ConfigDataManager {
                hasFileChanged("classpath:data/role_skills.csv") ||
                hasFileChanged("classpath:data/chests.csv") ||
                hasFileChanged("classpath:data/chest_loot.csv") ||
-               hasFileChanged("classpath:data/gift_loot.csv");
+               hasFileChanged("classpath:data/gift_loot.csv") ||
+               hasFileChanged("classpath:data/terrain_types.csv");
     }
 
     private boolean hasFileChanged(String path) throws Exception {
@@ -129,6 +130,7 @@ public class ConfigDataManager {
         mapConfigLoader.loadMapEntities();
         mapConfigLoader.loadChests();
         mapConfigLoader.loadChestLoot();
+        mapConfigLoader.loadTerrainTypes();
 
         log.info("All configs loaded successfully");
     }
@@ -268,6 +270,15 @@ public class ConfigDataManager {
 
     public List<ChestLootConfig> getChestLoot(String chestId) {
         return mapConfigLoader.getChestLoot(chestId);
+    }
+
+    // ========== 地形类型相关 ==========
+    public TerrainTypeConfig getTerrainType(String id) {
+        return mapConfigLoader.getTerrainType(id);
+    }
+
+    public Collection<TerrainTypeConfig> getAllTerrainTypes() {
+        return mapConfigLoader.getAllTerrainTypes().values();
     }
 
     // ========== 礼包相关 ==========

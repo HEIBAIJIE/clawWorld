@@ -78,7 +78,9 @@ class EnemyEditor:
             ('expMax', '最大经验'),
             ('goldMin', '最小金币'),
             ('goldMax', '最大金币'),
-            ('respawnSeconds', '刷新时间(秒)')
+            ('respawnSeconds', '刷新时间(秒)'),
+            ('walkSprite', '行走图'),
+            ('portrait', '头像')
         ]
 
         for field, label in labels:
@@ -277,7 +279,9 @@ class EnemyEditor:
                 'expMax': '15',
                 'goldMin': '5',
                 'goldMax': '10',
-                'respawnSeconds': '60'
+                'respawnSeconds': '60',
+                'walkSprite': '',
+                'portrait': ''
             }
 
             self.enemies.append(new_enemy)
@@ -415,7 +419,8 @@ class EnemyEditor:
                           'health', 'mana', 'physicalAttack', 'physicalDefense',
                           'magicAttack', 'magicDefense', 'speed', 'critRate',
                           'critDamage', 'hitRate', 'dodgeRate', 'skills',
-                          'expMin', 'expMax', 'goldMin', 'goldMax', 'respawnSeconds']
+                          'expMin', 'expMax', 'goldMin', 'goldMax', 'respawnSeconds',
+                          'walkSprite', 'portrait']
         write_csv('enemies.csv', self.enemies, fieldnames)
 
         # 保存掉落物

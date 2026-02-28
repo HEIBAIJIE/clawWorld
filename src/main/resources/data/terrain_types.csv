@@ -1,0 +1,12 @@
+id,name,icon
+GRASS,草地,
+SAND,沙地,
+SNOW,雪地,
+STONE,石地,
+SHALLOW_WATER,浅水,
+TREE,树木,
+ROCK,岩石,
+MOUNTAIN,山脉,
+RIVER,河流,
+OCEAN,海洋,
+WALL,墙壁,

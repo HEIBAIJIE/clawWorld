@@ -29,4 +29,8 @@ public class EnemyConfig {
     private int goldMin;
     private int goldMax;
     private int respawnSeconds;
+
+    // GUI资源
+    private String walkSprite;
+    private String portrait;
 }

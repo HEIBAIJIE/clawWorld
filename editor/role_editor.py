@@ -66,7 +66,9 @@ class RoleEditor:
         labels = [
             ('id', '职业ID'),
             ('name', '名称'),
-            ('description', '描述')
+            ('description', '描述'),
+            ('walkSprite', '行走图'),
+            ('portrait', '头像')
         ]
 
         for field, label in labels:
@@ -250,6 +252,8 @@ class RoleEditor:
                 'id': role_id,
                 'name': name_entry.get(),
                 'description': '',
+                'walkSprite': '',
+                'portrait': '',
                 'baseHealth': '100', 'baseMana': '50',
                 'basePhysicalAttack': '10', 'basePhysicalDefense': '5',
                 'baseMagicAttack': '5', 'baseMagicDefense': '5',
@@ -389,7 +393,9 @@ class RoleEditor:
                           'baseCritRate', 'baseCritDamage', 'baseHitRate', 'baseDodgeRate',
                           'healthPerLevel', 'manaPerLevel', 'physicalAttackPerLevel',
                           'physicalDefensePerLevel', 'magicAttackPerLevel', 'magicDefensePerLevel',
-                          'speedPerLevel']
+                          'speedPerLevel', 'critRatePerLevel', 'critDamagePerLevel',
+                          'hitRatePerLevel', 'dodgeRatePerLevel',
+                          'walkSprite', 'portrait']
         write_csv('roles.csv', self.roles, fieldnames)
 
         # 保存职业技能

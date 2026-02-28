@@ -66,7 +66,8 @@ class EquipmentEditor:
             ('id', '装备ID'),
             ('name', '名称'),
             ('description', '描述'),
-            ('basePrice', '基础价格')
+            ('basePrice', '基础价格'),
+            ('icon', '图标')
         ]
 
         for field, label in labels:
@@ -212,7 +213,8 @@ class EquipmentEditor:
                 'physicalAttack': '0', 'physicalDefense': '0',
                 'magicAttack': '0', 'magicDefense': '0',
                 'speed': '0', 'critRate': '0', 'critDamage': '0',
-                'hitRate': '0', 'dodgeRate': '0'
+                'hitRate': '0', 'dodgeRate': '0',
+                'icon': ''
             }
 
             self.equipment.append(new_equip)
@@ -247,7 +249,7 @@ class EquipmentEditor:
             fieldnames = ['id', 'name', 'description', 'basePrice', 'slot', 'rarity',
                           'strength', 'agility', 'intelligence', 'vitality',
                           'physicalAttack', 'physicalDefense', 'magicAttack', 'magicDefense',
-                          'speed', 'critRate', 'critDamage', 'hitRate', 'dodgeRate']
+                          'speed', 'critRate', 'critDamage', 'hitRate', 'dodgeRate', 'icon']
         write_csv('equipment.csv', self.equipment, fieldnames)
 
         messagebox.showinfo("提示", "装备数据已保存")

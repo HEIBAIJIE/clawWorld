@@ -16,4 +16,8 @@ public class NpcConfig {
     private int shopGold;
     private int shopRefreshSeconds;
     private double priceMultiplier;
+
+    // GUI资源
+    private String walkSprite;
+    private String portrait;
 }

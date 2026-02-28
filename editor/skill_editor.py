@@ -56,7 +56,8 @@ class SkillEditor:
             ('description', '描述'),
             ('manaCost', '法力消耗'),
             ('cooldown', '冷却回合'),
-            ('damageMultiplier', '伤害倍率')
+            ('damageMultiplier', '伤害倍率'),
+            ('vfx', '特效')
         ]
 
         for field, label in labels:
@@ -162,7 +163,8 @@ class SkillEditor:
                 'damageType': 'PHYSICAL',
                 'manaCost': '10',
                 'cooldown': '0',
-                'damageMultiplier': '1.0'
+                'damageMultiplier': '1.0',
+                'vfx': ''
             }
 
             self.skills.append(new_skill)
@@ -195,7 +197,7 @@ class SkillEditor:
         fieldnames = get_fieldnames('skills.csv')
         if not fieldnames:
             fieldnames = ['id', 'name', 'description', 'targetType', 'damageType',
-                          'manaCost', 'cooldown', 'damageMultiplier']
+                          'manaCost', 'cooldown', 'damageMultiplier', 'vfx']
         write_csv('skills.csv', self.skills, fieldnames)
 
         messagebox.showinfo("提示", "技能数据已保存")

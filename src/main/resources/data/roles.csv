@@ -1,5 +1,5 @@
-id,name,description,baseHealth,baseMana,basePhysicalAttack,basePhysicalDefense,baseMagicAttack,baseMagicDefense,baseSpeed,baseCritRate,baseCritDamage,baseHitRate,baseDodgeRate,healthPerLevel,manaPerLevel,physicalAttackPerLevel,physicalDefensePerLevel,magicAttackPerLevel,magicDefensePerLevel,speedPerLevel,critRatePerLevel,critDamagePerLevel,hitRatePerLevel,dodgeRatePerLevel
-WARRIOR,战士,强壮的近战战士,120,50,25,15,5,8,100,0.05,0.5,1.0,0.05,15,5,3.5,2.5,0.5,1.2,1.0,0.005,0.01,0.01,0.003
-RANGER,游侠,敏捷的远程射手,100,60,20,10,8,6,110,0.08,0.6,1.0,0.08,12,6,3.0,1.5,1.2,0.8,2.0,0.008,0.015,0.01,0.008
-MAGE,法师,强大的魔法使用者,80,100,8,5,30,10,95,0.06,0.5,1.0,0.04,10,12,0.8,0.8,4.0,1.5,0.8,0.006,0.01,0.01,0.004
-PRIEST,牧师,神圣的治疗者,90,90,12,10,25,12,100,0.05,0.5,1.0,0.05,11,10,1.5,1.5,3.5,2.0,1.0,0.005,0.01,0.01,0.005
+id,name,description,baseHealth,baseMana,basePhysicalAttack,basePhysicalDefense,baseMagicAttack,baseMagicDefense,baseSpeed,baseCritRate,baseCritDamage,baseHitRate,baseDodgeRate,healthPerLevel,manaPerLevel,physicalAttackPerLevel,physicalDefensePerLevel,magicAttackPerLevel,magicDefensePerLevel,speedPerLevel,critRatePerLevel,critDamagePerLevel,hitRatePerLevel,dodgeRatePerLevel,walkSprite,portrait
+WARRIOR,战士,强壮的近战战士,120,50,25,15,5,8,100,0.05,0.5,1.0,0.05,15,5,3.5,2.5,0.5,1.2,1.0,0.005,0.01,0.01,0.003,,
+RANGER,游侠,敏捷的远程射手,100,60,20,10,8,6,110,0.08,0.6,1.0,0.08,12,6,3.0,1.5,1.2,0.8,2.0,0.008,0.015,0.01,0.008,,
+MAGE,法师,强大的魔法使用者,80,100,8,5,30,10,95,0.06,0.5,1.0,0.04,10,12,0.8,0.8,4.0,1.5,0.8,0.006,0.01,0.01,0.004,,
+PRIEST,牧师,神圣的治疗者,90,90,12,10,25,12,100,0.05,0.5,1.0,0.05,11,10,1.5,1.5,3.5,2.0,1.0,0.005,0.01,0.01,0.005,,

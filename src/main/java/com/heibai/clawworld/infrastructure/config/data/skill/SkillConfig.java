@@ -15,4 +15,7 @@ public class SkillConfig {
     private int manaCost;
     private int cooldown;
     private double damageMultiplier;
+
+    // GUI资源
+    private String vfx;
 }

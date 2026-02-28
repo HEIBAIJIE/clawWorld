@@ -50,6 +50,7 @@ public class ItemConfigLoader {
                 item.setBasePrice(csvReader.getInt(record, "basePrice"));
                 item.setEffect(csvReader.getString(record, "effect"));
                 item.setEffectValue(csvReader.getIntOrNull(record, "effectValue"));
+                item.setIcon(csvReader.getStringOrNull(record, "icon"));
                 return item;
             });
 
@@ -90,6 +91,7 @@ public class ItemConfigLoader {
                 eq.setCritDamage(csvReader.getDouble(record, "critDamage"));
                 eq.setHitRate(csvReader.getDouble(record, "hitRate"));
                 eq.setDodgeRate(csvReader.getDouble(record, "dodgeRate"));
+                eq.setIcon(csvReader.getStringOrNull(record, "icon"));
                 return eq;
             });
 

@@ -65,6 +65,8 @@ public class CharacterConfigLoader {
                 enemy.setGoldMin(csvReader.getInt(record, "goldMin"));
                 enemy.setGoldMax(csvReader.getInt(record, "goldMax"));
                 enemy.setRespawnSeconds(csvReader.getInt(record, "respawnSeconds"));
+                enemy.setWalkSprite(csvReader.getStringOrNull(record, "walkSprite"));
+                enemy.setPortrait(csvReader.getStringOrNull(record, "portrait"));
                 return enemy;
             });
 
@@ -95,6 +97,8 @@ public class CharacterConfigLoader {
                 npc.setShopGold(csvReader.getInt(record, "shopGold"));
                 npc.setShopRefreshSeconds(csvReader.getInt(record, "shopRefreshSeconds"));
                 npc.setPriceMultiplier(csvReader.getDouble(record, "priceMultiplier"));
+                npc.setWalkSprite(csvReader.getStringOrNull(record, "walkSprite"));
+                npc.setPortrait(csvReader.getStringOrNull(record, "portrait"));
                 return npc;
             });
 
@@ -141,6 +145,8 @@ public class CharacterConfigLoader {
                 role.setCritDamagePerLevel(csvReader.getDouble(record, "critDamagePerLevel"));
                 role.setHitRatePerLevel(csvReader.getDouble(record, "hitRatePerLevel"));
                 role.setDodgeRatePerLevel(csvReader.getDouble(record, "dodgeRatePerLevel"));
+                role.setWalkSprite(csvReader.getStringOrNull(record, "walkSprite"));
+                role.setPortrait(csvReader.getStringOrNull(record, "portrait"));
                 return role;
             });
 

@@ -56,7 +56,8 @@ class ItemEditor:
             ('description', '描述'),
             ('maxStack', '最大堆叠'),
             ('basePrice', '基础价格'),
-            ('effectValue', '效果值')
+            ('effectValue', '效果值'),
+            ('icon', '图标')
         ]
 
         for field, label in labels:
@@ -162,7 +163,8 @@ class ItemEditor:
                 'maxStack': '99',
                 'basePrice': '10',
                 'effect': 'NONE',
-                'effectValue': '0'
+                'effectValue': '0',
+                'icon': ''
             }
 
             self.items.append(new_item)
@@ -195,7 +197,7 @@ class ItemEditor:
         fieldnames = get_fieldnames('items.csv')
         if not fieldnames:
             fieldnames = ['id', 'name', 'description', 'type', 'maxStack',
-                          'basePrice', 'effect', 'effectValue']
+                          'basePrice', 'effect', 'effectValue', 'icon']
         write_csv('items.csv', self.items, fieldnames)
 
         messagebox.showinfo("提示", "物品数据已保存")

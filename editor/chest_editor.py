@@ -65,7 +65,8 @@ class ChestEditor:
             ('id', '宝箱ID'),
             ('name', '名称'),
             ('description', '描述'),
-            ('respawnSeconds', '刷新时间(秒)')
+            ('respawnSeconds', '刷新时间(秒)'),
+            ('icon', '图标')
         ]
 
         for field, label in labels:
@@ -233,7 +234,8 @@ class ChestEditor:
                 'name': name_entry.get(),
                 'description': '一个宝箱',
                 'type': type_var.get(),
-                'respawnSeconds': respawn_entry.get() if type_var.get() == 'LARGE' else '0'
+                'respawnSeconds': respawn_entry.get() if type_var.get() == 'LARGE' else '0',
+                'icon': ''
             }
 
             self.chests.append(new_chest)
@@ -388,7 +390,7 @@ class ChestEditor:
         # 保存宝箱
         fieldnames = get_fieldnames('chests.csv')
         if not fieldnames:
-            fieldnames = ['id', 'name', 'description', 'type', 'respawnSeconds']
+            fieldnames = ['id', 'name', 'description', 'type', 'respawnSeconds', 'icon']
         write_csv('chests.csv', self.chests, fieldnames)
 
         # 保存掉落

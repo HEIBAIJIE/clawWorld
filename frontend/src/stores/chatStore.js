@@ -62,8 +62,8 @@ export const useChatStore = defineStore('chat', () => {
     const lines = logText.split('\n')
 
     for (const line of lines) {
-      // 解析格式1: [服务端][时间][状态][新增聊天][频道] 发送者: 内容
-      const stateMatch = line.match(/\[服务端\]\[([^\]]+)\]\[状态\]\[新增聊天\]\[([^\]]+)\]\s*([^:：]+)[：:]\s*(.+)/)
+      // 解析格式1: [时间][状态][新增聊天][频道] 发送者: 内容
+      const stateMatch = line.match(/^\[([^\]]+)\]\[状态\]\[新增聊天\]\[([^\]]+)\]\s*([^:：]+)[：:]\s*(.+)/)
       if (stateMatch) {
         const [, timeStr, channelCn, sender, content] = stateMatch
         const channel = getChannelKey(channelCn)
@@ -82,8 +82,8 @@ export const useChatStore = defineStore('chat', () => {
         continue
       }
 
-      // 解析组队邀请: [服务端][时间][状态][队伍变化]XXX 邀请你加入队伍
-      const partyInviteMatch = line.match(/\[服务端\]\[([^\]]+)\]\[状态\]\[队伍变化\](.+)\s+邀请你加入队伍/)
+      // 解析组队邀请: [时间][状态][队伍变化]XXX 邀请你加入队伍
+      const partyInviteMatch = line.match(/^\[([^\]]+)\]\[状态\]\[队伍变化\](.+)\s+邀请你加入队伍/)
       if (partyInviteMatch) {
         const [, timeStr, inviterName] = partyInviteMatch
         const timestamp = parseTimeStr(timeStr)
@@ -95,8 +95,8 @@ export const useChatStore = defineStore('chat', () => {
         continue
       }
 
-      // 解析交易邀请: [服务端][时间][状态][交易变化]XXX 邀请你进行交易
-      const tradeInviteMatch = line.match(/\[服务端\]\[([^\]]+)\]\[状态\]\[交易变化\](.+)\s+邀请你进行交易/)
+      // 解析交易邀请: [时间][状态][交易变化]XXX 邀请你进行交易
+      const tradeInviteMatch = line.match(/^\[([^\]]+)\]\[状态\]\[交易变化\](.+)\s+邀请你进行交易/)
       if (tradeInviteMatch) {
         const [, timeStr, inviterName] = tradeInviteMatch
         const timestamp = parseTimeStr(timeStr)
@@ -124,13 +124,13 @@ export const useChatStore = defineStore('chat', () => {
 
   // 解析时间字符串
   function parseTimeStr(timeStr) {
-    // 格式: 2月20日 03:25:20
-    const match = timeStr.match(/(\d+)月(\d+)日\s+(\d+):(\d+):(\d+)/)
+    // 格式: HH:MM
+    const match = timeStr.match(/(\d+):(\d+)/)
     if (match) {
-      const [, month, day, hour, minute, second] = match
+      const [, hour, minute] = match
       const now = new Date()
-      const date = new Date(now.getFullYear(), parseInt(month) - 1, parseInt(day),
-        parseInt(hour), parseInt(minute), parseInt(second))
+      const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
+        parseInt(hour), parseInt(minute), 0)
       return date.getTime()
     }
     return Date.now()

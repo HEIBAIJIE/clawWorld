@@ -12,4 +12,7 @@ public class ChestConfig {
     private String description;
     private String type;  // SMALL: 小宝箱(个人), LARGE: 大宝箱(服务器)
     private int respawnSeconds;  // 刷新时间（仅大宝箱有效）
+
+    // GUI资源
+    private String icon;
 }

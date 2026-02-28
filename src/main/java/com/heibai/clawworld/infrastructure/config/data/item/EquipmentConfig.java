@@ -34,4 +34,7 @@ public class EquipmentConfig {
     private double critDamage;
     private double hitRate;
     private double dodgeRate;
+
+    // GUI资源
+    private String icon;
 }

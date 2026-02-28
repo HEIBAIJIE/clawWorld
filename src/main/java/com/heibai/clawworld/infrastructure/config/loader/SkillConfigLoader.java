@@ -45,6 +45,7 @@ public class SkillConfigLoader {
                 skill.setManaCost(csvReader.getInt(record, "manaCost"));
                 skill.setCooldown(csvReader.getInt(record, "cooldown"));
                 skill.setDamageMultiplier(csvReader.getDouble(record, "damageMultiplier"));
+                skill.setVfx(csvReader.getStringOrNull(record, "vfx"));
                 return skill;
             });
 

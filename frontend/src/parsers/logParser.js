@@ -3,34 +3,28 @@
  * 解析服务端返回的日志格式：[来源][时间][类型][子类型]内容
  */
 
-// 日志行正则
-const LOG_PATTERN = /^\[([^\]]+)\]\[([^\]]+)\]\[([^\]]+)\]\[([^\]]+)\](.*)$/
+// 日志行正则 - 新格式：[时间][类型][子类型]内容
+const LOG_PATTERN = /^\[([^\]]+)\]\[([^\]]+)\]\[([^\]]+)\](.*)$/
 
 /**
  * 解析时间字符串为毫秒时间戳
- * 格式：X月X日 HH:MM:SS
+ * 格式：HH:MM
  * @param {string} timeStr - 时间字符串
  * @returns {number} 毫秒时间戳，解析失败返回0
  */
 export function parseTimeToTimestamp(timeStr) {
   if (!timeStr) return 0
 
-  // 匹配格式：X月X日 HH:MM:SS
-  const match = timeStr.match(/(\d+)月(\d+)日\s+(\d+):(\d+):(\d+)/)
+  // 匹配格式：HH:MM
+  const match = timeStr.match(/(\d+):(\d+)/)
   if (!match) return 0
 
-  const month = parseInt(match[1])
-  const day = parseInt(match[2])
-  const hour = parseInt(match[3])
-  const minute = parseInt(match[4])
-  const second = parseInt(match[5])
+  const hour = parseInt(match[1])
+  const minute = parseInt(match[2])
 
-  // 使用当前年份
+  // 使用当前日期
   const now = new Date()
-  const year = now.getFullYear()
-
-  // 创建日期对象
-  const date = new Date(year, month - 1, day, hour, minute, second)
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0)
   return date.getTime()
 }
 
@@ -42,15 +36,15 @@ export function parseTimeToTimestamp(timeStr) {
 export function parseLogLine(line) {
   const match = line.match(LOG_PATTERN)
   if (match) {
-    const timeStr = match[2]
+    const timeStr = match[1]
     return {
       isLog: true,
-      source: match[1],
+      source: 'SERVER', // 新格式不再包含来源，默认为服务端
       time: timeStr,
       timestamp: parseTimeToTimestamp(timeStr),
-      type: match[3],
-      subType: match[4],
-      content: match[5].trim()
+      type: match[2],
+      subType: match[3],
+      content: match[4].trim()
     }
   }
 

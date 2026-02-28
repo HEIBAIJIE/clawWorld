@@ -69,17 +69,6 @@ public class UnifiedResponseGenerator {
             Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
             if (accountOpt.isPresent()) {
                 account = accountOpt.get();
-                // 1. 添加客户端指令日志
-                if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
-                    GameLog clientLog = GameLog.builder()
-                        .source(GameLog.Source.CLIENT)
-                        .timestamp(account.getLastCommandTimestamp())
-                        .type(GameLog.Type.COMMAND)
-                        .subType("发送指令")
-                        .content(account.getLastCommand())
-                        .build();
-                    builder.addLog(clientLog);
-                }
 
                 // 检查玩家的实际窗口状态是否与玩家上次知道的窗口状态不一致
                 // 这种情况发生在：其他玩家的操作导致当前玩家的窗口状态被改变
@@ -253,17 +242,6 @@ public class UnifiedResponseGenerator {
             Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
             if (accountOpt.isPresent()) {
                 account = accountOpt.get();
-                // 添加客户端指令日志
-                if (account.getLastCommand() != null && account.getLastCommandTimestamp() != null) {
-                    GameLog clientLog = GameLog.builder()
-                        .source(GameLog.Source.CLIENT)
-                        .timestamp(account.getLastCommandTimestamp())
-                        .type(GameLog.Type.COMMAND)
-                        .subType("发送指令")
-                        .content(account.getLastCommand())
-                        .build();
-                    builder.addLog(clientLog);
-                }
 
                 // 检查玩家的实际窗口状态是否与玩家上次知道的窗口状态不一致
                 String dbWindowType = account.getCurrentWindowType();

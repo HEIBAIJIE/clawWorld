@@ -32,6 +32,7 @@ public class MapConfigLoader {
     private final List<MapTerrainConfig> mapTerrainConfigs = new ArrayList<>();
     private final List<MapEntityConfig> mapEntityConfigs = new ArrayList<>();
     private final List<ChestLootConfig> chestLootConfigs = new ArrayList<>();
+    private final Map<String, TerrainTypeConfig> terrainTypeConfigs = new ConcurrentHashMap<>();
 
     public void loadMaps() {
         try {
@@ -171,6 +172,7 @@ public class MapConfigLoader {
                 chest.setDescription(csvReader.getString(record, "description"));
                 chest.setType(csvReader.getString(record, "type"));
                 chest.setRespawnSeconds(csvReader.getInt(record, "respawnSeconds"));
+                chest.setIcon(csvReader.getStringOrNull(record, "icon"));
                 return chest;
             });
 
@@ -249,5 +251,37 @@ public class MapConfigLoader {
         return chestLootConfigs.stream()
                 .filter(loot -> loot.getChestId().equals(chestId))
                 .toList();
+    }
+
+    public void loadTerrainTypes() {
+        try {
+            Resource resource = resourceLoader.getResource("classpath:data/terrain_types.csv");
+            if (!resource.exists()) {
+                log.warn("terrain_types.csv not found, skipping");
+                return;
+            }
+
+            List<TerrainTypeConfig> terrainTypes = csvReader.readCsv(resource.getInputStream(), record -> {
+                TerrainTypeConfig tt = new TerrainTypeConfig();
+                tt.setId(csvReader.getString(record, "id"));
+                tt.setName(csvReader.getString(record, "name"));
+                tt.setIcon(csvReader.getStringOrNull(record, "icon"));
+                return tt;
+            });
+
+            terrainTypeConfigs.clear();
+            terrainTypes.forEach(tt -> terrainTypeConfigs.put(tt.getId(), tt));
+            log.info("Loaded {} terrain types", terrainTypes.size());
+        } catch (IOException e) {
+            log.error("Error loading terrain_types.csv", e);
+        }
+    }
+
+    public TerrainTypeConfig getTerrainType(String id) {
+        return terrainTypeConfigs.get(id);
+    }
+
+    public Map<String, TerrainTypeConfig> getAllTerrainTypes() {
+        return terrainTypeConfigs;
     }
 }

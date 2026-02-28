@@ -37,4 +37,8 @@ public class RoleConfig {
     private double critDamagePerLevel;
     private double hitRatePerLevel;
     private double dodgeRatePerLevel;
+
+    // GUI资源
+    private String walkSprite;
+    private String portrait;
 }

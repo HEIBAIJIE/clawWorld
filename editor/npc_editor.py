@@ -68,7 +68,9 @@ class NPCEditor:
             ('dialogues', '对话(分号分隔)'),
             ('shopGold', '商店金币'),
             ('shopRefreshSeconds', '刷新时间(秒)'),
-            ('priceMultiplier', '价格倍率')
+            ('priceMultiplier', '价格倍率'),
+            ('walkSprite', '行走图'),
+            ('portrait', '头像')
         ]
 
         for field, label in labels:
@@ -213,7 +215,9 @@ class NPCEditor:
                 'dialogues': '你好，旅行者！',
                 'shopGold': '1000',
                 'shopRefreshSeconds': '3600',
-                'priceMultiplier': '1.0'
+                'priceMultiplier': '1.0',
+                'walkSprite': '',
+                'portrait': ''
             }
 
             self.npcs.append(new_npc)
@@ -339,7 +343,8 @@ class NPCEditor:
         fieldnames = get_fieldnames('npcs.csv')
         if not fieldnames:
             fieldnames = ['id', 'name', 'description', 'hasShop', 'hasDialogue',
-                          'dialogues', 'shopGold', 'shopRefreshSeconds', 'priceMultiplier']
+                          'dialogues', 'shopGold', 'shopRefreshSeconds', 'priceMultiplier',
+                          'walkSprite', 'portrait']
         write_csv('npcs.csv', self.npcs, fieldnames)
 
         # 保存商店物品

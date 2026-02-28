@@ -1,7 +1,7 @@
-id,name,description,hasShop,hasDialogue,dialogues,shopGold,shopRefreshSeconds,priceMultiplier
-merchant_john,商人约翰,友善的旅行商人,true,true,欢迎光临！我这里有最好的货物;需要补给吗？看看我的商品吧,1000,300,1.2
-blacksmith_tom,铁匠汤姆,技艺精湛的铁匠,true,true,需要武器和护甲吗？;我能打造最好的装备,800,300,1.5
-priest_mary,牧师玛丽,慈祥的教会牧师,true,true,愿光明指引你的道路;需要治疗药水吗？,500,300,1.0
-guard_captain,守卫队长,城镇守卫队长,false,true,保持警惕，外面很危险;如果遇到麻烦就回来,0,0,1.0
-village_elder,村长,村子的长者,false,true,欢迎来到我们的村庄;森林深处有危险的怪物，小心,0,0,1.0
-trainer_bob,训练师鲍勃,经验丰富的战斗训练师,false,true,欢迎来到训练场！;想要提升战斗技巧吗？多练习就能变强;记住，实战是最好的老师,0,0,1.0
+id,name,description,hasShop,hasDialogue,dialogues,shopGold,shopRefreshSeconds,priceMultiplier,walkSprite,portrait
+merchant_john,商人约翰,友善的旅行商人,true,true,欢迎光临！我这里有最好的货物;需要补给吗？看看我的商品吧,1000,300,1.2,,
+blacksmith_tom,铁匠汤姆,技艺精湛的铁匠,true,true,需要武器和护甲吗？;我能打造最好的装备,800,300,1.5,,
+priest_mary,牧师玛丽,慈祥的教会牧师,true,true,愿光明指引你的道路;需要治疗药水吗？,500,300,1.0,,
+guard_captain,守卫队长,城镇守卫队长,false,true,保持警惕，外面很危险;如果遇到麻烦就回来,0,0,1.0,,
+village_elder,村长,村子的长者,false,true,欢迎来到我们的村庄;森林深处有危险的怪物，小心,0,0,1.0,,
+trainer_bob,训练师鲍勃,经验丰富的战斗训练师,false,true,欢迎来到训练场！;想要提升战斗技巧吗？多练习就能变强;记住，实战是最好的老师,0,0,1.0,,

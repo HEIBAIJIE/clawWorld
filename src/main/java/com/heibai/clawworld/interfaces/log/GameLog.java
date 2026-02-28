@@ -65,10 +65,7 @@ public class GameLog {
     public String format() {
         StringBuilder sb = new StringBuilder();
 
-        // [来源]
-        sb.append("[").append(source.getDisplayName()).append("]");
-
-        // [时间]
+        // [时间] - 只显示小时和分钟
         sb.append(formatTimestamp(timestamp));
 
         // [类型]
@@ -86,7 +83,7 @@ public class GameLog {
     }
 
     /**
-     * 格式化时间戳
+     * 格式化时间戳 - 只显示小时和分钟
      */
     private String formatTimestamp(Long timestamp) {
         if (timestamp == null) {
@@ -96,12 +93,9 @@ public class GameLog {
         ZoneId zoneId = ZoneId.systemDefault();
         LocalDateTime dateTime = LocalDateTime.ofInstant(instant, zoneId);
 
-        return String.format("[%d月%d日 %02d:%02d:%02d]",
-            dateTime.getMonthValue(),
-            dateTime.getDayOfMonth(),
+        return String.format("[%02d:%02d]",
             dateTime.getHour(),
-            dateTime.getMinute(),
-            dateTime.getSecond());
+            dateTime.getMinute());
     }
 
     /**

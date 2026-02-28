@@ -15,4 +15,7 @@ public class ItemConfig {
     private int basePrice;
     private String effect;
     private Integer effectValue;
+
+    // GUI资源
+    private String icon;
 }
