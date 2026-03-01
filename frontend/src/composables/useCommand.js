@@ -1502,6 +1502,14 @@ export function useCommand() {
       if (combatStore.combatResult) {
         combatStore.combatResult.gold = action.amount
       }
+    } else if (action.type === 'item') {
+      // 添加物品
+      if (combatStore.combatResult) {
+        if (!combatStore.combatResult.items) {
+          combatStore.combatResult.items = []
+        }
+        combatStore.combatResult.items.push(action.itemName)
+      }
     }
   }
 
@@ -1531,11 +1539,25 @@ export function useCommand() {
     if (result.combatEnd) {
       // 判断是否是自己的阵营获胜
       const isMyVictory = result.combatEnd.winnerFaction === combatStore.myFaction
-      combatStore.showCombatResult({
-        victory: isMyVictory,
-        experience: result.combatEnd.experience || 0,
-        gold: result.combatEnd.gold || 0
-      })
+
+      // 如果 combatResult 已经存在（通过战斗日志初始化），只更新数据，不覆盖
+      if (combatStore.combatResult) {
+        combatStore.combatResult.victory = isMyVictory
+        combatStore.combatResult.experience = result.combatEnd.experience || 0
+        combatStore.combatResult.gold = result.combatEnd.gold || 0
+        // 合并物品列表
+        if (result.combatEnd.items && result.combatEnd.items.length > 0) {
+          combatStore.combatResult.items = [...combatStore.combatResult.items, ...result.combatEnd.items]
+        }
+      } else {
+        // 否则创建新的 combatResult
+        combatStore.showCombatResult({
+          victory: isMyVictory,
+          experience: result.combatEnd.experience || 0,
+          gold: result.combatEnd.gold || 0,
+          items: result.combatEnd.items || []
+        })
+      }
     }
   }
 

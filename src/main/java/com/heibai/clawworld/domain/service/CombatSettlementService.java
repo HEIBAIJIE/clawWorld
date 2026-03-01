@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 @Component
 public class CombatSettlementService {
 
-    private final CombatRewardCalculator rewardCalculator = new CombatRewardCalculator();
+    private final CombatRewardCalculator rewardCalculator;
     private final ConfigDataManager configDataManager;
 
     // 已结束战斗的信息缓存（供后续玩家查询）
@@ -44,6 +44,7 @@ public class CombatSettlementService {
 
     public CombatSettlementService(ConfigDataManager configDataManager) {
         this.configDataManager = configDataManager;
+        this.rewardCalculator = new CombatRewardCalculator(configDataManager);
     }
 
     /**
@@ -444,7 +445,9 @@ public class CombatSettlementService {
                     } else {
                         var equipConfig = configDataManager.getEquipment(itemId);
                         if (equipConfig != null) {
-                            itemName = equipConfig.getName();
+                            // 装备显示完整格式（不含实例编号，因为还未生成）
+                            String slotName = getSlotName(equipConfig.getSlot());
+                            itemName = "[" + slotName + "]" + equipConfig.getName();
                         }
                     }
                 }
@@ -464,6 +467,27 @@ public class CombatSettlementService {
         return logs.stream()
             .map(entry -> String.format("[#%d] %s", entry.getSequence(), entry.getMessage()))
             .collect(Collectors.toList());
+    }
+
+    /**
+     * 获取装备槽位的中文名称
+     */
+    private String getSlotName(String slot) {
+        if (slot == null) return "未知";
+        switch (slot.toUpperCase()) {
+            case "HEAD": return "头部";
+            case "CHEST": return "胸部";
+            case "LEGS": return "腿部";
+            case "FEET": return "脚部";
+            case "RIGHT_HAND":
+            case "MAIN_HAND": return "右手";
+            case "LEFT_HAND":
+            case "OFF_HAND": return "左手";
+            case "ACCESSORY":
+            case "ACCESSORY1":
+            case "ACCESSORY2": return "饰品";
+            default: return slot;
+        }
     }
 
     /**

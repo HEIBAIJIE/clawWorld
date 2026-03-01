@@ -6,7 +6,6 @@ goblin,leather,COMMON,0.3
 goblin,iron_sword,COMMON,0.05
 wolf,health_potion_medium,EXCELLENT,0.2
 wolf,leather,COMMON,0.5
-orc_warrior,steel_sword,EXCELLENT,0.1
 orc_warrior,health_potion_medium,EXCELLENT,0.3
 orc_warrior,iron_ore,COMMON,0.4
 goblin_shaman,mana_potion_medium,EXCELLENT,0.3
@@ -17,3 +16,4 @@ forest_guardian,reset_potion,RARE,0.1
 ancient_dragon,dragon_blade,LEGENDARY,0.2
 ancient_dragon,reset_potion,RARE,0.5
 ancient_dragon,silver_ring,RARE,0.8
+orc_warrior,steel_sword,EXCELLENT,1

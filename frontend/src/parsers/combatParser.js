@@ -335,6 +335,15 @@ export function parseCombatAction(content) {
     }
   }
 
+  // 物品分配: "小小 获得物品: 中型生命药水" 或 "小小 获得物品: [右手]钢剑#1"
+  const itemMatch = actionContent.match(/获得物品[：:]\s*(.+)$/)
+  if (itemMatch) {
+    return {
+      type: 'item',
+      itemName: itemMatch[1].trim()
+    }
+  }
+
   return null
 }
 
@@ -383,6 +392,13 @@ export function parseCommandResponse(content) {
       } else if (action.type === 'gold') {
         if (result.combatEnd) {
           result.combatEnd.gold = action.amount
+        }
+      } else if (action.type === 'item') {
+        if (result.combatEnd) {
+          if (!result.combatEnd.items) {
+            result.combatEnd.items = []
+          }
+          result.combatEnd.items.push(action.itemName)
         }
       }
     }
