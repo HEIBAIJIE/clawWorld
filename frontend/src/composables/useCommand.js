@@ -1106,6 +1106,15 @@ export function useCommand() {
           })
         }
 
+        // 处理篝火休息后的生命/法力恢复
+        const restMatch = content.match(/生命和法力已完全恢复（生命\+(\d+)，法力\+(\d+)）/)
+        if (restMatch) {
+          playerStore.updateFromParsed({
+            currentHealth: playerStore.maxHealth,
+            currentMana: playerStore.maxMana
+          })
+        }
+
         // 处理队伍解散响应
         if (content.includes('队伍已解散')) {
           partyStore.reset()
