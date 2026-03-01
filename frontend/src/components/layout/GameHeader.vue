@@ -21,6 +21,7 @@ import { useSessionStore } from '../../stores/sessionStore'
 import { usePlayerStore } from '../../stores/playerStore'
 import { useMapStore } from '../../stores/mapStore'
 import { useLogStore } from '../../stores/logStore'
+import { useChatStore } from '../../stores/chatStore'
 import { useAgentStore } from '../../stores/agentStore'
 import { gameApi } from '../../api/game'
 import AgentConfigModal from '../agent/AgentConfigModal.vue'
@@ -29,6 +30,7 @@ const sessionStore = useSessionStore()
 const playerStore = usePlayerStore()
 const mapStore = useMapStore()
 const logStore = useLogStore()
+const chatStore = useChatStore()
 const agentStore = useAgentStore()
 
 const showConfigModal = ref(false)
@@ -50,6 +52,7 @@ const handleLogout = async () => {
     playerStore.reset()
     mapStore.reset()
     logStore.clear()
+    chatStore.clear()
   }
 }
 </script>

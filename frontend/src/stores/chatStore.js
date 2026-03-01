@@ -36,7 +36,8 @@ export const useChatStore = defineStore('chat', () => {
       timestamp,
       time: new Date(timestamp).toLocaleTimeString('zh-CN', {
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        second: '2-digit'
       }),
       actionType,  // 'party_invite' | 'trade_invite' | null
       actionTarget // 邀请者名称
@@ -60,6 +61,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!logText) return
 
     const lines = logText.split('\n')
+    let currentChatWindowTime = null  // 当前聊天记录窗口的时间戳
 
     for (const line of lines) {
       // 解析格式1: [时间][状态][新增聊天][频道] 发送者: 内容
@@ -69,17 +71,33 @@ export const useChatStore = defineStore('chat', () => {
         const channel = getChannelKey(channelCn)
         const timestamp = parseTimeStr(timeStr)
         addMessage(channel, sender.trim(), content.trim(), timestamp)
+        currentChatWindowTime = null
         continue
       }
 
-      // 解析格式2: [频道] 发送者: 内容 (在窗口聊天记录中)
-      const chatMatch = line.match(/^\[([世界地图队伍私聊]+)\]\s*([^:：]+)[：:]\s*(.+)/)
-      if (chatMatch) {
-        const [, channelCn, sender, content] = chatMatch
-        const channel = getChannelKey(channelCn)
-        // 使用当前时间作为时间戳
-        addMessage(channel, sender.trim(), content.trim(), Date.now())
+      // 解析格式2: [时间][窗口][聊天记录] 开始聊天记录块
+      const chatWindowMatch = line.match(/^\[([^\]]+)\]\[窗口\]\[聊天记录\]/)
+      if (chatWindowMatch) {
+        const [, timeStr] = chatWindowMatch
+        currentChatWindowTime = parseTimeStr(timeStr)
         continue
+      }
+
+      // 解析格式3: [频道] 发送者: 内容 (在聊天记录窗口中)
+      if (currentChatWindowTime) {
+        const chatLineMatch = line.match(/^\[([世界地图队伍私聊]+)\]\s*([^:：]+)[：:]\s*(.+)/)
+        if (chatLineMatch) {
+          const [, channelCn, sender, content] = chatLineMatch
+          const channel = getChannelKey(channelCn)
+          // 使用聊天记录窗口的时间戳，加上内容hash避免同一时间多条消息冲突
+          const contentHash = content.length + sender.length
+          addMessage(channel, sender.trim(), content.trim(), currentChatWindowTime + contentHash)
+          continue
+        }
+        // 遇到其他格式的行，结束聊天记录块
+        if (line.trim() && !line.startsWith('[') && line !== '新增聊天：') {
+          currentChatWindowTime = null
+        }
       }
 
       // 解析组队邀请: [时间][状态][队伍变化]XXX 邀请你加入队伍
