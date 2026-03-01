@@ -163,7 +163,7 @@ public class PartyServiceImpl implements PartyService {
         playerRepository.save(player);
 
         // 生成队伍状态描述
-        String partyInfo = generatePartyInfo(party);
+        String partyInfo = generatePartyInfo(party, playerId);
         return PartyResult.success("成功加入队伍\n" + partyInfo, party.getId());
     }
 
@@ -563,8 +563,14 @@ public class PartyServiceImpl implements PartyService {
     /**
      * 生成队伍状态描述
      */
-    private String generatePartyInfo(PartyEntity party) {
+    private String generatePartyInfo(PartyEntity party, String currentPlayerId) {
         StringBuilder sb = new StringBuilder();
+
+        // 如果当前玩家是队长，先显示提示
+        if (currentPlayerId != null && currentPlayerId.equals(party.getLeaderId())) {
+            sb.append("你是队长\n");
+        }
+
         sb.append("当前队伍成员(").append(party.getMemberIds().size()).append("/4)：\n");
 
         for (String memberId : party.getMemberIds()) {

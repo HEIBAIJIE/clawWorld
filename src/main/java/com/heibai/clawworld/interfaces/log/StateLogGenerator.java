@@ -397,9 +397,15 @@ public class StateLogGenerator {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("当前队伍成员(").append(snapshot.getMemberNames().size()).append("/4)：");
 
         String leaderName = snapshot.getLeaderName();
+        // 如果当前玩家是队长，先显示提示
+        if (currentPlayerName.equals(leaderName)) {
+            sb.append("你是队长\n");
+        }
+
+        sb.append("当前队伍成员(").append(snapshot.getMemberNames().size()).append("/4)：");
+
         for (String memberName : snapshot.getMemberNames()) {
             sb.append("\n  - ").append(memberName);
             // 标记队长
