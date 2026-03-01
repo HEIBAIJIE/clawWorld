@@ -1143,6 +1143,8 @@ export function useCommand() {
             const chestReward = parseChestReward(content)
             if (chestReward) {
               uiStore.showChestReward(chestReward.chestName, chestReward.items)
+              // 更新背包：移除礼包，添加获得的物品
+              updateInventoryAfterChestOpen(chestReward.chestName, chestReward.items)
             }
           }
         }
@@ -1554,6 +1556,69 @@ export function useCommand() {
     }
 
     return { chestName, items }
+  }
+
+  /**
+   * 更新背包：打开礼包后
+   * 移除礼包本身，添加获得的物品
+   */
+  function updateInventoryAfterChestOpen(chestName, rewardItems) {
+    const currentInventory = [...playerStore.inventory]
+
+    // 1. 移除礼包（数量-1或完全移除）
+    const chestIndex = currentInventory.findIndex(slot => slot.name === chestName)
+    if (chestIndex !== -1) {
+      if (currentInventory[chestIndex].quantity > 1) {
+        currentInventory[chestIndex].quantity -= 1
+      } else {
+        currentInventory.splice(chestIndex, 1)
+      }
+    }
+
+    // 2. 添加获得的物品
+    for (const rewardItem of rewardItems) {
+      // 检查物品名称是否包含槽位前缀（如 [右手]、[左手] 等），如果有则是装备
+      const slotMatch = rewardItem.name.match(/^\[(.+?)\](.+)$/)
+      const isEquipment = slotMatch !== null
+
+      if (isEquipment) {
+        // 装备：每件单独添加，保持完整名称格式
+        const slotName = slotMatch[1]
+        const equipName = slotMatch[2].trim()
+        const instanceMatch = equipName.match(/^(.+)#(\d+)$/)
+        const baseName = instanceMatch ? instanceMatch[1].trim() : equipName
+
+        for (let i = 0; i < rewardItem.quantity; i++) {
+          currentInventory.push({
+            name: rewardItem.name,  // 完整名称，如 "[右手]新手剑#6"
+            baseName: baseName,     // 基础名称，如 "新手剑"
+            displayName: equipName, // 显示名称，如 "新手剑#6"
+            slotName: slotName,     // 槽位名称，如 "右手"
+            quantity: 1,
+            isEquipment: true
+          })
+        }
+      } else {
+        // 普通物品：尝试堆叠
+        const existingIndex = currentInventory.findIndex(slot =>
+          slot.name === rewardItem.name && !slot.isEquipment
+        )
+
+        if (existingIndex !== -1) {
+          currentInventory[existingIndex].quantity += rewardItem.quantity
+        } else {
+          currentInventory.push({
+            name: rewardItem.name,
+            quantity: rewardItem.quantity,
+            isEquipment: false
+          })
+        }
+      }
+    }
+
+    // 3. 更新 playerStore
+    playerStore.updateFromParsed({ inventory: currentInventory })
+    console.log('[Command] 礼包打开后更新背包:', currentInventory)
   }
 
   /**

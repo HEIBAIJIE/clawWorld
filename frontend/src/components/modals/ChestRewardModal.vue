@@ -143,6 +143,10 @@ const uiStore = useUIStore()
 .reward-item:nth-child(3) { animation-delay: 0.3s; }
 .reward-item:nth-child(4) { animation-delay: 0.4s; }
 .reward-item:nth-child(5) { animation-delay: 0.5s; }
+.reward-item:nth-child(6) { animation-delay: 0.6s; }
+.reward-item:nth-child(7) { animation-delay: 0.7s; }
+.reward-item:nth-child(8) { animation-delay: 0.8s; }
+.reward-item:nth-child(n+9) { animation-delay: 0.9s; }
 
 @keyframes item-appear {
   from {

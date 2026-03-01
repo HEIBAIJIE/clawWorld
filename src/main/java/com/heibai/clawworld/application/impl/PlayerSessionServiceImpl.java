@@ -359,7 +359,12 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
         PlayerEntity entity = playerMapper.toEntity(player);
         playerRepository.save(entity);
 
-        // 生成背包更新信息
+        // 对于礼包，不附加背包更新信息（避免冗余）
+        if (item.getEffect() != null && item.getEffect().equals("OPEN_GIFT")) {
+            return OperationResult.success(resultMessage != null ? resultMessage : "使用物品成功: " + itemName);
+        }
+
+        // 其他物品生成背包更新信息
         String inventoryUpdate = generateInventoryUpdate(player);
 
         return OperationResult.success(resultMessage != null ? resultMessage : "使用物品成功: " + itemName, inventoryUpdate);
