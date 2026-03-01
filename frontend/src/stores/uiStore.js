@@ -153,27 +153,46 @@ export const useUIStore = defineStore('ui', () => {
   }
 
   // 显示宝箱奖励弹窗
+  let chestRewardTimer1 = null
+  let chestRewardTimer2 = null
+
   function showChestReward(chestName, items) {
     console.log('[UIStore] 显示宝箱奖励:', chestName, items)
+
+    // 清除之前的定时器
+    if (chestRewardTimer1) clearTimeout(chestRewardTimer1)
+    if (chestRewardTimer2) clearTimeout(chestRewardTimer2)
+
+    // 重置状态，确保 fadeOut 为 false
     chestReward.value = {
       visible: true,
       chestName,
       items,
       fadeOut: false
     }
+
     // 2秒后开始淡出
-    setTimeout(() => {
-      chestReward.value.fadeOut = true
+    chestRewardTimer1 = setTimeout(() => {
+      if (chestReward.value.visible) {
+        chestReward.value.fadeOut = true
+      }
     }, 2000)
-    // 3秒后完全关闭（不重置 fadeOut，让 visible 变化时保持淡出状态）
-    setTimeout(() => {
+
+    // 3秒后完全关闭
+    chestRewardTimer2 = setTimeout(() => {
       chestReward.value.visible = false
+      chestReward.value.fadeOut = false
     }, 3000)
   }
 
   // 关闭宝箱奖励弹窗
   function closeChestReward() {
+    // 清除定时器
+    if (chestRewardTimer1) clearTimeout(chestRewardTimer1)
+    if (chestRewardTimer2) clearTimeout(chestRewardTimer2)
+
     chestReward.value.visible = false
+    chestReward.value.fadeOut = false
   }
 
   return {
