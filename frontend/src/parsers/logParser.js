@@ -8,23 +8,24 @@ const LOG_PATTERN = /^\[([^\]]+)\]\[([^\]]+)\]\[([^\]]+)\](.*)$/
 
 /**
  * 解析时间字符串为毫秒时间戳
- * 格式：HH:MM
+ * 格式：HH:MM:SS
  * @param {string} timeStr - 时间字符串
  * @returns {number} 毫秒时间戳，解析失败返回0
  */
 export function parseTimeToTimestamp(timeStr) {
   if (!timeStr) return 0
 
-  // 匹配格式：HH:MM
-  const match = timeStr.match(/(\d+):(\d+)/)
+  // 匹配格式：HH:MM:SS 或 HH:MM（兼容旧格式）
+  const match = timeStr.match(/(\d+):(\d+)(?::(\d+))?/)
   if (!match) return 0
 
   const hour = parseInt(match[1])
   const minute = parseInt(match[2])
+  const second = match[3] ? parseInt(match[3]) : 0
 
   // 使用当前日期
   const now = new Date()
-  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0)
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, second)
   return date.getTime()
 }
 

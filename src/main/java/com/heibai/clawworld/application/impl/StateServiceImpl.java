@@ -359,7 +359,7 @@ public class StateServiceImpl implements StateService {
             return state.toString();
         }
 
-        // 1. 指令响应
+        // 1. 响应
         state.append(">>> ").append(commandResult).append("\n\n");
 
         // 2. 战斗日志（显示最近的战斗事件）

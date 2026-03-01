@@ -44,7 +44,7 @@ public class StateLogGenerator {
     public void generateMapStateLogs(GameLogBuilder builder, String playerId, String commandResult) {
         Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
         if (!accountOpt.isPresent()) {
-            builder.addState("指令响应", "错误: 无法获取玩家状态");
+            builder.addState("响应", "错误: 无法获取玩家状态");
             return;
         }
         AccountEntity account = accountOpt.get();
@@ -130,8 +130,8 @@ public class StateLogGenerator {
         // 5. 聊天消息变化
         generateChatChangeLogs(builder, playerId, lastTimestamp);
 
-        // 6. 指令响应（放在最后）
-        builder.addState("指令响应", commandResult);
+        // 6. 响应（放在最后）
+        builder.addState("响应", commandResult);
 
         // 7. 更新状态时间戳
         account.setLastStateTimestamp(System.currentTimeMillis());

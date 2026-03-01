@@ -339,8 +339,8 @@ export function parseCombatAction(content) {
 }
 
 /**
- * 从指令响应中解析战斗结果
- * @param {string} content - 指令响应内容
+ * 从响应中解析战斗结果
+ * @param {string} content - 响应内容
  * @returns {object|null} 战斗结果
  */
 export function parseCommandResponse(content) {

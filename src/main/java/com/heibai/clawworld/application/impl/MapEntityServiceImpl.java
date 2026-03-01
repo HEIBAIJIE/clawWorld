@@ -253,7 +253,7 @@ public class MapEntityServiceImpl implements MapEntityService {
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     playerRepository.save(player);
-                    return MoveResult.error("移动被中断，当前位置: (" + player.getX() + ", " + player.getY() + ")");
+                    return MoveResult.error("移动中断于(" + player.getX() + ", " + player.getY() + ")");
                 }
             }
 
@@ -265,7 +265,7 @@ public class MapEntityServiceImpl implements MapEntityService {
         // 保存最终位置
         playerRepository.save(player);
 
-        return MoveResult.success(targetX, targetY, String.format("移动完成，当前位置: (%d, %d)", targetX, targetY));
+        return MoveResult.success(targetX, targetY, String.format("移动至(%d, %d)", targetX, targetY));
     }
 
     @Override

@@ -124,13 +124,13 @@ export const useChatStore = defineStore('chat', () => {
 
   // 解析时间字符串
   function parseTimeStr(timeStr) {
-    // 格式: HH:MM
-    const match = timeStr.match(/(\d+):(\d+)/)
+    // 格式: HH:MM:SS 或 HH:MM（兼容旧格式）
+    const match = timeStr.match(/(\d+):(\d+)(?::(\d+))?/)
     if (match) {
-      const [, hour, minute] = match
+      const [, hour, minute, second] = match
       const now = new Date()
       const date = new Date(now.getFullYear(), now.getMonth(), now.getDate(),
-        parseInt(hour), parseInt(minute), 0)
+        parseInt(hour), parseInt(minute), second ? parseInt(second) : 0)
       return date.getTime()
     }
     return Date.now()

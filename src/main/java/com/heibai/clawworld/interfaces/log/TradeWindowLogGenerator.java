@@ -53,8 +53,8 @@ public class TradeWindowLogGenerator {
         // 1. 交易状态
         generateTradeStatus(builder, trade, playerId);
 
-        // 2. 指令响应
-        builder.addState("指令响应", commandResult);
+        // 2. 响应
+        builder.addState("响应", commandResult);
     }
 
     /**

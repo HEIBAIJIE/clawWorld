@@ -180,8 +180,8 @@ public class CombatWindowLogGenerator {
      */
     public int generateCombatStateLogs(GameLogBuilder builder, Combat combat, String playerId,
                                        String commandResult, int lastLogSequence, long turnStartTime) {
-        // 1. 指令响应（不再单独添加，因为战斗日志中已经包含了行动信息）
-        // 只有当没有新的战斗日志时才显示指令响应
+        // 1. 响应（不再单独添加，因为战斗日志中已经包含了行动信息）
+        // 只有当没有新的战斗日志时才显示响应
         boolean hasNewLogs = false;
 
         // 2. 增量战斗日志（每条日志单独作为一条状态日志）
@@ -201,9 +201,9 @@ public class CombatWindowLogGenerator {
             }
         }
 
-        // 如果没有新的战斗日志，显示指令响应
+        // 如果没有新的战斗日志，显示响应
         if (!hasNewLogs) {
-            builder.addState("指令响应", commandResult);
+            builder.addState("响应", commandResult);
         }
 
         // 2.5 参战方信息（当有新阵营加入时，前端需要更新参战方列表）

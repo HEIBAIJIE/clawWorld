@@ -95,12 +95,12 @@ public class UnifiedResponseGenerator {
 
         // 2. 根据窗口类型生成状态日志
         if (actualCurrentWindowType == CommandContext.WindowType.MAP) {
-            // 地图窗口：生成环境变化和指令响应
+            // 地图窗口：生成环境变化和响应
             // 只有当 playerId 不为 null 时才调用，避免 findById(null) 异常
             if (playerId != null) {
                 stateLogGenerator.generateMapStateLogs(builder, playerId, commandResult);
             } else {
-                builder.addState("指令响应", commandResult);
+                builder.addState("响应", commandResult);
             }
         } else if (actualCurrentWindowType == CommandContext.WindowType.COMBAT) {
             // 战斗窗口：生成战斗状态（增量日志）
@@ -124,13 +124,13 @@ public class UnifiedResponseGenerator {
                             // 稍后统一保存
                         }
                     } else {
-                        builder.addState("指令响应", commandResult);
+                        builder.addState("响应", commandResult);
                     }
                 } else {
-                    builder.addState("指令响应", commandResult);
+                    builder.addState("响应", commandResult);
                 }
             } else {
-                builder.addState("指令响应", commandResult);
+                builder.addState("响应", commandResult);
             }
         } else if (actualCurrentWindowType == CommandContext.WindowType.TRADE) {
             // 交易窗口：生成交易状态
@@ -142,13 +142,13 @@ public class UnifiedResponseGenerator {
                     if (trade != null) {
                         tradeWindowLogGenerator.generateTradeStateLogs(builder, trade, playerId, commandResult);
                     } else {
-                        builder.addState("指令响应", commandResult);
+                        builder.addState("响应", commandResult);
                     }
                 } else {
-                    builder.addState("指令响应", commandResult);
+                    builder.addState("响应", commandResult);
                 }
             } else {
-                builder.addState("指令响应", commandResult);
+                builder.addState("响应", commandResult);
             }
         } else if (actualCurrentWindowType == CommandContext.WindowType.SHOP) {
             // 商店窗口：生成商店状态
@@ -161,17 +161,17 @@ public class UnifiedResponseGenerator {
                     if (shopInfo != null) {
                         shopWindowLogGenerator.generateShopStateLogs(builder, shopInfo, player, commandResult);
                     } else {
-                        builder.addState("指令响应", commandResult);
+                        builder.addState("响应", commandResult);
                     }
                 } else {
-                    builder.addState("指令响应", commandResult);
+                    builder.addState("响应", commandResult);
                 }
             } else {
-                builder.addState("指令响应", commandResult);
+                builder.addState("响应", commandResult);
             }
         } else {
-            // 其他窗口：只返回指令响应
-            builder.addState("指令响应", commandResult);
+            // 其他窗口：只返回响应
+            builder.addState("响应", commandResult);
         }
 
         // 3. 如果窗口发生变化，添加窗口变化日志和新窗口内容
@@ -261,7 +261,7 @@ public class UnifiedResponseGenerator {
             }
         }
 
-        builder.addState("指令响应", errorMessage);
+        builder.addState("响应", errorMessage);
 
         // 如果窗口发生变化，添加窗口变化日志和新窗口内容
         if (newWindowType != null) {

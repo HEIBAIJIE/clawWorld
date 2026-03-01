@@ -944,9 +944,9 @@ export function useCommand() {
         }
         break
 
-      case '指令响应':
-        // 处理移动完成响应
-        const moveMatch = content.match(/移动完成，当前位置[：:]\s*\((\d+),\s*(\d+)\)/)
+      case '响应':
+        // 处理移动响应
+        const moveMatch = content.match(/移动至\((\d+),\s*(\d+)\)/)
         if (moveMatch) {
           const newX = parseInt(moveMatch[1])
           const newY = parseInt(moveMatch[2])
@@ -1147,13 +1147,13 @@ export function useCommand() {
           }
         }
 
-        // 处理战斗中的指令响应（包含战斗结果）
+        // 处理战斗中的响应（包含战斗结果）
         // 注意：即使 isInCombat 已经被重置，也要检查是否包含战斗结果
         if (combatStore.isInCombat || content.includes('获得胜利')) {
           processCombatCommandResponse(content)
         }
 
-        // 处理交易相关的指令响应
+        // 处理交易相关的响应
         if (tradeStore.isInTrade) {
           // 交易完成
           if (content.includes('交易完成')) {
@@ -1165,7 +1165,7 @@ export function useCommand() {
           }
         }
 
-        // 处理商店相关的指令响应
+        // 处理商店相关的响应
         if (shopStore.isInShop) {
           // 离开商店
           if (content.includes('离开商店')) {
@@ -1495,11 +1495,11 @@ export function useCommand() {
   }
 
   /**
-   * 处理战斗中的指令响应
+   * 处理战斗中的响应
    */
   function processCombatCommandResponse(content) {
     const result = parseCommandResponse(content)
-    console.log('[Command] 处理战斗指令响应:', result)
+    console.log('[Command] 处理战斗响应:', result)
 
     // 处理战斗动作特效
     for (const action of result.actions) {

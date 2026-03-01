@@ -83,7 +83,7 @@ public class GameLog {
     }
 
     /**
-     * 格式化时间戳 - 只显示小时和分钟
+     * 格式化时间戳 - 显示小时、分钟和秒
      */
     private String formatTimestamp(Long timestamp) {
         if (timestamp == null) {
@@ -93,9 +93,10 @@ public class GameLog {
         ZoneId zoneId = ZoneId.systemDefault();
         LocalDateTime dateTime = LocalDateTime.ofInstant(instant, zoneId);
 
-        return String.format("[%02d:%02d]",
+        return String.format("[%02d:%02d:%02d]",
             dateTime.getHour(),
-            dateTime.getMinute());
+            dateTime.getMinute(),
+            dateTime.getSecond());
     }
 
     /**

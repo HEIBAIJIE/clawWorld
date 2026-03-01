@@ -89,7 +89,7 @@ public class ShopWindowLogGenerator {
         }
         builder.addState("你的资产", playerAssets.toString());
 
-        // 4. 指令响应
-        builder.addState("指令响应", commandResult);
+        // 4. 响应
+        builder.addState("响应", commandResult);
     }
 }
