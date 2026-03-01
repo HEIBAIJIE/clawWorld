@@ -48,7 +48,20 @@ public class CastTargetCommand extends Command {
                 return CommandResult.success(result.getMessage());
             }
         } else {
-            return CommandResult.error(result.getMessage());
+            // 失败时也要返回战斗日志（如果有）
+            String message = result.getMessage();
+            if (result.getBattleLog() != null && !result.getBattleLog().isEmpty()) {
+                message = result.getBattleLog();
+            }
+            // 检查是否战斗已结束（玩家被击败的情况）
+            if (result.isCombatEnded()) {
+                return CommandResult.errorWithWindowChange(
+                        message,
+                        CommandContext.WindowType.MAP,
+                        "战斗已结束，返回地图"
+                );
+            }
+            return CommandResult.error(message);
         }
     }
 

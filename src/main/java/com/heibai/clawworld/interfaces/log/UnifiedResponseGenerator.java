@@ -63,7 +63,8 @@ public class UnifiedResponseGenerator {
 
         // 只有当 playerId 不为 null 时才查询账号信息
         // 避免查询 playerId=null 时返回多个未注册账号的问题
-        CommandContext.WindowType actualCurrentWindowType = currentWindowType;
+        // 如果newWindowType不为null，说明窗口已经切换，应该使用newWindowType作为实际窗口类型
+        CommandContext.WindowType actualCurrentWindowType = newWindowType != null ? newWindowType : currentWindowType;
         AccountEntity account = null;
         if (playerId != null) {
             Optional<AccountEntity> accountOpt = accountRepository.findByPlayerId(playerId);
@@ -124,9 +125,12 @@ public class UnifiedResponseGenerator {
                             // 稍后统一保存
                         }
                     } else {
+                        // 战斗已结束（combat为null），commandResult可能包含完整的战斗日志
+                        // 直接使用commandResult，它已经在CastCommand中被设置为battleLog
                         builder.addState("响应", commandResult);
                     }
                 } else {
+                    // 玩家没有combatId，可能战斗刚结束，commandResult包含战斗结果
                     builder.addState("响应", commandResult);
                 }
             } else {

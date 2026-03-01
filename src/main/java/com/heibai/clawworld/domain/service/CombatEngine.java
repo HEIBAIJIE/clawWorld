@@ -346,7 +346,31 @@ public class CombatEngine {
 
             CombatCharacter caster = combat.findCharacter(casterId);
             if (caster == null || !caster.isAlive()) {
-                return CombatActionResult.error("施法者不存在或已死亡");
+                log.info("[战斗 {}] 玩家 {} 已死亡或不存在，检查战斗状态", combatId, casterId);
+                // 玩家已死亡，检查战斗是否已结束
+                endInfoOpt = settlementService.getEndedCombatInfo(combatId);
+                if (endInfoOpt.isPresent()) {
+                    log.info("[战斗 {}] 从缓存中找到战斗结束信息", combatId);
+                    return settlementService.createCombatEndedResult(endInfoOpt.get(), casterId);
+                }
+                // 检查战斗实例是否已标记为结束
+                boolean isFinished = combat.isFinished();
+                log.info("[战斗 {}] combat.isFinished() = {}", combatId, isFinished);
+                if (isFinished) {
+                    // 战斗已结束，调用finishCombat进行结算
+                    log.info("[战斗 {}] 战斗已结束，调用finishCombat进行结算", combatId);
+                    List<String> endLogs = settlementService.finishCombat(combat, turnTimeoutManager, turnWaiters, createRemover(combatId));
+                    CombatActionResult result = CombatActionResult.error("施法者不存在或已死亡");
+                    result.setCombatEnded(true);
+                    result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+                    log.info("[战斗 {}] 返回战斗结束结果，combatEnded={}", combatId, result.isCombatEnded());
+                    return result;
+                }
+                // 战斗未结束但玩家已死亡（不应该发生，但作为兜底）
+                log.warn("[战斗 {}] 战斗未结束但玩家已死亡", combatId);
+                CombatActionResult result = CombatActionResult.error("施法者不存在或已死亡");
+                result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+                return result;
             }
 
             // 检查是否轮到该角色（不推进行动条，只查询当前状态）
@@ -407,12 +431,14 @@ public class CombatEngine {
             // 检查战斗是否结束
             if (combat.isFinished()) {
                 List<String> endLogs = settlementService.finishCombat(combat, turnTimeoutManager, turnWaiters, createRemover(combat.getCombatId()));
+                result.setCombatEnded(true);
                 if (endLogs != null) {
-                    result.setCombatEnded(true);
                     for (String log : endLogs) {
                         result.addLog(log);
                     }
                 }
+                // 即使endLogs为null（战斗已经被处理过），也要设置战斗日志
+                result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
                 return result;
             }
 
@@ -477,12 +503,14 @@ public class CombatEngine {
                 // 检查战斗是否因敌人行动而结束
                 if (combat.isFinished()) {
                     List<String> endLogs = settlementService.finishCombat(combat, turnTimeoutManager, turnWaiters, createRemover(combat.getCombatId()));
+                    result.setCombatEnded(true);
                     if (endLogs != null) {
-                        result.setCombatEnded(true);
                         for (String log : endLogs) {
                             result.addLog(log);
                         }
                     }
+                    // 即使endLogs为null（战斗已经被处理过），也要设置战斗日志
+                    result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
                     return result;
                 }
             }
@@ -566,23 +594,31 @@ public class CombatEngine {
 
         CombatCharacter caster = combat.findCharacter(casterId);
         if (caster == null || !caster.isAlive()) {
-            return CombatActionResult.error("施法者不存在或已死亡");
+            CombatActionResult result = CombatActionResult.error("施法者不存在或已死亡");
+            result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+            return result;
         }
 
         // 检查技能冷却
         if (caster.isSkillOnCooldown(skillId)) {
-            return CombatActionResult.error("技能冷却中");
+            CombatActionResult result = CombatActionResult.error("技能冷却中");
+            result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+            return result;
         }
 
         // 从技能配置中获取技能信息
         Skill skill = skillResolver.getSkillById(skillId);
         if (skill == null) {
-            return CombatActionResult.error("技能不存在");
+            CombatActionResult result = CombatActionResult.error("技能不存在");
+            result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+            return result;
         }
 
         // 检查法力值
         if (!caster.consumeMana(skill.getManaCost())) {
-            return CombatActionResult.error("法力值不足");
+            CombatActionResult result = CombatActionResult.error("法力值不足");
+            result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+            return result;
         }
 
         CombatActionResult result = new CombatActionResult();
@@ -662,8 +698,16 @@ public class CombatEngine {
             }
 
             CombatCharacter character = combat.findCharacter(characterId);
-            if (character == null) {
-                return CombatActionResult.error("角色不存在");
+            if (character == null || !character.isAlive()) {
+                // 角色不存在或已死亡，检查战斗是否已结束
+                endInfoOpt = settlementService.getEndedCombatInfo(combatId);
+                if (endInfoOpt.isPresent()) {
+                    return settlementService.createCombatEndedResult(endInfoOpt.get(), characterId);
+                }
+                // 战斗未结束但角色已死亡
+                CombatActionResult result = CombatActionResult.error("角色不存在或已死亡");
+                result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+                return result;
             }
 
             // 检查当前回合（不推进行动条）
@@ -745,8 +789,16 @@ public class CombatEngine {
             }
 
             CombatCharacter character = combat.findCharacter(characterId);
-            if (character == null) {
-                return CombatActionResult.error("角色不存在");
+            if (character == null || !character.isAlive()) {
+                // 角色不存在或已死亡，检查战斗是否已结束
+                endInfoOpt = settlementService.getEndedCombatInfo(combatId);
+                if (endInfoOpt.isPresent()) {
+                    return settlementService.createCombatEndedResult(endInfoOpt.get(), characterId);
+                }
+                // 战斗未结束但角色已死亡
+                CombatActionResult result = CombatActionResult.error("角色不存在或已死亡");
+                result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+                return result;
             }
 
             // 检查战斗是否结束
@@ -888,8 +940,16 @@ public class CombatEngine {
             }
 
             CombatCharacter character = combat.findCharacter(characterId);
-            if (character == null) {
-                return CombatActionResult.error("角色不存在");
+            if (character == null || !character.isAlive()) {
+                // 角色不存在或已死亡，检查战斗是否已结束
+                Optional<CombatSettlementService.CombatEndInfo> endInfoOpt = settlementService.getEndedCombatInfo(combatId);
+                if (endInfoOpt.isPresent()) {
+                    return settlementService.createCombatEndedResult(endInfoOpt.get(), characterId);
+                }
+                // 战斗未结束但角色已死亡
+                CombatActionResult result = CombatActionResult.error("角色不存在或已死亡");
+                result.setBattleLog(convertLogsToStrings(combat.getAllLogs()));
+                return result;
             }
 
             // 只有玩家可以撤退

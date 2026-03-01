@@ -166,6 +166,14 @@ public interface CombatService {
             return result;
         }
 
+        public static ActionResult error(String message, String battleLog) {
+            ActionResult result = new ActionResult();
+            result.success = false;
+            result.message = message;
+            result.battleLog = battleLog;
+            return result;
+        }
+
         public boolean isSuccess() {
             return success;
         }

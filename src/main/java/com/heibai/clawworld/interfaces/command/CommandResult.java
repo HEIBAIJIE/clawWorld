@@ -76,4 +76,15 @@ public class CommandResult {
                 .inventoryChanged(false)
                 .build();
     }
+
+    public static CommandResult errorWithWindowChange(String message, CommandContext.WindowType newWindowType, String windowContent) {
+        return CommandResult.builder()
+                .success(false)
+                .message(message)
+                .windowChanged(true)
+                .newWindowType(newWindowType)
+                .windowContent(windowContent)
+                .inventoryChanged(false)
+                .build();
+    }
 }

@@ -338,8 +338,19 @@ public class CombatServiceImpl implements CombatService {
 
             CombatEngine.CombatActionResult result = combatEngine.executeSkillWithWait(combatId, playerId, skillId, targetId);
 
+            log.info("executeSkillWithWait返回: success={}, combatEnded={}, message={}",
+                result.isSuccess(), result.isCombatEnded(), result.getMessage());
+
             if (!result.isSuccess()) {
-                return ActionResult.error(result.getMessage());
+                // 如果失败，也要返回战斗日志
+                String battleLog = result.getBattleLog() != null ? String.join("\n", result.getBattleLog()) : "";
+                if (result.isCombatEnded()) {
+                    log.info("战斗已结束，调用handleCombatEnd");
+                    endHandler.handleCombatEnd(combatId);
+                    return ActionResult.combatEnded(result.getMessage(), battleLog);
+                }
+                log.info("战斗未结束，返回错误");
+                return ActionResult.error(result.getMessage(), battleLog);
             }
 
             String battleLog = String.join("\n", result.getBattleLog());
@@ -376,7 +387,13 @@ public class CombatServiceImpl implements CombatService {
             CombatEngine.CombatActionResult result = combatEngine.executeSkillWithWait(combatId, playerId, skillId, target.getCharacterId());
 
             if (!result.isSuccess()) {
-                return ActionResult.error(result.getMessage());
+                // 如果失败，也要返回战斗日志
+                String battleLog = result.getBattleLog() != null ? String.join("\n", result.getBattleLog()) : "";
+                if (result.isCombatEnded()) {
+                    endHandler.handleCombatEnd(combatId);
+                    return ActionResult.combatEnded(result.getMessage(), battleLog);
+                }
+                return ActionResult.error(result.getMessage(), battleLog);
             }
 
             String battleLog = String.join("\n", result.getBattleLog());
@@ -499,7 +516,13 @@ public class CombatServiceImpl implements CombatService {
             CombatEngine.CombatActionResult result = combatEngine.skipTurnWithWait(combatId, playerId);
 
             if (!result.isSuccess()) {
-                return ActionResult.error(result.getMessage());
+                // 如果失败，也要返回战斗日志
+                String battleLog = result.getBattleLog() != null ? String.join("\n", result.getBattleLog()) : "";
+                if (result.isCombatEnded()) {
+                    endHandler.handleCombatEnd(combatId);
+                    return ActionResult.combatEnded(result.getMessage(), battleLog);
+                }
+                return ActionResult.error(result.getMessage(), battleLog);
             }
 
             String battleLog = String.join("\n", result.getBattleLog());
@@ -522,7 +545,13 @@ public class CombatServiceImpl implements CombatService {
             CombatEngine.CombatActionResult result = combatEngine.forfeit(combatId, playerId);
 
             if (!result.isSuccess()) {
-                return ActionResult.error(result.getMessage());
+                // 如果失败，也要返回战斗日志
+                String battleLog = result.getBattleLog() != null ? String.join("\n", result.getBattleLog()) : "";
+                if (result.isCombatEnded()) {
+                    endHandler.handleCombatEnd(combatId);
+                    return ActionResult.combatEnded(result.getMessage(), battleLog);
+                }
+                return ActionResult.error(result.getMessage(), battleLog);
             }
 
             if (result.isCombatEnded()) {
