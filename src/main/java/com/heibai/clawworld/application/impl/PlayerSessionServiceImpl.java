@@ -671,6 +671,23 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
             default -> attributeType;
         };
 
+        // 计算总四维（玩家自身 + 装备加成）- 与装备/卸装备保持一致
+        int totalStrength = player.getStrength();
+        int totalAgility = player.getAgility();
+        int totalIntelligence = player.getIntelligence();
+        int totalVitality = player.getVitality();
+
+        if (player.getEquipment() != null) {
+            for (Equipment eq : player.getEquipment().values()) {
+                if (eq != null) {
+                    totalStrength += eq.getStrength();
+                    totalAgility += eq.getAgility();
+                    totalIntelligence += eq.getIntelligence();
+                    totalVitality += eq.getVitality();
+                }
+            }
+        }
+
         String statusInfo = String.format(
             "添加属性点成功: %s +%d\n" +
             "当前属性：力量%d 敏捷%d 智力%d 体力%d\n" +
@@ -679,7 +696,7 @@ public class PlayerSessionServiceImpl implements PlayerSessionService {
             "物攻%d 物防%d 法攻%d 法防%d 速度%d\n" +
             "暴击率%.1f%% 暴击伤害%.1f%% 命中率%.1f%% 闪避率%.1f%%",
             attrName, amount,
-            player.getStrength(), player.getAgility(), player.getIntelligence(), player.getVitality(),
+            totalStrength, totalAgility, totalIntelligence, totalVitality,
             player.getFreeAttributePoints(),
             player.getCurrentHealth(), player.getMaxHealth(), player.getCurrentMana(), player.getMaxMana(),
             player.getPhysicalAttack(), player.getPhysicalDefense(), player.getMagicAttack(), player.getMagicDefense(), player.getSpeed(),

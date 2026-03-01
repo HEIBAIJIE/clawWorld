@@ -44,9 +44,26 @@ public class CharacterInfoServiceImpl implements CharacterInfoService {
         int requiredExp = player.getExperienceForNextLevel();
         int progressPercent = player.getExperienceProgressPercent();
         sb.append(String.format("经验: %d/%d (%d%%)  金币: %d\n", currentExp, requiredExp, progressPercent, player.getGold()));
+
+        // 计算总四维（玩家自身 + 装备加成）
+        int totalStrength = player.getStrength();
+        int totalAgility = player.getAgility();
+        int totalIntelligence = player.getIntelligence();
+        int totalVitality = player.getVitality();
+
+        if (player.getEquipment() != null) {
+            for (Equipment eq : player.getEquipment().values()) {
+                if (eq != null) {
+                    totalStrength += eq.getStrength();
+                    totalAgility += eq.getAgility();
+                    totalIntelligence += eq.getIntelligence();
+                    totalVitality += eq.getVitality();
+                }
+            }
+        }
+
         sb.append(String.format("力量%d 敏捷%d 智力%d 体力%d\n",
-            player.getStrength(), player.getAgility(),
-            player.getIntelligence(), player.getVitality()));
+            totalStrength, totalAgility, totalIntelligence, totalVitality));
         sb.append(String.format("生命%d/%d 法力%d/%d\n",
             player.getCurrentHealth(), player.getMaxHealth(),
             player.getCurrentMana(), player.getMaxMana()));
